@@ -63,7 +63,7 @@ La partida se disputa a un total de **21 Piedras**:
 
 ---
 
-## 🚀 Registro de Cambios Recientes (v1.0.0)
+## 🚀 Registro de Cambios Recientes (v1.0)
 
 * 🏷️ **Nueva Identidad "El Piedrero":** Actualización completa de la marca, títulos y manifiesto del sistema.
 * 📜 **Historial Persistente de Partidas:** Registro rotativo de las últimas 30 partidas con tarjetas de resultados detalladas (`HistoryScreen.kt` y `GameHistoryRepository.kt`).
