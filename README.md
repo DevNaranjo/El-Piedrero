@@ -52,13 +52,13 @@ La partida se disputa a un total de **21 Piedras**:
 
 | Jugada / Canto | Piedras Sumadas | Descripción | Audio Nativo (`assets/`) |
 | :--- | :---: | :--- | :--- |
-| **Ronda** | **+1** | Tres cartas del mismo índice / figura. | 🔊 `Ronda.mp3` |
-| **Parranda** | **+3** | Tres cartas correlativas de la misma mano. | 🔊 `Parranda.mp3` |
-| **Caracol** | **+4** | Cuatro cartas iguales o jugada mayor. | 🔊 `Caracol.mp3` |
-| **Caracolillo** | **+5** | Variante tradicional de 5 piedras. | 🔊 `Caracolillo.mp3` |
-| **Majo** | **+1** | Casar o majar la carta jugada por el rival. | 🔊 `Majo.mp3` |
-| **Limpiar** | **+1** | Dejar la mesa completamente limpia de cartas. | 🔊 `Limpio.mp3` |
-| **Majo y Limpio** | **+2** | Casar carta del contrario y limpiar la mesa a la vez. | 🔊 `Majo-y-limpio.mp3` |
+| **Ronda** | **+1** | 2 cartas iguales en la mano. | 🔊 `Ronda.mp3` |
+| **Parranda** | **+3** | 3 cartas iguales en la mano. | 🔊 `Parranda.mp3` |
+| **Caracol** | **+4** | 3 cartas correlativas de la mano. | 🔊 `Caracol.mp3` |
+| **Caracolillo** | **+5** | 3 cartas correlativas del mismo palo. | 🔊 `Caracolillo.mp3` |
+| **Majo** | **+1** | Tirar una carta igual que la que acaba de tirar la persona anterior. | 🔊 `Majo.mp3` |
+| **Limpiar** | **+1** | Recoger y dejar la mesa completamente limpia de cartas. | 🔊 `Limpio.mp3` |
+| **Majo y Limpio** | **+2** | Tirar carta igual que el contrario y limpiar la mesa a la vez. | 🔊 `Majo-y-limpio.mp3` |
 | **Ajuste (+ / -)** | **+1 / -1** | Modificación manual de piedras en cualquier momento. | 📳 Tock / Háptico |
 
 ---
