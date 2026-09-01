@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElPiedreroNetworkProtocol",
+  "description": "Protocolo unificado NDJSON para sincronización en tiempo real de Piedras (11 Malas / 10 Buenas), Cantos (Ronda, Parranda, Caracol, Caracolillo), Jugadas (Limpiar, Majo, Majo y Limpio), Audio Cues y Fin de Partida.",
+  "type": "object",
+  "required": ["type", "id", "timestamp", "senderId"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "JOIN_REQUEST",
+        "JOIN_RESPONSE",
+        "ROOM_CONFIG_UPDATE",
+        "SCORE_UPDATE",
+        "SOUND_TRIGGER",
+        "END_GAME",
+        "GAME_STATE_BROADCAST",
+        "HEARTBEAT_PING",
+        "HEARTBEAT_PONG"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp en milisegundos."
+    },
+    "senderId": {
+      "type": "string"
+    },
+    "joinRequest": {
+      "type": "object",
+      "properties": {
+        "playerName": { "type": "string" },
+        "clientVersion": { "type": "string" }
+      },
+      "required": ["playerName"]
+    },
+    "joinResponse": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "assignedTeam": {
+          "type": "string",
+          "enum": ["TEAM_A", "TEAM_B", "TEAM_C", "SPECTATOR"]
+        },
+        "errorMessage": { "type": ["string", "null"] },
+        "gameState": { "$ref": "#/$defs/GameState" }
+      },
+      "required": ["accepted", "assignedTeam"]
+    },
+    "roomConfigUpdate": {
+      "type": "object",
+      "properties": {
+        "teamAName": { "type": "string" },
+        "teamBName": { "type": "string" },
+        "teamCName": { "type": "string" },
+        "maxPlayers": { "type": "integer", "minimum": 2, "maximum": 4 }
+      }
+    },
+    "scoreUpdate": {
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "type": "string",
+          "enum": ["TEAM_A", "TEAM_B", "TEAM_C"]
+        },
+        "cantoType": {
+          "type": ["string", "null"],
+          "enum": [
+            "RONDA",
+            "PARRANDA",
+            "CARACOL",
+            "CARACOLILLO",
+            "LIMPIAR",
+            "MAJO",
+            "MAJO_Y_LIMPIO",
+            "MANUAL_ADJUST",
+            null
+          ]
+        },
+        "piedras": {
+          "type": "integer",
+          "description": "Piedras a sumar o restar."
+        },
+        "reason": { "type": "string" }
+      },
+      "required": ["teamId", "piedras"]
+    },
+    "soundTrigger": {
+      "type": "object",
+      "properties": {
+        "soundType": {
+          "type": "string",
+          "enum": [
+            "ENTERED_BUENAS",
+            "GAME_WON",
+            "CARD_PLAYED",
+            "CANTO_RONDA",
+            "CANTO_PARRANDA",
+            "CANTO_CARACOL",
+            "CANTO_CARACOLILLO",
+            "JUGADA_LIMPIAR",
+            "JUGADA_MAJO",
+            "JUGADA_MAJO_Y_LIMPIO"
+          ]
+        },
+        "teamId": {
+          "type": ["string", "null"],
+          "enum": ["TEAM_A", "TEAM_B", "TEAM_C", null]
+        }
+      },
+      "required": ["soundType"]
+    },
+    "endGame": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string" }
+      }
+    },
+    "gameStateBroadcast": {
+      "$ref": "#/$defs/GameState"
+    }
+  },
+  "$defs": {
+    "Player": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "team": {
+          "type": "string",
+          "enum": ["TEAM_A", "TEAM_B", "TEAM_C", "SPECTATOR"]
+        },
+        "isHost": { "type": "boolean" }
+      },
+      "required": ["id", "name", "team", "isHost"]
+    },
+    "TeamScore": {
+      "type": "object",
+      "properties": {
+        "totalPiedras": { "type": "integer", "minimum": 0, "maximum": 21 },
+        "malas": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "buenas": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "isInBuenas": { "type": "boolean" }
+      },
+      "required": ["totalPiedras", "malas", "buenas", "isInBuenas"]
+    },
+    "GameState": {
+      "type": "object",
+      "properties": {
+        "gameId": { "type": "string" },
+        "nameTeamA": { "type": "string" },
+        "nameTeamB": { "type": "string" },
+        "nameTeamC": { "type": "string" },
+        "scoreTeamA": { "$ref": "#/$defs/TeamScore" },
+        "scoreTeamB": { "$ref": "#/$defs/TeamScore" },
+        "scoreTeamC": { "$ref": "#/$defs/TeamScore" },
+        "maxPlayers": { "type": "integer", "enum": [2, 3, 4], "default": 4 },
+        "status": {
+          "type": "string",
+          "enum": ["WAITING", "PLAYING", "PAUSED", "FINISHED"]
+        },
+        "winnerTeam": {
+          "type": ["string", "null"],
+          "enum": ["TEAM_A", "TEAM_B", "TEAM_C", null]
+        },
+        "version": { "type": "integer" },
+        "connectedPlayers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Player" }
+        }
+      },
+      "required": [
+        "gameId",
+        "nameTeamA",
+        "nameTeamB",
+        "nameTeamC",
+        "scoreTeamA",
+        "scoreTeamB",
+        "scoreTeamC",
+        "maxPlayers",
+        "status",
+        "version",
+        "connectedPlayers"
+      ]
+    }
+  }
+}

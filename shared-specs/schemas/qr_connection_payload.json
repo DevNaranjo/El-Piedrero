@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RondaCanariaQRConnectionPayload",
+  "description": "Carga de datos codificada en el código QR del Host para la Ronda Canaria.",
+  "type": "object",
+  "required": ["ip", "port", "gameId", "hostName", "maxPlayers"],
+  "properties": {
+    "ip": {
+      "type": "string",
+      "format": "ipv4",
+      "description": "Dirección IPv4 local del Host."
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535,
+      "description": "Puerto TCP del socket del Host."
+    },
+    "gameId": {
+      "type": "string",
+      "description": "Identificador único de la sala / partida."
+    },
+    "hostName": {
+      "type": "string",
+      "description": "Nombre visible del Host."
+    },
+    "teamAName": {
+      "type": "string",
+      "default": "Equipo A"
+    },
+    "teamBName": {
+      "type": "string",
+      "default": "Equipo B"
+    },
+    "maxPlayers": {
+      "type": "integer",
+      "enum": [2, 3, 4],
+      "default": 4
+    }
+  }
+}

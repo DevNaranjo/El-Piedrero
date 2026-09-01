@@ -1,0 +1,50 @@
+# ==========================================
+# Android & Gradle (Open Source Project)
+# ==========================================
+.gradle/
+build/
+/*/build/
+app/build/
+
+# Local SDK and user machine paths
+local.properties
+.idea/
+.run/
+*.iml
+*/*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Output packaging artifacts
+*.apk
+!ElPiedrero.apk
+*.ap_
+*.aab
+*.dex
+output-metadata.json
+
+# Keystores & Signing Secrets
+*.keystore
+*.jks
+
+# Google Services & Analytics configs
+google-services.json
+
+# ==========================================
+# OS & Editors
+# ==========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.bak
+*~
+
+# Logs & Diagnostics
+*.log
+*.tmp
+hs_err_pid*
+replay_pid*

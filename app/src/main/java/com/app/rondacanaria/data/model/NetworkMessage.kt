@@ -1,0 +1,166 @@
+package com.app.rondacanaria.data.model
+
+import kotlinx.serialization.Serializable
+import java.util.UUID
+
+@Serializable
+enum class MessageType {
+    JOIN_REQUEST,
+    JOIN_RESPONSE,
+    ROOM_CONFIG_UPDATE,
+    SCORE_UPDATE,
+    SOUND_TRIGGER,
+    END_GAME,
+    GAME_STATE_BROADCAST,
+    HEARTBEAT_PING,
+    HEARTBEAT_PONG
+}
+
+@Serializable
+enum class Team {
+    TEAM_A,
+    TEAM_B,
+    TEAM_C,
+    SPECTATOR
+}
+
+@Serializable
+enum class GameStatus {
+    WAITING,
+    PLAYING,
+    PAUSED,
+    FINISHED
+}
+
+@Serializable
+enum class SoundType {
+    ENTERED_BUENAS,
+    GAME_WON,
+    CARD_PLAYED,
+    CANTO_RONDA,
+    CANTO_PARRANDA,
+    CANTO_CARACOL,
+    CANTO_CARACOLILLO,
+    JUGADA_LIMPIAR,
+    JUGADA_MAJO,
+    JUGADA_MAJO_Y_LIMPIO
+}
+
+@Serializable
+enum class CantoType(val defaultPiedras: Int, val displayName: String, val soundType: SoundType) {
+    RONDA(1, "Ronda (+1)", SoundType.CANTO_RONDA),
+    PARRANDA(3, "Parranda (+3)", SoundType.CANTO_PARRANDA),
+    CARACOL(4, "Caracol (+4)", SoundType.CANTO_CARACOL),
+    CARACOLILLO(5, "Caracolillo (+5)", SoundType.CANTO_CARACOLILLO),
+    LIMPIAR(1, "Limpiar (+1)", SoundType.JUGADA_LIMPIAR),
+    MAJO(1, "Majo (+1)", SoundType.JUGADA_MAJO),
+    MAJO_Y_LIMPIO(2, "Majo y Limpio (+2)", SoundType.JUGADA_MAJO_Y_LIMPIO),
+    MANUAL_ADJUST(0, "Ajuste Manual", SoundType.CARD_PLAYED)
+}
+
+@Serializable
+data class Player(
+    val id: String,
+    val name: String,
+    val team: Team,
+    val isHost: Boolean
+)
+
+@Serializable
+data class TeamScore(
+    val totalPiedras: Int = 0,
+    val malas: Int = 0,
+    val buenas: Int = 0,
+    val isInBuenas: Boolean = false
+) {
+    companion object {
+        const val MAX_MALAS = 11
+        const val MAX_BUENAS = 10
+        const val TOTAL_PIEDRAS_VICTORY = 21
+
+        fun calculate(total: Int): TeamScore {
+            val clampedTotal = total.coerceIn(0, TOTAL_PIEDRAS_VICTORY)
+            val malas = minOf(clampedTotal, MAX_MALAS)
+            val buenas = maxOf(0, clampedTotal - MAX_MALAS)
+            val inBuenas = clampedTotal >= MAX_MALAS
+            return TeamScore(
+                totalPiedras = clampedTotal,
+                malas = malas,
+                buenas = buenas,
+                isInBuenas = inBuenas
+            )
+        }
+    }
+}
+
+@Serializable
+data class GameState(
+    val gameId: String,
+    val nameTeamA: String = "Equipo A",
+    val nameTeamB: String = "Equipo B",
+    val nameTeamC: String = "Equipo C",
+    val scoreTeamA: TeamScore = TeamScore.calculate(0),
+    val scoreTeamB: TeamScore = TeamScore.calculate(0),
+    val scoreTeamC: TeamScore = TeamScore.calculate(0),
+    val maxPlayers: Int = 4,
+    val status: GameStatus = GameStatus.WAITING,
+    val winnerTeam: Team? = null,
+    val version: Long = 0L,
+    val connectedPlayers: List<Player> = emptyList()
+)
+
+@Serializable
+data class JoinRequestPayload(
+    val playerName: String,
+    val clientVersion: String = "1.0.0"
+)
+
+@Serializable
+data class JoinResponsePayload(
+    val accepted: Boolean,
+    val assignedTeam: Team,
+    val errorMessage: String? = null,
+    val gameState: GameState? = null
+)
+
+@Serializable
+data class RoomConfigPayload(
+    val teamAName: String? = null,
+    val teamBName: String? = null,
+    val teamCName: String? = null,
+    val maxPlayers: Int? = null
+)
+
+@Serializable
+data class ScoreUpdatePayload(
+    val teamId: Team,
+    val cantoType: CantoType? = null,
+    val piedras: Int,
+    val reason: String = ""
+)
+
+@Serializable
+data class SoundTriggerPayload(
+    val soundType: SoundType,
+    val teamId: Team? = null
+)
+
+@Serializable
+data class EndGamePayload(
+    val reason: String = "Partida finalizada manualmente"
+)
+
+@Serializable
+data class NetworkEnvelope(
+    val type: MessageType,
+    val id: String = UUID.randomUUID().toString(),
+    val timestamp: Long = System.currentTimeMillis(),
+    val senderId: String,
+    val joinRequest: JoinRequestPayload? = null,
+    val joinResponse: JoinResponsePayload? = null,
+    val roomConfigUpdate: RoomConfigPayload? = null,
+    val scoreUpdate: ScoreUpdatePayload? = null,
+    val soundTrigger: SoundTriggerPayload? = null,
+    val endGame: EndGamePayload? = null,
+    val gameStateBroadcast: GameState? = null
+)
