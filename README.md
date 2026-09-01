@@ -1,6 +1,8 @@
 # El Piedrero 📱🃏🪨
 ### Marcador Open Source de Piedras y Cantos para la Ronda Canaria
 
+[🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)

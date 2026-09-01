@@ -1,5 +1,7 @@
 # Guía de Contribución para El Piedrero 🤝
 
+[🇪🇸 Español](CONTRIBUTING.md) • [🇬🇧 English](CONTRIBUTING_EN.md)
+
 ¡Gracias por tu interés en colaborar con **El Piedrero**! Este es un proyecto de código abierto desarrollado para preservar y modernizar el conteo de la tradicional **Ronda Canaria**.
 
 ---
