@@ -13,7 +13,10 @@ data class ConnectionInfo(
     val teamAName: String = "Equipo A",
     val teamBName: String = "Equipo B",
     val teamCName: String = "Equipo C",
-    val maxPlayers: Int = 4
+    val teamDName: String = "Equipo D",
+    val maxPlayers: Int = 4,
+    val roomToken: String = "",
+    val secretKey: String = ""
 ) {
     fun toJson(): String {
         return Json.encodeToString(this)

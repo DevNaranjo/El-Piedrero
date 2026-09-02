@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
@@ -70,13 +71,22 @@ fun ScannerScreen(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                scanError?.let {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                val displayedError = uiState.errorMessage ?: scanError
+                displayedError?.let {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
                 }
             }
         }

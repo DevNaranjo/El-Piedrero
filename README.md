@@ -3,6 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
+[![Versión](https://img.shields.io/badge/Versión-1.0.02092026-orange.svg)](https://github.com/DevNaranjo/ElPiedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -20,6 +21,12 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 Si solo quieres instalar y jugar a la Ronda Canaria con tu familia y amigos:
 * Descarga el instalador listo para usar: **[`ElPiedrero.apk`](ElPiedrero.apk)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior.
+* **Verificación de Integridad (SHA-256):**
+  ```text
+  0484B51C4453376F233AFADA531DEC4F12B68BFFF6A7014351EC774D0546863A
+  ```
+  *(En PowerShell: `Get-FileHash ElPiedrero.apk -Algorithm SHA256` | En Linux/macOS: `sha256sum ElPiedrero.apk`)*
+* **Firma Oficial:** Certificado digital RSA 2048 bits a nombre de `DevNaranjo`.
 
 ---
 
@@ -36,10 +43,12 @@ Si solo quieres instalar y jugar a la Ronda Canaria con tu familia y amigos:
   * **2 Jugadores** (1 vs 1).
   * **3 Jugadores** (Trío con 3 equipos independientes: A, B y C).
   * **4 Jugadores** (2 vs 2 por parejas).
-* 🛡️ **Seguridad y Rendimiento de Red:**
-  * Protocolo seguro NDJSON con protección DoS ante desbordamiento de tramas (>32 KB).
-  * Validación estricta de piedras nominales en el servidor Host.
-  * Búfer reutilizable en CameraX para evitar recolecciones de basura del Garbage Collector a 60 FPS.
+* 🛡️ **Seguridad Criptográfica y Red Local:**
+  * **Cifrado AES-256-GCM Extremo a Extremo:** Toda la comunicación por Sockets TCP en la Wi-Fi local viaja cifrada con clave simétrica aleatoria de 256 bits generada por el Host y compartida únicamente a través del código QR físico.
+  * **Autenticación con Token de Sala:** Solo los jugadores que hayan escaneado presencialmente el código QR del anfitrión poseen el token de autorización para unirse.
+  * **Firma de Producción Oficial:** Compilado en modo Release y firmado con certificado propio de DevNaranjo (sin certificados genéricos de depuración ni flag `testOnly`).
+  * **Protocolo con Protección DoS:** Límite estricto de 32 KB por trama contra desbordamientos de memoria.
+  * **Búfer Reutilizable en CameraX:** Elimina pausas del Garbage Collector a 60 FPS al escanear el QR.
 
 ---
 
@@ -65,9 +74,20 @@ La partida se disputa a un total de **21 Piedras**:
 
 ---
 
-## 🚀 Registro de Cambios Recientes (v1.0)
+## 🚀 Registro de Cambios — v1.0.02092026
 
-* 🏷️ **Nueva Identidad "El Piedrero":** Actualización completa de la marca, títulos y manifiesto del sistema.
+### 🆕 Últimas Mejoras (02/09/2026)
+
+* 👤 **Nombres de jugador en 2 y 3 jugadores:** El nombre del equipo es directamente el nombre de cada jugador. En local se introduce al configurar la partida; en multijugador se asigna automáticamente al alias del jugador al conectarse mediante QR. No se puede cambiar de equipo en estos modos.
+* 💤 **Suplente en Tríos (3 jugadores):** Cualquier jugador puede ponerse en reserva (descanso/baño) para que los otros dos disputen un 1 vs 1, pudiendo reincorporarse en cualquier momento — **solo antes de contar la primera piedra**. Una vez iniciado el marcador, la opción de suplente queda bloqueada permanentemente hasta reiniciar la partida. Se muestra un aviso visual al respecto.
+* 🔒 **Sin reservas en 2 jugadores:** En partidas mano a mano no existe opción de suplente ni reserva bajo ningún concepto.
+* 🏠 **Modo Local limpio:** En partidas locales la barra superior muestra «Partida Local» sin menciones a «Anfitrión». El diálogo de gestión de equipos/suplente omite botones innecesarios y etiquetas de anfitrión.
+* 🔢 **Obligatoriedad de 2 equipos en reserva para 8 jugadores:** Con 4 equipos (A, B, C, D), es obligatorio tener exactamente 2 en reserva antes de poder iniciar la partida. El botón de inicio permanece deshabilitado hasta cumplir este requisito. La restricción se aplica en UI, ViewModel y capa de dominio.
+* ✏️ **Corrección de nombres en 2 y 3 jugadores:** Los nombres escritos por el usuario se respetan correctamente tanto en local como en multijugador, corrigiendo un bug que los reemplazaba con valores genéricos («Jugador 1», «Jugador 2»…).
+
+### 🏷️ Historial anterior
+
+* 🏷️ **Nueva Identidad «El Piedrero»:** Actualización completa de la marca, títulos y manifiesto del sistema.
 * 📜 **Historial Persistente de Partidas:** Registro rotativo de las últimas 30 partidas con tarjetas de resultados detalladas (`HistoryScreen.kt` y `GameHistoryRepository.kt`).
 * 🃏 **Nuevas Jugadas Tradicionales:** Incorporación de *Limpiar (+1)*, *Majo (+1)*, *Majo y Limpio (+2)* y variante *Caracolillo (+5)* con sus audios y hápticos asociados.
 * 🛡️ **Blindaje de Red y Anti-Trampas:** Límite estricto de 32 KB por trama en sockets TCP contra ataques DoS y validación de puntuaciones nominales en el servidor Host.
@@ -76,6 +96,7 @@ La partida se disputa a un total de **21 Piedras**:
 * 🌍 **Lanzamiento Open Source:** Repositorio estructurado bajo Licencia MIT con `CONTRIBUTING.md` y compilación portable con Gradle Toolchains.
 
 ---
+
 
 ## 🏗️ Arquitectura y Tecnologías
 

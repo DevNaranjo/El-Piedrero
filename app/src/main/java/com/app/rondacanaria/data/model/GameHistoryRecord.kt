@@ -16,5 +16,7 @@ data class GameHistoryRecord(
     val teamBPiedras: Int,
     val teamCName: String? = null,
     val teamCPiedras: Int? = null,
+    val teamDName: String? = null,
+    val teamDPiedras: Int? = null,
     val maxPlayers: Int = 4
 )

@@ -1,6 +1,7 @@
 package com.app.rondacanaria.data.network
 
 import com.app.rondacanaria.data.model.NetworkEnvelope
+import com.app.rondacanaria.data.network.crypto.RondaCipher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
+import javax.crypto.SecretKey
 
 sealed interface ClientConnectionState {
     data object Disconnected : ClientConnectionState
@@ -40,6 +42,19 @@ class SocketClient(
     private var clientScope: CoroutineScope? = null
     private var readJob: Job? = null
     private val writeMutex = Mutex()
+    private var secretKey: SecretKey? = null
+
+    fun setEncryptionKey(base64Key: String?) {
+        secretKey = if (!base64Key.isNullOrBlank()) {
+            try {
+                RondaCipher.parseKey(base64Key)
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+    }
 
     private val _connectionState = MutableStateFlow<ClientConnectionState>(ClientConnectionState.Disconnected)
     val connectionState: StateFlow<ClientConnectionState> = _connectionState.asStateFlow()
@@ -78,10 +93,20 @@ class SocketClient(
                             val line = readBoundedLine(newReader) ?: break // EOF
                             if (line.isNotBlank()) {
                                 try {
-                                    val envelope = json.decodeFromString<NetworkEnvelope>(line)
+                                    val currentKey = secretKey
+                                    val plainJson = if (currentKey != null) {
+                                        RondaCipher.decrypt(line.trim(), currentKey)
+                                    } else {
+                                        line
+                                    }
+                                    val envelope = json.decodeFromString<NetworkEnvelope>(plainJson)
                                     _incomingMessages.emit(envelope)
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                    if (secretKey != null) {
+                                        // Error de descifrado o clave incorrecta
+                                        break
+                                    }
                                 }
                             }
                         }
@@ -104,10 +129,16 @@ class SocketClient(
         if (_connectionState.value !is ClientConnectionState.Connected) return false
 
         return try {
-            val jsonString = json.encodeToString(message) + "\n"
+            val rawJson = json.encodeToString(message)
+            val currentKey = secretKey
+            val payloadToSend = if (currentKey != null) {
+                RondaCipher.encrypt(rawJson, currentKey) + "\n"
+            } else {
+                rawJson + "\n"
+            }
             writeMutex.withLock {
                 val currentWriter = writer ?: return false
-                currentWriter.write(jsonString)
+                currentWriter.write(payloadToSend)
                 currentWriter.flush()
             }
             true

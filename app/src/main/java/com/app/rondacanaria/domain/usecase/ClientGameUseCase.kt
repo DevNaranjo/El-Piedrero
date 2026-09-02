@@ -32,6 +32,7 @@ class ClientGameUseCase(
     private var targetHost: String = ""
     private var targetPort: Int = NetworkUtils.DEFAULT_PORT
     private var localPlayerName: String = "Jugador"
+    private var targetRoomToken: String = ""
     val localPlayerId: String = UUID.randomUUID().toString()
 
     private val _sessionStatus = MutableStateFlow(SessionStatus.IDLE)
@@ -49,10 +50,18 @@ class ClientGameUseCase(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    fun joinGame(host: String, port: Int = NetworkUtils.DEFAULT_PORT, playerName: String) {
+    fun joinGame(
+        host: String,
+        port: Int = NetworkUtils.DEFAULT_PORT,
+        playerName: String,
+        roomToken: String = "",
+        encryptionKey: String = ""
+    ) {
         this.targetHost = host
         this.targetPort = port
         this.localPlayerName = playerName
+        this.targetRoomToken = roomToken
+        this.socketClient.setEncryptionKey(encryptionKey)
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         useCaseScope = scope
@@ -74,7 +83,9 @@ class ClientGameUseCase(
             socketClient.connectionState.collect { state ->
                 when (state) {
                     is ClientConnectionState.Connected -> {
-                        _sessionStatus.value = SessionStatus.CONNECTED
+                        if (_sessionStatus.value != SessionStatus.RECONNECTING) {
+                            _sessionStatus.value = SessionStatus.CONNECTING
+                        }
                         reconnectJob?.cancel()
                         startHeartbeat()
                         sendJoinRequest()
@@ -115,7 +126,9 @@ class ClientGameUseCase(
             type = MessageType.JOIN_REQUEST,
             senderId = localPlayerId,
             joinRequest = JoinRequestPayload(
-                playerName = localPlayerName
+                playerName = localPlayerName,
+                clientVersion = "1.0",
+                roomToken = targetRoomToken
             )
         )
         socketClient.sendMessage(envelope)
@@ -130,8 +143,10 @@ class ClientGameUseCase(
                     response.gameState?.let { state ->
                         _gameState.value = state
                     }
+                    _sessionStatus.value = SessionStatus.CONNECTED
                 } else {
                     _errorMessage.value = response.errorMessage ?: "Conexión rechazada por el anfitrión."
+                    _sessionStatus.value = SessionStatus.ERROR
                     leaveGame()
                 }
             }
@@ -140,6 +155,10 @@ class ClientGameUseCase(
                 val current = _gameState.value
                 if (current == null || newState.version >= current.version) {
                     _gameState.value = newState
+                    val myPlayer = newState.connectedPlayers.find { it.id == localPlayerId }
+                    if (myPlayer != null && _myTeam.value != myPlayer.team) {
+                        _myTeam.value = myPlayer.team
+                    }
                 }
             }
             MessageType.SOUND_TRIGGER -> {
@@ -194,6 +213,30 @@ class ClientGameUseCase(
         socketClient.sendMessage(envelope)
     }
 
+    suspend fun requestSwitchTeam(targetTeam: Team) {
+        if (_gameState.value?.maxPlayers == 2) return
+        // En tríos, solo se puede usar suplente antes de contar cualquier piedra
+        if (_gameState.value?.maxPlayers == 3 && _gameState.value?.moveHistory?.isNotEmpty() == true) return
+        val envelope = NetworkEnvelope(
+            type = MessageType.SWITCH_TEAM,
+            senderId = localPlayerId,
+            switchTeam = SwitchTeamPayload(
+                playerId = localPlayerId,
+                targetTeam = targetTeam,
+                playerName = localPlayerName
+            )
+        )
+        socketClient.sendMessage(envelope)
+    }
+
+    suspend fun requestUndoLastMove() {
+        val envelope = NetworkEnvelope(
+            type = MessageType.UNDO_LAST_MOVE,
+            senderId = localPlayerId
+        )
+        socketClient.sendMessage(envelope)
+    }
+
     private fun startHeartbeat() {
         stopHeartbeat()
         heartbeatJob = useCaseScope?.launch {
@@ -241,9 +284,11 @@ class ClientGameUseCase(
     fun leaveGame() {
         stopHeartbeat()
         reconnectJob?.cancel()
+        socketClient.setEncryptionKey(null)
         socketClient.disconnect()
         useCaseScope?.cancel()
         useCaseScope = null
+        targetRoomToken = ""
         _sessionStatus.value = SessionStatus.DISCONNECTED
         _gameState.value = null
     }

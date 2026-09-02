@@ -13,7 +13,9 @@ enum class MessageType {
     END_GAME,
     GAME_STATE_BROADCAST,
     HEARTBEAT_PING,
-    HEARTBEAT_PONG
+    HEARTBEAT_PONG,
+    SWITCH_TEAM,
+    UNDO_LAST_MOVE
 }
 
 @Serializable
@@ -21,6 +23,8 @@ enum class Team {
     TEAM_A,
     TEAM_B,
     TEAM_C,
+    TEAM_D,
+    RESERVE,
     SPECTATOR
 }
 
@@ -43,7 +47,12 @@ enum class SoundType {
     CANTO_CARACOLILLO,
     JUGADA_LIMPIAR,
     JUGADA_MAJO,
-    JUGADA_MAJO_Y_LIMPIO
+    JUGADA_MAJO_Y_LIMPIO,
+    JUGADA_CONTRAMAJO,
+    JUGADA_REQUETEMAJO,
+    JUGADA_REQUETECONTRAMAJO,
+    PIEDRA_ADD,
+    PIEDRA_SUBTRACT
 }
 
 @Serializable
@@ -55,6 +64,9 @@ enum class CantoType(val defaultPiedras: Int, val displayName: String, val sound
     LIMPIAR(1, "Limpiar (+1)", SoundType.JUGADA_LIMPIAR),
     MAJO(1, "Majo (+1)", SoundType.JUGADA_MAJO),
     MAJO_Y_LIMPIO(2, "Majo y Limpio (+2)", SoundType.JUGADA_MAJO_Y_LIMPIO),
+    CONTRAMAJO(2, "Contramajo (+2)", SoundType.JUGADA_CONTRAMAJO),
+    REQUETEMAJO(3, "Requetemajo (+3)", SoundType.JUGADA_REQUETEMAJO),
+    REQUETECONTRAMAJO(4, "Requetecontramajo (+4)", SoundType.JUGADA_REQUETECONTRAMAJO),
     MANUAL_ADJUST(0, "Ajuste Manual", SoundType.CARD_PLAYED)
 }
 
@@ -94,25 +106,47 @@ data class TeamScore(
 }
 
 @Serializable
+data class GameMove(
+    val id: String = UUID.randomUUID().toString(),
+    val timestamp: Long = System.currentTimeMillis(),
+    val teamId: Team,
+    val deltaPiedras: Int,
+    val reason: String,
+    val previousTotalPiedras: Int,
+    val newTotalPiedras: Int,
+    val authorName: String? = null,
+    val previousReserveTeams: List<Team> = emptyList()
+)
+
+@Serializable
 data class GameState(
     val gameId: String,
     val nameTeamA: String = "Equipo A",
     val nameTeamB: String = "Equipo B",
     val nameTeamC: String = "Equipo C",
+    val nameTeamD: String = "Equipo D",
     val scoreTeamA: TeamScore = TeamScore.calculate(0),
     val scoreTeamB: TeamScore = TeamScore.calculate(0),
     val scoreTeamC: TeamScore = TeamScore.calculate(0),
+    val scoreTeamD: TeamScore = TeamScore.calculate(0),
+    val winsTeamA: Int = 0,
+    val winsTeamB: Int = 0,
+    val winsTeamC: Int = 0,
+    val winsTeamD: Int = 0,
     val maxPlayers: Int = 4,
     val status: GameStatus = GameStatus.WAITING,
     val winnerTeam: Team? = null,
     val version: Long = 0L,
-    val connectedPlayers: List<Player> = emptyList()
+    val connectedPlayers: List<Player> = emptyList(),
+    val moveHistory: List<GameMove> = emptyList(),
+    val reserveTeams: List<Team> = emptyList()
 )
 
 @Serializable
 data class JoinRequestPayload(
     val playerName: String,
-    val clientVersion: String = "1.0.0"
+    val clientVersion: String = "1.0",
+    val roomToken: String = ""
 )
 
 @Serializable
@@ -128,7 +162,16 @@ data class RoomConfigPayload(
     val teamAName: String? = null,
     val teamBName: String? = null,
     val teamCName: String? = null,
-    val maxPlayers: Int? = null
+    val teamDName: String? = null,
+    val maxPlayers: Int? = null,
+    val reserveTeams: List<Team>? = null
+)
+
+@Serializable
+data class SwitchTeamPayload(
+    val playerId: String,
+    val targetTeam: Team,
+    val playerName: String = ""
 )
 
 @Serializable
@@ -162,5 +205,6 @@ data class NetworkEnvelope(
     val scoreUpdate: ScoreUpdatePayload? = null,
     val soundTrigger: SoundTriggerPayload? = null,
     val endGame: EndGamePayload? = null,
+    val switchTeam: SwitchTeamPayload? = null,
     val gameStateBroadcast: GameState? = null
 )

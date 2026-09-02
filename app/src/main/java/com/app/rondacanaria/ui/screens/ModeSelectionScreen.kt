@@ -13,8 +13,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.app.rondacanaria.R
+import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 
@@ -29,6 +36,9 @@ fun ModeSelectionScreen(
     var localTeamA by remember { mutableStateOf("Equipo A") }
     var localTeamB by remember { mutableStateOf("Equipo B") }
     var localTeamC by remember { mutableStateOf("Equipo C") }
+    var localTeamD by remember { mutableStateOf("Equipo D") }
+    var localReserve6 by remember { mutableStateOf(Team.TEAM_C) }
+    var localReserves8 by remember { mutableStateOf(setOf(Team.TEAM_C, Team.TEAM_D)) }
 
     Scaffold(
         topBar = {
@@ -50,10 +60,20 @@ fun ModeSelectionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(20.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.app_logo),
+                contentDescription = "Logo El Piedrero",
+                modifier = Modifier
+                    .size(115.dp)
+                    .clip(CircleShape)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "¿Cómo vas a jugar hoy?",
                 style = MaterialTheme.typography.headlineMedium,
@@ -65,7 +85,7 @@ fun ModeSelectionScreen(
                 text = "Selecciona la modalidad para iniciar la mesa",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 28.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
             )
 
             // Opción 1: Marcador Local (1 Dispositivo)
@@ -184,7 +204,8 @@ fun ModeSelectionScreen(
                 Text(
                     text = "Historial de Partidas (Últimas 30)",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -194,25 +215,27 @@ fun ModeSelectionScreen(
     if (showLocalSetupDialog) {
         AlertDialog(
             onDismissRequest = { showLocalSetupDialog = false },
-            title = { Text("Configurar Partida Local") },
+            title = { Text("Configurar Partida Local", textAlign = TextAlign.Center) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Capacidad de la mesa:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
-                            2 to "1 vs 1",
+                            2 to "1v1",
                             3 to "Trío",
-                            4 to "Parejas"
+                            4 to "2x2",
+                            6 to "3x2",
+                            8 to "4x2"
                         ).forEach { (count, subtext) ->
                             val isSelected = localMaxPlayers == count
                             OutlinedButton(
                                 onClick = { localMaxPlayers = count },
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = if (isSelected) {
                                     ButtonDefaults.outlinedButtonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -228,28 +251,52 @@ fun ModeSelectionScreen(
                                     width = if (isSelected) 2.dp else 1.dp,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                                 ),
-                                contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                                contentPadding = PaddingValues(vertical = 6.dp, horizontal = 2.dp)
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
                                         text = "$count",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Black
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black,
+                                        textAlign = TextAlign.Center
                                     )
                                     Text(
                                         text = subtext,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
                         }
                     }
 
+                    val modeDescription = when (localMaxPlayers) {
+                        2 -> "👤 Mano a Mano: 1 contra 1 (Sin reservas)"
+                        3 -> "👥 En Trío (1 vs 1 vs 1): Si alguien va al baño o no juega una mano, se puede poner en reserva para seguir jugando 1 vs 1 sin tener que reiniciar."
+                        4 -> "👥 Por Parejas: 2 contra 2 (4 jugadores)"
+                        6 -> "👥 6 Jugadores: 3 equipos de 2 (A, B y C con reservas)"
+                        else -> "👥 8 Jugadores: 4 equipos de 2 (A, B, C y D con reservas)"
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = modeDescription,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+
                     OutlinedTextField(
                         value = localTeamA,
                         onValueChange = { localTeamA = it },
-                        label = { Text(if (localMaxPlayers == 3) "Jugador / Equipo A" else "Nombre Equipo A") },
+                        label = { Text(if (localMaxPlayers in listOf(2, 3)) "Nombre Jugador 1" else "Nombre Equipo A") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -257,38 +304,162 @@ fun ModeSelectionScreen(
                     OutlinedTextField(
                         value = localTeamB,
                         onValueChange = { localTeamB = it },
-                        label = { Text(if (localMaxPlayers == 3) "Jugador / Equipo B" else "Nombre Equipo B") },
+                        label = { Text(if (localMaxPlayers in listOf(2, 3)) "Nombre Jugador 2" else "Nombre Equipo B") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    if (localMaxPlayers == 3) {
+                    if (localMaxPlayers in listOf(3, 6, 8)) {
                         OutlinedTextField(
                             value = localTeamC,
                             onValueChange = { localTeamC = it },
-                            label = { Text("Jugador / Equipo C") },
+                            label = { Text(if (localMaxPlayers == 3) "Nombre Jugador 3" else "Nombre Equipo C") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+
+                    if (localMaxPlayers == 8) {
+                        OutlinedTextField(
+                            value = localTeamD,
+                            onValueChange = { localTeamD = it },
+                            label = { Text("Nombre Equipo D") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Selector de equipo en reserva para 6 jugadores (3 equipos de 2)
+                    if (localMaxPlayers == 6) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Equipo que estará en reserva:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Solo jugarán 2 equipos a la vez. El equipo en reserva esperará su turno y no saldrá en el marcador.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                Team.TEAM_A to localTeamA,
+                                Team.TEAM_B to localTeamB,
+                                Team.TEAM_C to localTeamC
+                            ).forEach { (team, label) ->
+                                val isReserve = localReserve6 == team
+                                FilterChip(
+                                    selected = isReserve,
+                                    onClick = { localReserve6 = team },
+                                    label = {
+                                        Text(
+                                            text = if (isReserve) "💤 Reserva ($label)" else label,
+                                            fontSize = 11.sp,
+                                            maxLines = 2,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    // Selector de equipos en reserva para 8 jugadores (4 equipos de 2)
+                    if (localMaxPlayers == 8) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Equipos que estarán en reserva (2 equipos):",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Solo los 2 equipos activos saldrán en el marcador para no saturar la pantalla.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                Team.TEAM_A to localTeamA,
+                                Team.TEAM_B to localTeamB,
+                                Team.TEAM_C to localTeamC,
+                                Team.TEAM_D to localTeamD
+                            ).chunked(2).forEach { rowTeams ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    rowTeams.forEach { (team, label) ->
+                                        val isReserve = localReserves8.contains(team)
+                                        FilterChip(
+                                            selected = isReserve,
+                                            onClick = {
+                                                if (isReserve) {
+                                                    if (localReserves8.size > 1) {
+                                                        localReserves8 = localReserves8 - team
+                                                    }
+                                                } else {
+                                                    if (localReserves8.size < 2) {
+                                                        localReserves8 = localReserves8 + team
+                                                    } else {
+                                                        localReserves8 = setOf(localReserves8.last(), team)
+                                                    }
+                                                }
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = if (isReserve) "💤 Reserva ($label)" else label,
+                                                    fontSize = 11.5.sp,
+                                                    maxLines = 2,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
             confirmButton = {
                 Button(onClick = {
                     showLocalSetupDialog = false
+                    val reserves = when (localMaxPlayers) {
+                        6 -> listOf(localReserve6)
+                        8 -> localReserves8.toList()
+                        else -> emptyList()
+                    }
+                    val finalTeamA = if (localMaxPlayers in listOf(2, 3)) localTeamA.ifBlank { "Jugador 1" } else localTeamA.ifBlank { "Equipo A" }
+                    val finalTeamB = if (localMaxPlayers in listOf(2, 3)) localTeamB.ifBlank { "Jugador 2" } else localTeamB.ifBlank { "Equipo B" }
+                    val finalTeamC = if (localMaxPlayers == 3) localTeamC.ifBlank { "Jugador 3" } else localTeamC.ifBlank { "Equipo C" }
+                    val finalTeamD = localTeamD.ifBlank { "Equipo D" }
+
                     viewModel.startLocalGame(
-                        teamA = localTeamA,
-                        teamB = localTeamB,
-                        teamC = localTeamC,
-                        maxPlayers = localMaxPlayers
+                        teamA = finalTeamA,
+                        teamB = finalTeamB,
+                        teamC = finalTeamC,
+                        teamD = finalTeamD,
+                        maxPlayers = localMaxPlayers,
+                        reserveTeams = reserves
                     )
                 }) {
-                    Text("Empezar Partida")
+                    Text("Empezar Partida", textAlign = TextAlign.Center)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLocalSetupDialog = false }) {
-                    Text("Cancelar")
+                    Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
         )

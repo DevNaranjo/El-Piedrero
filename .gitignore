@@ -28,6 +28,8 @@ output-metadata.json
 # Keystores & Signing Secrets
 *.keystore
 *.jks
+keystore.properties
+signing.properties
 
 # Google Services & Analytics configs
 google-services.json
@@ -48,3 +50,28 @@ Desktop.ini
 *.tmp
 hs_err_pid*
 replay_pid*
+
+# ==========================================
+# Windows specifics
+# ==========================================
+$RECYCLE.BIN/
+*.lnk
+
+# ==========================================
+# IntelliJ / Android Studio extras
+# ==========================================
+.idea/shelf/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/caches/
+.idea/modules.xml
+*.hprof
+
+# ==========================================
+# AI / Dev Tools scratch files
+# ==========================================
+.gemini/
+.aider*
+.cursor/

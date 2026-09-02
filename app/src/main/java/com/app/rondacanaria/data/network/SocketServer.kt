@@ -1,6 +1,7 @@
 package com.app.rondacanaria.data.network
 
 import com.app.rondacanaria.data.model.NetworkEnvelope
+import com.app.rondacanaria.data.network.crypto.RondaCipher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
+import javax.crypto.SecretKey
 
 sealed interface ServerEvent {
     data class ClientConnected(val clientId: String, val remoteAddress: String) : ServerEvent
@@ -38,6 +40,19 @@ class SocketServer(
     private var serverSocket: ServerSocket? = null
     private var serverScope: CoroutineScope? = null
     private var acceptJob: Job? = null
+    private var secretKey: SecretKey? = null
+
+    fun setEncryptionKey(base64Key: String?) {
+        secretKey = if (!base64Key.isNullOrBlank()) {
+            try {
+                RondaCipher.parseKey(base64Key)
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+    }
 
     private val _serverEvents = MutableSharedFlow<ServerEvent>(extraBufferCapacity = 64)
     val serverEvents: SharedFlow<ServerEvent> = _serverEvents.asSharedFlow()
@@ -109,10 +124,20 @@ class SocketServer(
                     val line = readBoundedLine(reader) ?: break // EOF (cliente desconectado)
                     if (line.isNotBlank()) {
                         try {
-                            val envelope = json.decodeFromString<NetworkEnvelope>(line)
+                            val currentKey = secretKey
+                            val plainJson = if (currentKey != null) {
+                                RondaCipher.decrypt(line.trim(), currentKey)
+                            } else {
+                                line
+                            }
+                            val envelope = json.decodeFromString<NetworkEnvelope>(plainJson)
                             _serverEvents.emit(ServerEvent.MessageReceived(clientId, envelope))
                         } catch (parseError: Exception) {
                             _serverEvents.emit(ServerEvent.Error(parseError))
+                            // Si el descifrado falla (trama corrupta o ataque de inyección), cerrar la sesión
+                            if (secretKey != null) {
+                                break
+                            }
                         }
                     }
                 }
@@ -127,12 +152,18 @@ class SocketServer(
     }
 
     suspend fun broadcast(message: NetworkEnvelope) {
-        val jsonString = json.encodeToString(message) + "\n"
+        val rawJson = json.encodeToString(message)
+        val currentKey = secretKey
+        val payloadToSend = if (currentKey != null) {
+            RondaCipher.encrypt(rawJson, currentKey) + "\n"
+        } else {
+            rawJson + "\n"
+        }
         activeClients.values.forEach { session ->
             serverScope?.launch {
                 try {
                     session.writeMutex.withLock {
-                        session.writer.write(jsonString)
+                        session.writer.write(payloadToSend)
                         session.writer.flush()
                     }
                 } catch (e: Exception) {
@@ -144,10 +175,16 @@ class SocketServer(
 
     suspend fun sendToClient(clientId: String, message: NetworkEnvelope): Boolean {
         val session = activeClients[clientId] ?: return false
-        val jsonString = json.encodeToString(message) + "\n"
+        val rawJson = json.encodeToString(message)
+        val currentKey = secretKey
+        val payloadToSend = if (currentKey != null) {
+            RondaCipher.encrypt(rawJson, currentKey) + "\n"
+        } else {
+            rawJson + "\n"
+        }
         return try {
             session.writeMutex.withLock {
-                session.writer.write(jsonString)
+                session.writer.write(payloadToSend)
                 session.writer.flush()
             }
             true
@@ -157,7 +194,7 @@ class SocketServer(
         }
     }
 
-    private fun disconnectClient(clientId: String) {
+    fun disconnectClient(clientId: String) {
         val session = activeClients.remove(clientId)
         if (session != null) {
             try {

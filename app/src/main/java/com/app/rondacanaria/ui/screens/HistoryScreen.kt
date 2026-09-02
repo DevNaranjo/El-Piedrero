@@ -99,12 +99,12 @@ fun HistoryScreen(
                         showClearDialog = false
                     }
                 ) {
-                    Text("Borrar todo", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text("Borrar todo", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancelar")
+                    Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
         )
@@ -214,6 +214,13 @@ fun HistoryCard(record: GameHistoryRecord) {
                         name = record.teamCName,
                         score = record.teamCPiedras,
                         isWinner = record.winnerTeam == Team.TEAM_C
+                    )
+                }
+                if (record.teamDName != null && record.teamDPiedras != null) {
+                    TeamScoreColumn(
+                        name = record.teamDName,
+                        score = record.teamDPiedras,
+                        isWinner = record.winnerTeam == Team.TEAM_D
                     )
                 }
             }

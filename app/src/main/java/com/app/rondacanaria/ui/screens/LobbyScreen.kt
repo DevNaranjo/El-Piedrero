@@ -12,8 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 
@@ -27,7 +29,10 @@ fun LobbyScreen(
     var teamAName by remember { mutableStateOf(uiState.teamAName) }
     var teamBName by remember { mutableStateOf(uiState.teamBName) }
     var teamCName by remember { mutableStateOf(uiState.teamCName) }
+    var teamDName by remember { mutableStateOf(uiState.teamDName) }
     var maxPlayers by remember { mutableStateOf(uiState.maxPlayers) }
+    var hostReserve6 by remember { mutableStateOf(Team.TEAM_C) }
+    var hostReserves8 by remember { mutableStateOf(setOf(Team.TEAM_C, Team.TEAM_D)) }
     var showHostDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -91,7 +96,7 @@ fun LobbyScreen(
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Crear Mesa (Host con QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Crear Mesa (Host con QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -105,7 +110,7 @@ fun LobbyScreen(
             ) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Unirse a Mesa (Escanear QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Unirse a Mesa (Escanear QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             }
         }
     }
@@ -120,18 +125,20 @@ fun LobbyScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
-                            2 to "1 vs 1",
+                            2 to "1v1",
                             3 to "Trío",
-                            4 to "Parejas"
+                            4 to "2x2",
+                            6 to "3x2",
+                            8 to "4x2"
                         ).forEach { (count, subtext) ->
                             val isSelected = maxPlayers == count
                             OutlinedButton(
                                 onClick = { maxPlayers = count },
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = if (isSelected) {
                                     ButtonDefaults.outlinedButtonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -147,18 +154,20 @@ fun LobbyScreen(
                                     width = if (isSelected) 2.dp else 1.dp,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                                 ),
-                                contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                                contentPadding = PaddingValues(vertical = 6.dp, horizontal = 2.dp)
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
                                         text = "$count",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Black
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black,
+                                        textAlign = TextAlign.Center
                                     )
                                     Text(
                                         text = subtext,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -166,9 +175,11 @@ fun LobbyScreen(
                     }
 
                     val modeDescription = when (maxPlayers) {
-                        2 -> "👤 Mano a Mano: 1 contra 1 (Individual)"
-                        3 -> "👥 En Trío: 3 jugadores en mesa (A, B y C)"
-                        else -> "👥 Por Parejas: 2 contra 2 (4 jugadores)"
+                        2 -> "👤 Mano a Mano: 1 contra 1 (Sin reservas)"
+                        3 -> "👥 En Trío (1 vs 1 vs 1): Si alguien va al baño o no juega una mano, puede ponerse en reserva para seguir jugando 1 vs 1 sin cambiar de sala."
+                        4 -> "👥 Por Parejas: 2 contra 2 (4 jugadores)"
+                        6 -> "👥 6 Jugadores: 3 equipos de 2 (A, B y C con reservas)"
+                        else -> "👥 8 Jugadores: 4 equipos de 2 (A, B, C y D con reservas)"
                     }
 
                     Surface(
@@ -185,45 +196,181 @@ fun LobbyScreen(
                         )
                     }
 
-                    OutlinedTextField(
-                        value = teamAName,
-                        onValueChange = { teamAName = it },
-                        label = { Text(if (maxPlayers == 3) "Jugador / Equipo A" else "Nombre Equipo A") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = teamBName,
-                        onValueChange = { teamBName = it },
-                        label = { Text(if (maxPlayers == 3) "Jugador / Equipo B" else "Nombre Equipo B") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (maxPlayers == 3) {
+                    if (maxPlayers in listOf(2, 3)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "👤 En partidas de $maxPlayers jugadores, el nombre del equipo es automáticamente el nombre de cada jugador al conectarse (sin elección de equipo).",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                            )
+                        }
+                    } else {
                         OutlinedTextField(
-                            value = teamCName,
-                            onValueChange = { teamCName = it },
-                            label = { Text("Jugador / Equipo C") },
+                            value = teamAName,
+                            onValueChange = { teamAName = it },
+                            label = { Text("Nombre Equipo A") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        OutlinedTextField(
+                            value = teamBName,
+                            onValueChange = { teamBName = it },
+                            label = { Text("Nombre Equipo B") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (maxPlayers in listOf(6, 8)) {
+                            OutlinedTextField(
+                                value = teamCName,
+                                onValueChange = { teamCName = it },
+                                label = { Text("Nombre Equipo C") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        if (maxPlayers == 8) {
+                            OutlinedTextField(
+                                value = teamDName,
+                                onValueChange = { teamDName = it },
+                                label = { Text("Nombre Equipo D") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    // Selector de equipo en reserva para 6 jugadores (3 equipos de 2)
+                    if (maxPlayers == 6) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Equipo que estará en reserva:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Solo jugarán 2 equipos a la vez. El equipo en reserva esperará su turno y no saldrá en el marcador.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            listOf(
+                                Team.TEAM_A to teamAName,
+                                Team.TEAM_B to teamBName,
+                                Team.TEAM_C to teamCName
+                            ).forEach { (team, label) ->
+                                val isReserve = hostReserve6 == team
+                                FilterChip(
+                                    selected = isReserve,
+                                    onClick = { hostReserve6 = team },
+                                    label = {
+                                        Text(
+                                            text = if (isReserve) "💤 Reserva ($label)" else label,
+                                            fontSize = 11.sp,
+                                            maxLines = 2,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    // Selector de equipos en reserva para 8 jugadores (4 equipos de 2)
+                    if (maxPlayers == 8) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Equipos que estarán en reserva (2 equipos):",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Solo los 2 equipos activos saldrán en el marcador para no saturar la pantalla.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                Team.TEAM_A to teamAName,
+                                Team.TEAM_B to teamBName,
+                                Team.TEAM_C to teamCName,
+                                Team.TEAM_D to teamDName
+                            ).chunked(2).forEach { rowTeams ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    rowTeams.forEach { (team, label) ->
+                                        val isReserve = hostReserves8.contains(team)
+                                        FilterChip(
+                                            selected = isReserve,
+                                            onClick = {
+                                                if (isReserve) {
+                                                    if (hostReserves8.size > 1) {
+                                                        hostReserves8 = hostReserves8 - team
+                                                    }
+                                                } else {
+                                                    if (hostReserves8.size < 2) {
+                                                        hostReserves8 = hostReserves8 + team
+                                                    } else {
+                                                        hostReserves8 = setOf(hostReserves8.last(), team)
+                                                    }
+                                                }
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = if (isReserve) "💤 Reserva ($label)" else label,
+                                                    fontSize = 11.5.sp,
+                                                    maxLines = 2,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.setRoomConfig(teamAName, teamBName, teamCName, maxPlayers)
-                    viewModel.startHosting()
+                    val selectedReserves = when (maxPlayers) {
+                        6 -> listOf(hostReserve6)
+                        8 -> hostReserves8.toList()
+                        else -> emptyList()
+                    }
+                    val finalA = if (maxPlayers in listOf(2, 3)) uiState.playerName.ifBlank { "Jugador 1" } else teamAName
+                    val finalB = if (maxPlayers in listOf(2, 3)) "" else teamBName
+                    val finalC = if (maxPlayers in listOf(2, 3)) "" else teamCName
+                    viewModel.setRoomConfig(finalA, finalB, finalC, teamDName, maxPlayers, selectedReserves)
+                    viewModel.startHosting(selectedReserves)
                     showHostDialog = false
                 }) {
-                    Text("Abrir Mesa")
+                    Text("Abrir Mesa", textAlign = TextAlign.Center)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showHostDialog = false }) {
-                    Text("Cancelar")
+                    Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
         )
