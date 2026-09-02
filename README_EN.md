@@ -3,6 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
+[![Version](https://img.shields.io/badge/Version-1.0.02092026.2-orange.svg)](https://github.com/DevNaranjo/ElPiedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -73,7 +74,22 @@ The game is played to a total of **21 Stones ("Piedras")**:
 
 ---
 
-## 🚀 Recent Changelog (v1.0)
+## 🚀 Changelog — v1.0.02092026.2
+
+### 🆕 Latest Improvements (v1.0.02092026.2)
+
+* 🛡️ **Network Hardening & Socket Security:** Automatic discard on Host of unauthorized remote control commands (`ROOM_CONFIG_UPDATE` and `END_GAME`) from clients; table configuration and game termination are strictly restricted to the local Host console.
+* 🔒 **Strict Network Policy:** Removed `android:usesCleartextTraffic` and added `network_security_config.xml` with `cleartextTrafficPermitted="false"` to prevent any unencrypted HTTP traffic.
+* ⚡ **Direct Audio Streaming (Zero Disk I/O):** `RondaAudioPlayer` now streams audio directly from the APK asset descriptor (`AssetFileDescriptor`), eliminating unnecessary disk writes on device flash memory.
+* 🚀 **Compose Memoization:** Memoized deal history grouping and sorting in `ScoreBoardScreen.kt` with `remember(history)` to prevent redundant recalculations during recomposition.
+* 🧹 **ViewModel Lifecycle Cleanup:** Explicit socket server and client cleanup in `ScoreViewModel.onCleared()` to prevent background coroutine or connection leaks.
+* 📐 **Refactored 2-Column Call Buttons:** Symmetric 5x2 grid with `Modifier.weight(1f)`, 48 dp height, 12 dp rounded corners, Material 3 color hierarchy, and `TextOverflow.Ellipsis`.
+* ♿ **Accessible Stone Scoring Buttons (48 dp):** Continuous full-width horizontal bar for manual stone adjustments (`-`, `+`, `+N`) with 48 dp minimum touch target and bold `titleMedium` typography for seniors.
+* 🃏 **Deal Stepper Normalization:** Card dealing stepper buttons normalized to 44x44 dp with generous spacing around the central ordinal indicator.
+* 🔊 **Independent Parallel Audio Channels:** Stone adjust sounds no longer interrupt or cut off the "¡Buenas!" audio.
+* ⚙️ **CI/CD & GitHub Actions:** Automatic keystore generation on CI runners when private signing keys are absent, plus dedicated ProGuard/R8 rules in `app/proguard-rules.pro`.
+
+### 🏷️ Previous History (v1.0.02092026)
 
 * 🏷️ **New Identity "El Piedrero":** Complete update of brand, titles, and system manifest.
 * 📜 **Persistent Game History:** Rotating history of the last 30 games with detailed scorecards (`HistoryScreen.kt` & `GameHistoryRepository.kt`).
