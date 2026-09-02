@@ -140,7 +140,7 @@ fun HostLobbyScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "💡 En partidas de 3 cada jugador es su propio equipo. Si alguien va al baño o no juega una mano, toca su estado y ponlo como 'Suplente' para seguir jugando 1 vs 1 sin cambiar de sala.",
+                        text = "💡 En partidas de 3 cada jugador es su propio equipo. Si alguien va al baño o no juega una mano, pulsa su botón 'Reserva' para seguir jugando 1 vs 1 sin cambiar de sala.",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -204,125 +204,131 @@ fun HostLobbyScreen(
                                 }
                             }
 
-                            var showTeamMenu by remember { mutableStateOf(false) }
-                            Box {
-                                val isTwoPlayers = (uiState.gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
-                                val canInteractWithTeam = !isTwoPlayers
+                            val isTwoPlayers = (uiState.gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
 
-                                Surface(
-                                    color = when (player.team) {
-                                        Team.TEAM_A -> MaterialTheme.colorScheme.primaryContainer
-                                        Team.TEAM_B -> MaterialTheme.colorScheme.secondaryContainer
-                                        Team.TEAM_C -> MaterialTheme.colorScheme.tertiaryContainer
-                                        Team.TEAM_D -> MaterialTheme.colorScheme.surfaceVariant
-                                        Team.RESERVE -> Color(0xFFFFE082)
-                                        Team.SPECTATOR -> MaterialTheme.colorScheme.surfaceVariant
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = if (canInteractWithTeam) Modifier.clickable { showTeamMenu = true } else Modifier
-                                ) {
-                                    val (teamColor, teamLabel) = when (player.team) {
-                                        Team.TEAM_A -> MaterialTheme.colorScheme.onPrimaryContainer to (if (isThreePlayers || isTwoPlayers) player.name else uiState.gameState.nameTeamA)
-                                        Team.TEAM_B -> MaterialTheme.colorScheme.onSecondaryContainer to (if (isThreePlayers || isTwoPlayers) player.name else uiState.gameState.nameTeamB)
-                                        Team.TEAM_C -> MaterialTheme.colorScheme.onTertiaryContainer to (if (isThreePlayers || isTwoPlayers) player.name else uiState.gameState.nameTeamC)
-                                        Team.TEAM_D -> MaterialTheme.colorScheme.onSurfaceVariant to uiState.gameState.nameTeamD
-                                        Team.RESERVE -> Color.Black to "💤 Suplente"
-                                        Team.SPECTATOR -> Color.Gray to "Espectador"
-                                    }
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = teamLabel,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = teamColor
+                            if (isTwoPlayers) {
+                                // En salas de 2 jugadores a la derecha no sale nada
+                            } else if (isThreePlayers) {
+                                val isPlayerReserve = player.team == Team.RESERVE
+                                val playerIndex = uiState.gameState.connectedPlayers.indexOfFirst { it.id == player.id }
+                                val myOriginalTeam = when (playerIndex) {
+                                    0 -> Team.TEAM_A
+                                    1 -> Team.TEAM_B
+                                    2 -> Team.TEAM_C
+                                    else -> Team.TEAM_A
+                                }
+
+                                if (isPlayerReserve) {
+                                    FilledTonalButton(
+                                        onClick = { viewModel.switchPlayerTeam(player.id, myOriginalTeam) },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = Color(0xFFFFE082),
+                                            contentColor = Color(0xFF5D4037)
                                         )
-                                        if (canInteractWithTeam) {
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Activar", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { viewModel.switchPlayerTeam(player.id, Team.RESERVE) },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.PauseCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Reserva", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                    }
+                                }
+                            } else {
+                                var showTeamMenu by remember { mutableStateOf(false) }
+                                Box {
+                                    Surface(
+                                        color = when (player.team) {
+                                            Team.TEAM_A -> MaterialTheme.colorScheme.primaryContainer
+                                            Team.TEAM_B -> MaterialTheme.colorScheme.secondaryContainer
+                                            Team.TEAM_C -> MaterialTheme.colorScheme.tertiaryContainer
+                                            Team.TEAM_D -> MaterialTheme.colorScheme.surfaceVariant
+                                            Team.RESERVE -> Color(0xFFFFE082)
+                                            Team.SPECTATOR -> MaterialTheme.colorScheme.surfaceVariant
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.clickable { showTeamMenu = true }
+                                    ) {
+                                        val (teamColor, teamLabel) = when (player.team) {
+                                            Team.TEAM_A -> MaterialTheme.colorScheme.onPrimaryContainer to uiState.gameState.nameTeamA
+                                            Team.TEAM_B -> MaterialTheme.colorScheme.onSecondaryContainer to uiState.gameState.nameTeamB
+                                            Team.TEAM_C -> MaterialTheme.colorScheme.onTertiaryContainer to uiState.gameState.nameTeamC
+                                            Team.TEAM_D -> MaterialTheme.colorScheme.onSurfaceVariant to uiState.gameState.nameTeamD
+                                            Team.RESERVE -> Color.Black to "💤 Reserva"
+                                            Team.SPECTATOR -> Color.Gray to "Espectador"
+                                        }
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = teamLabel,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = teamColor
+                                            )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Icon(
                                                 imageVector = Icons.Default.ArrowDropDown,
-                                                contentDescription = "Cambiar estado",
+                                                contentDescription = "Cambiar equipo",
                                                 modifier = Modifier.size(16.dp),
                                                 tint = teamColor
                                             )
                                         }
                                     }
-                                }
 
-                                if (canInteractWithTeam) {
                                     DropdownMenu(
                                         expanded = showTeamMenu,
                                         onDismissRequest = { showTeamMenu = false }
                                     ) {
-                                        if (isThreePlayers) {
-                                            val playerIndex = uiState.gameState.connectedPlayers.indexOfFirst { it.id == player.id }
-                                            val myOriginalTeam = when (playerIndex) {
-                                                0 -> Team.TEAM_A
-                                                1 -> Team.TEAM_B
-                                                2 -> Team.TEAM_C
-                                                else -> Team.TEAM_A
+                                        DropdownMenuItem(
+                                            text = { Text(uiState.gameState.nameTeamA) },
+                                            onClick = {
+                                                viewModel.switchPlayerTeam(player.id, Team.TEAM_A)
+                                                showTeamMenu = false
                                             }
-
-                                            if (player.team == Team.RESERVE) {
-                                                DropdownMenuItem(
-                                                    text = { Text("🟢 Activar Jugador", textAlign = TextAlign.Center) },
-                                                    onClick = {
-                                                        viewModel.switchPlayerTeam(player.id, myOriginalTeam)
-                                                        showTeamMenu = false
-                                                    }
-                                                )
-                                            } else {
-                                                DropdownMenuItem(
-                                                    text = { Text("💤 Poner como Suplente (Baño / Descanso)", textAlign = TextAlign.Center) },
-                                                    onClick = {
-                                                        viewModel.switchPlayerTeam(player.id, Team.RESERVE)
-                                                        showTeamMenu = false
-                                                    }
-                                                )
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(uiState.gameState.nameTeamB) },
+                                            onClick = {
+                                                viewModel.switchPlayerTeam(player.id, Team.TEAM_B)
+                                                showTeamMenu = false
                                             }
-                                        } else {
+                                        )
+                                        if (uiState.gameState.maxPlayers in listOf(6, 8)) {
                                             DropdownMenuItem(
-                                                text = { Text(uiState.gameState.nameTeamA) },
+                                                text = { Text(uiState.gameState.nameTeamC) },
                                                 onClick = {
-                                                    viewModel.switchPlayerTeam(player.id, Team.TEAM_A)
-                                                    showTeamMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(uiState.gameState.nameTeamB) },
-                                                onClick = {
-                                                    viewModel.switchPlayerTeam(player.id, Team.TEAM_B)
-                                                    showTeamMenu = false
-                                                }
-                                            )
-                                            if (uiState.gameState.maxPlayers in listOf(6, 8)) {
-                                                DropdownMenuItem(
-                                                    text = { Text(uiState.gameState.nameTeamC) },
-                                                    onClick = {
-                                                        viewModel.switchPlayerTeam(player.id, Team.TEAM_C)
-                                                        showTeamMenu = false
-                                                    }
-                                                )
-                                            }
-                                            if (uiState.gameState.maxPlayers == 8) {
-                                                DropdownMenuItem(
-                                                    text = { Text(uiState.gameState.nameTeamD) },
-                                                    onClick = {
-                                                        viewModel.switchPlayerTeam(player.id, Team.TEAM_D)
-                                                        showTeamMenu = false
-                                                    }
-                                                )
-                                            }
-                                            DropdownMenuItem(
-                                                text = { Text("💤 Reserva (Poner en reserva)", textAlign = TextAlign.Center) },
-                                                onClick = {
-                                                    viewModel.switchPlayerTeam(player.id, Team.RESERVE)
+                                                    viewModel.switchPlayerTeam(player.id, Team.TEAM_C)
                                                     showTeamMenu = false
                                                 }
                                             )
                                         }
+                                        if (uiState.gameState.maxPlayers == 8) {
+                                            DropdownMenuItem(
+                                                text = { Text(uiState.gameState.nameTeamD) },
+                                                onClick = {
+                                                    viewModel.switchPlayerTeam(player.id, Team.TEAM_D)
+                                                    showTeamMenu = false
+                                                }
+                                            )
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("💤 Reserva (Poner en reserva)", textAlign = TextAlign.Center) },
+                                            onClick = {
+                                                viewModel.switchPlayerTeam(player.id, Team.RESERVE)
+                                                showTeamMenu = false
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -344,16 +350,16 @@ fun HostLobbyScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "👑 Equipos en Reserva (Solo Anfitrión)",
+                            text = "👑 Equipos que van a jugar (Solo Anfitrión)",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
                             text = if (uiState.gameState.maxPlayers == 6) {
-                                "Selecciona qué equipo esperará en reserva (los 2 equipos activos saldrán en el marcador):"
+                                "Selecciona qué 2 equipos jugarán en mesa (el restante esperará en reserva):"
                             } else {
-                                "Selecciona qué 2 equipos estarán en reserva (los 2 equipos activos saldrán en el marcador):"
+                                "Selecciona qué 2 equipos jugarán en mesa (los otros 2 quedarán en reserva):"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 11.sp,
@@ -368,24 +374,30 @@ fun HostLobbyScreen(
                         }
 
                         if (uiState.gameState.maxPlayers == 6) {
+                            val allTeams6 = listOf(
+                                Team.TEAM_A to uiState.gameState.nameTeamA,
+                                Team.TEAM_B to uiState.gameState.nameTeamB,
+                                Team.TEAM_C to uiState.gameState.nameTeamC
+                            )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                listOf(
-                                    Team.TEAM_A to uiState.gameState.nameTeamA,
-                                    Team.TEAM_B to uiState.gameState.nameTeamB,
-                                    Team.TEAM_C to uiState.gameState.nameTeamC
-                                ).forEach { (team, name) ->
-                                    val isRes = effectiveReserves.contains(team)
+                                allTeams6.forEach { (team, name) ->
+                                    val isPlaying = !effectiveReserves.contains(team)
                                     FilterChip(
-                                        selected = isRes,
+                                        selected = isPlaying,
                                         onClick = {
-                                            viewModel.updateReserveTeams(listOf(team))
+                                            if (!isPlaying) {
+                                                val currentPlaying = allTeams6.map { it.first }.filter { !effectiveReserves.contains(it) }
+                                                val newPlaying = (currentPlaying.takeLast(1) + team).toSet()
+                                                val newReserves = allTeams6.map { it.first }.filter { !newPlaying.contains(it) }
+                                                viewModel.updateReserveTeams(newReserves)
+                                            }
                                         },
                                         label = {
                                             Text(
-                                                text = if (isRes) "💤 Reserva ($name)" else name,
+                                                text = if (isPlaying) "⚔️ Juega ($name)" else "💤 Reserva ($name)",
                                                 fontSize = 11.5.sp,
                                                 maxLines = 2,
                                                 textAlign = TextAlign.Center,
@@ -397,36 +409,36 @@ fun HostLobbyScreen(
                                 }
                             }
                         } else if (uiState.gameState.maxPlayers == 8) {
+                            val allTeams8 = listOf(
+                                Team.TEAM_A to uiState.gameState.nameTeamA,
+                                Team.TEAM_B to uiState.gameState.nameTeamB,
+                                Team.TEAM_C to uiState.gameState.nameTeamC,
+                                Team.TEAM_D to uiState.gameState.nameTeamD
+                            )
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                listOf(
-                                    Team.TEAM_A to uiState.gameState.nameTeamA,
-                                    Team.TEAM_B to uiState.gameState.nameTeamB,
-                                    Team.TEAM_C to uiState.gameState.nameTeamC,
-                                    Team.TEAM_D to uiState.gameState.nameTeamD
-                                ).chunked(2).forEach { rowTeams ->
+                                allTeams8.chunked(2).forEach { rowTeams ->
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         rowTeams.forEach { (team, name) ->
-                                            val currentRes = effectiveReserves
-                                            val isRes = currentRes.contains(team)
+                                            val isPlaying = !effectiveReserves.contains(team)
                                             FilterChip(
-                                                selected = isRes,
+                                                selected = isPlaying,
                                                 onClick = {
-                                                    val newRes = if (isRes) {
-                                                        if (currentRes.size > 1) currentRes - team else currentRes
-                                                    } else {
-                                                        if (currentRes.size < 2) currentRes + team else listOf(currentRes.last(), team)
+                                                    if (!isPlaying) {
+                                                        val currentPlaying = allTeams8.map { it.first }.filter { !effectiveReserves.contains(it) }
+                                                        val newPlaying = (currentPlaying.takeLast(1) + team).toSet()
+                                                        val newReserves = allTeams8.map { it.first }.filter { !newPlaying.contains(it) }
+                                                        viewModel.updateReserveTeams(newReserves)
                                                     }
-                                                    viewModel.updateReserveTeams(newRes)
                                                 },
                                                 label = {
                                                     Text(
-                                                        text = if (isRes) "💤 Reserva ($name)" else name,
+                                                        text = if (isPlaying) "⚔️ Juega ($name)" else "💤 Reserva ($name)",
                                                         fontSize = 11.5.sp,
                                                         maxLines = 2,
                                                         textAlign = TextAlign.Center,

@@ -237,6 +237,16 @@ class ClientGameUseCase(
         socketClient.sendMessage(envelope)
     }
 
+    suspend fun requestUpdateDeal(newDeal: Int) {
+        if (newDeal < 1) return
+        val envelope = NetworkEnvelope(
+            type = MessageType.UPDATE_DEAL,
+            senderId = localPlayerId,
+            updateDeal = UpdateDealPayload(dealNumber = newDeal)
+        )
+        socketClient.sendMessage(envelope)
+    }
+
     private fun startHeartbeat() {
         stopHeartbeat()
         heartbeatJob = useCaseScope?.launch {

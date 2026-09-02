@@ -20,8 +20,10 @@ class RondaAudioPlayer(private val context: Context) {
     private val tag = "RondaAudioPlayer"
     private var toneGenerator: ToneGenerator? = null
     private var activeMediaPlayer: MediaPlayer? = null
+    private var sfxMediaPlayer: MediaPlayer? = null
     private val voiceAudioQueue = ConcurrentLinkedQueue<SoundType>()
     private var isPlayingVoice = false
+    private var isPlayingBuenas = false
     private val playerLock = Any()
 
     init {
@@ -53,19 +55,40 @@ class RondaAudioPlayer(private val context: Context) {
         }
     }
 
+    private fun stopSfxMediaPlayer() {
+        try {
+            sfxMediaPlayer?.apply {
+                setOnCompletionListener(null)
+                setOnErrorListener(null)
+                try {
+                    if (isPlaying) stop()
+                } catch (e: Exception) { }
+                release()
+            }
+        } catch (e: Exception) {
+            // ignorar
+        } finally {
+            sfxMediaPlayer = null
+        }
+    }
+
     private fun stopCurrentPlayback() {
         synchronized(playerLock) {
             voiceAudioQueue.clear()
             isPlayingVoice = false
+            isPlayingBuenas = false
             stopActiveMediaPlayerOnly()
         }
+    }
+
+    private fun isStoneSound(type: SoundType): Boolean {
+        return type == SoundType.PIEDRA_ADD || type == SoundType.PIEDRA_SUBTRACT || type == SoundType.CARD_PLAYED
     }
 
     fun playSound(type: SoundType) {
         triggerHapticFeedback(type)
 
         if (type == SoundType.ENTERED_BUENAS) {
-            // Solo no se debe cortar cuando suene el audio que afirma que estás en buenas:
             // Si hay un cántico de voz sonando, se encola para sonar inmediatamente al terminar dicho cántico
             synchronized(playerLock) {
                 if (isPlayingVoice) {
@@ -73,11 +96,21 @@ class RondaAudioPlayer(private val context: Context) {
                     return
                 }
                 isPlayingVoice = true
+                isPlayingBuenas = true
             }
             playVoiceType(type)
+        } else if (isStoneSound(type)) {
+            // El sonido de sumar o restar piedras NO debe cortar el audio de cuando estás en buenas
+            synchronized(playerLock) {
+                if (isPlayingBuenas) {
+                    // Reproducir el sonido de la piedra en paralelo sin interrumpir el audio de Buenas
+                    playSfx(type)
+                    return
+                }
+            }
+            playSfx(type)
         } else {
-            // Los audios se podrán cortar por ejemplo si haces dos clics en ronda.
-            // Además si "Buenas" (o cualquier otro) está sonando y se le da a algún botón, se debe cortar.
+            // Los audios de cantos se detendrán si se canta otra jugada
             stopCurrentPlayback()
 
             if (isVoiceAudio(type)) {
@@ -94,6 +127,94 @@ class RondaAudioPlayer(private val context: Context) {
                     playSyntheticFallback(type)
                 }
             }
+        }
+    }
+
+    private fun playSfx(type: SoundType) {
+        val candidateNames = when (type) {
+            SoundType.CARD_PLAYED,
+            SoundType.PIEDRA_ADD -> listOf("piedra", "sumar", "piedra_add", "click", "tock", "card_played")
+            SoundType.PIEDRA_SUBTRACT -> listOf("restar", "piedra_sub", "pop", "remove", "untock")
+            else -> return
+        }
+
+        try {
+            val assetList = context.assets.list("") ?: emptyArray()
+            val matchingAsset = assetList.firstOrNull { fileName ->
+                val nameWithoutExt = fileName.substringBeforeLast(".")
+                val normFile = nameWithoutExt.lowercase().replace("-", "_").replace(" ", "_")
+                candidateNames.any { candidate ->
+                    val normCandidate = candidate.lowercase().replace("-", "_").replace(" ", "_")
+                    nameWithoutExt.equals(candidate, ignoreCase = true) || normFile == normCandidate
+                }
+            }
+            if (matchingAsset != null) {
+                if (playSfxAssetDirect(matchingAsset)) {
+                    return
+                }
+                val cachedFile = extractAssetToCache(matchingAsset)
+                if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0) {
+                    stopSfxMediaPlayer()
+                    val attributes = AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .build()
+
+                    sfxMediaPlayer = MediaPlayer().apply {
+                        setAudioAttributes(attributes)
+                        setDataSource(cachedFile.absolutePath)
+                        prepare()
+                        start()
+                        setOnCompletionListener {
+                            it.release()
+                            if (sfxMediaPlayer == it) sfxMediaPlayer = null
+                        }
+                        setOnErrorListener { it, _, _ ->
+                            it.release()
+                            if (sfxMediaPlayer == it) sfxMediaPlayer = null
+                            true
+                        }
+                    }
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error buscando asset para SFX $type", e)
+        }
+
+        // Fallback acústico independiente con ToneGenerator (no detiene MediaPlayer)
+        playSyntheticFallback(type)
+    }
+
+    private fun playSfxAssetDirect(assetName: String): Boolean {
+        return try {
+            val afd = context.assets.openFd(assetName)
+            stopSfxMediaPlayer()
+
+            val attributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .build()
+
+            sfxMediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(attributes)
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
+                prepare()
+                start()
+                setOnCompletionListener {
+                    it.release()
+                    if (sfxMediaPlayer == it) sfxMediaPlayer = null
+                }
+                setOnErrorListener { it, _, _ ->
+                    it.release()
+                    if (sfxMediaPlayer == it) sfxMediaPlayer = null
+                    true
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -115,12 +236,25 @@ class RondaAudioPlayer(private val context: Context) {
     }
 
     private fun playVoiceType(type: SoundType) {
+        synchronized(playerLock) {
+            isPlayingBuenas = (type == SoundType.ENTERED_BUENAS)
+        }
         val played = playAudioFileForType(type, onComplete = {
+            synchronized(playerLock) {
+                if (type == SoundType.ENTERED_BUENAS) {
+                    isPlayingBuenas = false
+                }
+            }
             onVoiceCompleted()
         })
         if (!played) {
             Log.w(tag, "No se encontró archivo de audio para $type. Usando fallback acústico.")
             playSyntheticFallback(type)
+            synchronized(playerLock) {
+                if (type == SoundType.ENTERED_BUENAS) {
+                    isPlayingBuenas = false
+                }
+            }
             onVoiceCompleted()
         }
     }
@@ -167,10 +301,14 @@ class RondaAudioPlayer(private val context: Context) {
                 }
             }
             if (matchingAsset != null) {
+                if (playAssetDirect(matchingAsset, volume, onComplete)) {
+                    Log.i(tag, "Reproduciendo audio directo desde asset: $matchingAsset (volumen: $volume)")
+                    return true
+                }
                 val cachedFile = extractAssetToCache(matchingAsset)
                 if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0) {
                     playFile(cachedFile, volume, onComplete)
-                    Log.i(tag, "Reproduciendo audio desde asset: $matchingAsset (volumen: $volume)")
+                    Log.i(tag, "Reproduciendo audio desde cache: $matchingAsset (volumen: $volume)")
                     return true
                 }
             }
@@ -193,6 +331,41 @@ class RondaAudioPlayer(private val context: Context) {
         }
 
         return false
+    }
+
+    private fun playAssetDirect(assetName: String, volume: Float = 1.0f, onComplete: (() -> Unit)?): Boolean {
+        return try {
+            val afd = context.assets.openFd(assetName)
+            stopActiveMediaPlayerOnly()
+
+            val attributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .build()
+
+            activeMediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(attributes)
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
+                setVolume(volume, volume)
+                prepare()
+                start()
+                setOnCompletionListener {
+                    it.release()
+                    if (activeMediaPlayer == it) activeMediaPlayer = null
+                    onComplete?.invoke()
+                }
+                setOnErrorListener { it, _, _ ->
+                    it.release()
+                    if (activeMediaPlayer == it) activeMediaPlayer = null
+                    onComplete?.invoke()
+                    true
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun extractAssetToCache(assetName: String): File? {
@@ -364,6 +537,7 @@ class RondaAudioPlayer(private val context: Context) {
 
     fun release() {
         stopCurrentPlayback()
+        stopSfxMediaPlayer()
         toneGenerator?.release()
         toneGenerator = null
     }

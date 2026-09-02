@@ -17,7 +17,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.02092026"
+        versionName = "1.0.02092026.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -33,12 +33,6 @@ android {
                 storePassword = "elPiedreroKey2026!"
                 keyAlias = "elpiedrero"
                 keyPassword = "elPiedreroKey2026!"
-            } else {
-                val debugConfig = signingConfigs.getByName("debug")
-                storeFile = debugConfig.storeFile
-                storePassword = debugConfig.storePassword
-                keyAlias = debugConfig.keyAlias
-                keyPassword = debugConfig.keyPassword
             }
         }
     }
@@ -46,7 +40,12 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            val releaseKeystore = file("${rootDir}/release.keystore")
+            signingConfig = if (releaseKeystore.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -74,18 +74,23 @@ La partida se disputa a un total de **21 Piedras**:
 
 ---
 
-## 🚀 Registro de Cambios — v1.0.02092026
+## 🚀 Registro de Cambios — v1.0.02092026.2
 
-### 🆕 Últimas Mejoras (02/09/2026)
+### 🆕 Últimas Mejoras (v1.0.02092026.2)
 
-* 👤 **Nombres de jugador en 2 y 3 jugadores:** El nombre del equipo es directamente el nombre de cada jugador. En local se introduce al configurar la partida; en multijugador se asigna automáticamente al alias del jugador al conectarse mediante QR. No se puede cambiar de equipo en estos modos.
-* 💤 **Suplente en Tríos (3 jugadores):** Cualquier jugador puede ponerse en reserva (descanso/baño) para que los otros dos disputen un 1 vs 1, pudiendo reincorporarse en cualquier momento — **solo antes de contar la primera piedra**. Una vez iniciado el marcador, la opción de suplente queda bloqueada permanentemente hasta reiniciar la partida. Se muestra un aviso visual al respecto.
-* 🔒 **Sin reservas en 2 jugadores:** En partidas mano a mano no existe opción de suplente ni reserva bajo ningún concepto.
-* 🏠 **Modo Local limpio:** En partidas locales la barra superior muestra «Partida Local» sin menciones a «Anfitrión». El diálogo de gestión de equipos/suplente omite botones innecesarios y etiquetas de anfitrión.
-* 🔢 **Obligatoriedad de 2 equipos en reserva para 8 jugadores:** Con 4 equipos (A, B, C, D), es obligatorio tener exactamente 2 en reserva antes de poder iniciar la partida. El botón de inicio permanece deshabilitado hasta cumplir este requisito. La restricción se aplica en UI, ViewModel y capa de dominio.
-* ✏️ **Corrección de nombres en 2 y 3 jugadores:** Los nombres escritos por el usuario se respetan correctamente tanto en local como en multijugador, corrigiendo un bug que los reemplazaba con valores genéricos («Jugador 1», «Jugador 2»…).
+* 🛡️ **Blindaje de Red y Seguridad en Sockets:** Descarte automático en el Host de comandos remotos no autorizados (`ROOM_CONFIG_UPDATE` y `END_GAME`) emitidos por clientes. La configuración de sala y cierre de mesa queda restringida exclusivamente a la consola local del Anfitrión, mientras que la salida de un cliente se gestiona como desconexión limpia individual sin interrumpir la partida al resto de participantes.
+* 🔒 **Política de Tráfico de Red Estricto:** Eliminado `android:usesCleartextTraffic` e incorporado `network_security_config.xml` con `cleartextTrafficPermitted="false"`, bloqueando tráfico HTTP no cifrado residual mientras la comunicación local P2P se mantiene protegida con AES-256-GCM.
+* ⚡ **Optimización de Audio Directo (Zero-Disk-IO):** `RondaAudioPlayer` reproduce los efectos y cánticos directamente desde el descriptor nativo del APK (`AssetFileDescriptor`) mediante streaming en memoria, eliminando escrituras y copias temporales en el almacenamiento flash del dispositivo (`cacheDir`).
+* 🚀 **Memoización de Historial en Compose:** Implementado `remember(history)` en la agrupación y ordenación de jugadas por reparto en `ScoreBoardScreen.kt`, previniendo recálculos innecesarios de mapas y ordenaciones durante recomposiciones y animaciones.
+* 🧹 **Limpieza del Ciclo de Vida en ViewModel:** Parada explícita y liberación de escuchadores de sockets (`ServerSocket.close()`) y corrutinas de red en `ScoreViewModel.onCleared()` para prevenir fugas de recursos al salir de la app.
+* 📐 **Botonera de Jugadas Refactorizada (2 Columnas Simétricas):** Distribución uniforme de las 10 jugadas tradicionales en 5 filas estrictas de 2 columnas (`Modifier.weight(1f)`), con altura normalizada de `48.dp`, esquinas uniformes `RoundedCornerShape(12.dp)` y prevención de deformaciones (`maxLines = 1` y `TextOverflow.Ellipsis`).
+* ♿ **Accesibilidad y Touch Target en Sumar y Restar (48 dp):** Los controles de ajuste manual (`-`, `+`, `+N`) dentro de las tarjetas de puntuación se integraron en una barra horizontal continua al 100% de ancho con `Modifier.weight(1f)`, altura mínima usable de `48.dp` (`defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)`) y tipografía `titleMedium` (`20.sp` / `16.sp`) en negrita centrada, garantizando un área de toque cómoda y accesible especialmente para personas mayores.
+* 🃏 **Normalización del Stepper de Reparto de Cartas:** Los controles del contador de manos (`-` y `+`) se elevaron a `44.dp × 44.dp` con `FilledTonalIconButton` y `FilledIconButton`, y el badge central ordinal (`"Xº / Y"`) cuenta con `padding(horizontal = 14.dp)` para una lectura holgada.
+* 🔊 **Canal de Audio Independiente para Piedras y Buenas:** Se desacopló la reproducción de efectos de sonido de piedras (`PIEDRA_ADD`, `PIEDRA_SUBTRACT`) del reproductor de voz principal. Al sumar o restar piedras mientras se reproduce el audio de «¡Buenas!», el sonido de la piedra se emite de manera concurrente en un canal paralelo sin cortar ni interrumpir el audio de Buenas.
+* ⚙️ **Firma y CI/CD en GitHub Actions:** Configuración automática en `app/build.gradle.kts` y el workflow de GitHub Actions para autogenerar el keystore de debug cuando no exista un certificado release privado en el runner, garantizando builds exitosos en cualquier entorno CI.
+* 📱 **Acciones Inferiores Limpias (50% / 50%):** Fila inferior fija con «Deshacer» y «Terminar Partida» dividida al 50% cada una con `Modifier.weight(1f)` y altura de `50.dp`. Retirados los botones inferiores redundantes de registro y suma rápida.
 
-### 🏷️ Historial anterior
+### 🏷️ Mejoras Anteriores (v1.0.02092026)
 
 * 🏷️ **Nueva Identidad «El Piedrero»:** Actualización completa de la marca, títulos y manifiesto del sistema.
 * 📜 **Historial Persistente de Partidas:** Registro rotativo de las últimas 30 partidas con tarjetas de resultados detalladas (`HistoryScreen.kt` y `GameHistoryRepository.kt`).

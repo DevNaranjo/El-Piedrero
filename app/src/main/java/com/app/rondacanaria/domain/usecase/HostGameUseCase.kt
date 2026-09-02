@@ -253,8 +253,10 @@ class HostGameUseCase(
             }
 
             MessageType.ROOM_CONFIG_UPDATE -> {
-                val config = envelope.roomConfigUpdate ?: return
-                updateRoomConfig(config.teamAName, config.teamBName, config.teamCName, config.teamDName, config.maxPlayers, config.reserveTeams)
+                // Medida de seguridad: La configuración de la sala sólo puede ser modificada localmente por el Host.
+                // Se descarta cualquier paquete recibido por socket remoto para evitar manipulación no autorizada.
+                android.util.Log.w("HostGameUseCase", "Intento no autorizado de ROOM_CONFIG_UPDATE desde cliente: $clientId")
+                return
             }
 
             MessageType.SWITCH_TEAM -> {
@@ -316,8 +318,11 @@ class HostGameUseCase(
             }
 
             MessageType.END_GAME -> {
-                val reason = envelope.endGame?.reason ?: "Partida finalizada"
-                endGame(reason)
+                // Medida de seguridad: La finalización de la partida para toda la sala está reservada al Host.
+                // Si un cliente envía END_GAME, se procesa como salida individual del cliente sin cerrar la mesa.
+                android.util.Log.w("HostGameUseCase", "Cliente $clientId envió END_GAME. Desconectando cliente sin cerrar la sala.")
+                socketServer.disconnectClient(clientId)
+                return
             }
 
             MessageType.HEARTBEAT_PING -> {
@@ -326,6 +331,15 @@ class HostGameUseCase(
                     senderId = "HOST"
                 )
                 socketServer.sendToClient(clientId, pong)
+            }
+
+            MessageType.UPDATE_DEAL -> {
+                val senderPlayer = _connectedClients.value[clientId]
+                if (senderPlayer != null && (_gameState.value.reserveTeams.contains(senderPlayer.team) || senderPlayer.team == Team.RESERVE)) {
+                    return
+                }
+                val newDeal = envelope.updateDeal?.dealNumber ?: return
+                setCurrentDeal(newDeal)
             }
 
             else -> {}
@@ -402,7 +416,8 @@ class HostGameUseCase(
                     previousTotalPiedras = oldTotal,
                     newTotalPiedras = newTotal,
                     authorName = authorName,
-                    previousReserveTeams = current.reserveTeams
+                    previousReserveTeams = current.reserveTeams,
+                    dealNumber = current.currentDeal
                 )
             } else {
                 current.moveHistory
@@ -482,8 +497,8 @@ class HostGameUseCase(
 
         // 2. Emitir aviso de Buenas o Victoria si ocurrió
         soundToTrigger?.let { soundPayload ->
-            if (cantoType != null && cantoType != CantoType.MANUAL_ADJUST) {
-                delay(600L) // Breve pausa para que se distingan ambos audios
+            if (cantoType != null) {
+                delay(450L) // Breve pausa para que se distingan ambos audios
             }
             _soundEvents.emit(soundPayload)
             val soundEnvelope = NetworkEnvelope(
@@ -579,7 +594,8 @@ class HostGameUseCase(
                 winnerTeam = null,
                 reserveTeams = nextReserves,
                 version = current.version + 1,
-                moveHistory = emptyList()
+                moveHistory = emptyList(),
+                currentDeal = 1
             )
         }
         broadcastCurrentState()
@@ -721,6 +737,21 @@ class HostGameUseCase(
                 connectedPlayers = updatedPlayers,
                 version = current.version + 1
             )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun setCurrentDeal(newDeal: Int) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            val maxDeals = getMaxDeals(current.maxPlayers)
+            val effectiveDeal = if (newDeal > maxDeals || newDeal < 1) 1 else newDeal
+            if (current.currentDeal != effectiveDeal) {
+                _gameState.value = current.copy(
+                    currentDeal = effectiveDeal,
+                    version = current.version + 1
+                )
+            }
         }
         broadcastCurrentState()
     }

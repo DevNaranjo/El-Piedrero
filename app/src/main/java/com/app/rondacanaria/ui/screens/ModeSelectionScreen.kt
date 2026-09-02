@@ -3,7 +3,9 @@ package com.app.rondacanaria.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -217,7 +219,12 @@ fun ModeSelectionScreen(
             onDismissRequest = { showLocalSetupDialog = false },
             title = { Text("Configurar Partida Local", textAlign = TextAlign.Center) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text("Capacidad de la mesa:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
 
                     Row(
@@ -329,35 +336,42 @@ fun ModeSelectionScreen(
                         )
                     }
 
-                    // Selector de equipo en reserva para 6 jugadores (3 equipos de 2)
+                    // Selector de equipos que van a jugar para 6 jugadores (3 equipos de 2)
                     if (localMaxPlayers == 6) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Equipo que estará en reserva:",
+                            text = "⚔️ Equipos que van a jugar (Selecciona 2):",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Solo jugarán 2 equipos a la vez. El equipo en reserva esperará su turno y no saldrá en el marcador.",
+                            text = "Los 2 equipos seleccionados jugarán en mesa. El restante esperará en reserva.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val allTeams6 = listOf(
+                            Team.TEAM_A to localTeamA,
+                            Team.TEAM_B to localTeamB,
+                            Team.TEAM_C to localTeamC
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf(
-                                Team.TEAM_A to localTeamA,
-                                Team.TEAM_B to localTeamB,
-                                Team.TEAM_C to localTeamC
-                            ).forEach { (team, label) ->
-                                val isReserve = localReserve6 == team
+                            allTeams6.forEach { (team, label) ->
+                                val isPlaying = localReserve6 != team
                                 FilterChip(
-                                    selected = isReserve,
-                                    onClick = { localReserve6 = team },
+                                    selected = isPlaying,
+                                    onClick = {
+                                        if (!isPlaying) {
+                                            val currentPlaying = allTeams6.map { it.first }.filter { it != localReserve6 }
+                                            val newPlaying = (currentPlaying.takeLast(1) + team).toSet()
+                                            localReserve6 = allTeams6.map { it.first }.first { !newPlaying.contains(it) }
+                                        }
+                                    },
                                     label = {
                                         Text(
-                                            text = if (isReserve) "💤 Reserva ($label)" else label,
+                                            text = if (isPlaying) "⚔️ Juega ($label)" else "💤 Reserva ($label)",
                                             fontSize = 11.sp,
                                             maxLines = 2,
                                             textAlign = TextAlign.Center,
@@ -370,53 +384,48 @@ fun ModeSelectionScreen(
                         }
                     }
 
-                    // Selector de equipos en reserva para 8 jugadores (4 equipos de 2)
+                    // Selector de equipos que van a jugar para 8 jugadores (4 equipos de 2)
                     if (localMaxPlayers == 8) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Equipos que estarán en reserva (2 equipos):",
+                            text = "⚔️ Equipos que van a jugar (Selecciona 2):",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Solo los 2 equipos activos saldrán en el marcador para no saturar la pantalla.",
+                            text = "Los 2 equipos seleccionados jugarán en mesa y saldrán en el marcador. Los otros 2 esperarán en reserva.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val allTeams8 = listOf(
+                            Team.TEAM_A to localTeamA,
+                            Team.TEAM_B to localTeamB,
+                            Team.TEAM_C to localTeamC,
+                            Team.TEAM_D to localTeamD
                         )
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf(
-                                Team.TEAM_A to localTeamA,
-                                Team.TEAM_B to localTeamB,
-                                Team.TEAM_C to localTeamC,
-                                Team.TEAM_D to localTeamD
-                            ).chunked(2).forEach { rowTeams ->
+                            allTeams8.chunked(2).forEach { rowTeams ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     rowTeams.forEach { (team, label) ->
-                                        val isReserve = localReserves8.contains(team)
+                                        val isPlaying = !localReserves8.contains(team)
                                         FilterChip(
-                                            selected = isReserve,
+                                            selected = isPlaying,
                                             onClick = {
-                                                if (isReserve) {
-                                                    if (localReserves8.size > 1) {
-                                                        localReserves8 = localReserves8 - team
-                                                    }
-                                                } else {
-                                                    if (localReserves8.size < 2) {
-                                                        localReserves8 = localReserves8 + team
-                                                    } else {
-                                                        localReserves8 = setOf(localReserves8.last(), team)
-                                                    }
+                                                if (!isPlaying) {
+                                                    val currentPlaying = allTeams8.map { it.first }.filter { !localReserves8.contains(it) }
+                                                    val newPlaying = (currentPlaying.takeLast(1) + team).toSet()
+                                                    localReserves8 = allTeams8.map { it.first }.filter { !newPlaying.contains(it) }.toSet()
                                                 }
                                             },
                                             label = {
                                                 Text(
-                                                    text = if (isReserve) "💤 Reserva ($label)" else label,
+                                                    text = if (isPlaying) "⚔️ Juega ($label)" else "💤 Reserva ($label)",
                                                     fontSize = 11.5.sp,
                                                     maxLines = 2,
                                                     textAlign = TextAlign.Center,

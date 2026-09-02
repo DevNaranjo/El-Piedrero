@@ -5,10 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.rondacanaria.data.audio.RondaAudioPlayer
 import com.app.rondacanaria.data.history.GameHistoryRepository
-import com.app.rondacanaria.data.model.CantoType
-import com.app.rondacanaria.data.model.GameHistoryRecord
-import com.app.rondacanaria.data.model.GameState
-import com.app.rondacanaria.data.model.Team
+import com.app.rondacanaria.data.model.*
 import com.app.rondacanaria.data.network.NetworkUtils
 import com.app.rondacanaria.domain.model.ConnectionInfo
 import com.app.rondacanaria.domain.usecase.ClientGameUseCase
@@ -289,7 +286,10 @@ class ScoreViewModel(
     fun callCanto(teamId: Team, canto: CantoType) {
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
-        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        if (!state.isLocalGame) {
+            if (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR) return
+            if (state.myTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
+        }
 
         val author = state.playerName
         viewModelScope.launch {
@@ -304,7 +304,10 @@ class ScoreViewModel(
     fun manualScoreChange(teamId: Team, delta: Int, reason: String = "Ajuste manual") {
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
-        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        if (!state.isLocalGame) {
+            if (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR) return
+            if (state.myTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
+        }
 
         val author = state.playerName
         viewModelScope.launch {
@@ -318,7 +321,7 @@ class ScoreViewModel(
 
     fun undoLastMove() {
         val state = _uiState.value
-        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR)) return
 
         viewModelScope.launch {
             if (state.isHost) {
@@ -329,12 +332,31 @@ class ScoreViewModel(
         }
     }
 
+    fun changeDeal(newDeal: Int) {
+        val state = _uiState.value
+        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        val maxP = if (state.gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) {
+            state.gameState.maxPlayers
+        } else {
+            state.maxPlayers
+        }
+        val maxDeals = getMaxDeals(maxP)
+        val targetDeal = if (newDeal > maxDeals || newDeal < 1) 1 else newDeal
+        viewModelScope.launch {
+            if (state.isHost || state.isLocalGame) {
+                hostUseCase.setCurrentDeal(targetDeal)
+            } else {
+                clientUseCase.requestUpdateDeal(targetDeal)
+            }
+        }
+    }
+
     fun terminateGame() {
         viewModelScope.launch {
-            if (_uiState.value.isHost) {
+            if (_uiState.value.isHost || _uiState.value.isLocalGame) {
                 hostUseCase.endGame("Partida finalizada por el Host")
             } else {
-                clientUseCase.requestEndGame("Partida finalizada por jugador")
+                clientUseCase.leaveGame()
             }
             exitGame()
         }
@@ -459,6 +481,8 @@ class ScoreViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        hostUseCase.stopHost()
+        clientUseCase.leaveGame()
         audioPlayer.release()
     }
 }

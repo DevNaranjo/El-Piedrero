@@ -3,7 +3,9 @@ package com.app.rondacanaria.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
@@ -62,15 +65,22 @@ fun ScoreBoardScreen(
     val isThreePlayers = gameState.maxPlayers == 3 || uiState.maxPlayers == 3
     val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
 
+    val maxDeals = when {
+        isTwoPlayers -> 6
+        isThreePlayers -> 4
+        else -> 3
+    }
+
     // En tríos solo se puede usar la opción de suplente ANTES de contar cualquier piedra.
     val noPiedrasAun = gameState.moveHistory.isEmpty()
 
     // En 2 jugadores NO hay reservas bajo ningún concepto.
     // En 3 jugadores se permite reserva solo si no se ha contado ninguna piedra todavía.
-    // En 4, 6 y 8 jugadores solo en multijugador.
+    // En 6 y 8 jugadores (con 3 o 4 equipos) se permite rotar qué 2 equipos juegan en mesa tanto en local como en multijugador.
     val canOpenReserveOrTeamDialog = when {
         isTwoPlayers -> false
         isThreePlayers -> noPiedrasAun
+        hasTeamC || hasTeamD -> true
         else -> !uiState.isLocalGame
     }
 
@@ -86,12 +96,15 @@ fun ScoreBoardScreen(
     val showTeamC = hasTeamC && !isTeamCReserve
     val showTeamD = hasTeamD && !isTeamDReserve
 
-    val isReserve = isMultiplayerClient && (uiState.myTeam == Team.RESERVE || effectiveReserveTeams.contains(uiState.myTeam))
+    val isMultiplayer = !uiState.isLocalGame
+    val isReserve = isMultiplayer && (uiState.myTeam == Team.RESERVE || effectiveReserveTeams.contains(uiState.myTeam) || uiState.myTeam == Team.SPECTATOR)
 
-    val canModifyA = showTeamA && (!isMultiplayerClient || uiState.myTeam == Team.TEAM_A) && !isReserve
-    val canModifyB = showTeamB && (!isMultiplayerClient || uiState.myTeam == Team.TEAM_B) && !isReserve
-    val canModifyC = showTeamC && (!isMultiplayerClient || uiState.myTeam == Team.TEAM_C) && !isReserve
-    val canModifyD = showTeamD && (!isMultiplayerClient || uiState.myTeam == Team.TEAM_D) && !isReserve
+    // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
+    // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO.
+    val canModifyA = showTeamA && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_A && !isReserve))
+    val canModifyB = showTeamB && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_B && !isReserve))
+    val canModifyC = showTeamC && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_C && !isReserve))
+    val canModifyD = showTeamD && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_D && !isReserve))
 
     val activeTeamsCount = listOf(showTeamA, showTeamB, showTeamC, showTeamD).count { it }
     val isCompactCards = activeTeamsCount > 2
@@ -189,10 +202,11 @@ fun ScoreBoardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(10.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (!uiState.isLocalGame) {
+            if (!uiState.isLocalGame && uiState.sessionStatus != SessionStatus.CONNECTED) {
                 ConnectionStatusBanner(status = uiState.sessionStatus, isHost = uiState.isHost)
                 Spacer(modifier = Modifier.height(6.dp))
             }
@@ -231,11 +245,115 @@ fun ScoreBoardScreen(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
+            // Sumador de Reparto de Cartas
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Style,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "Reparto de cartas:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "Mano / Reparto ${gameState.currentDeal} de $maxDeals",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalIconButton(
+                            onClick = { viewModel.changeDeal(gameState.currentDeal - 1) },
+                            enabled = !isReserve && gameState.currentDeal > 1,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Remove,
+                                contentDescription = "Reparto anterior",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 14.dp)
+                            ) {
+                                Text(
+                                    text = "${gameState.currentDeal}º / $maxDeals",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 13.5.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        val isAtMaxDeals = gameState.currentDeal >= maxDeals
+                        FilledIconButton(
+                            onClick = {
+                                val nextDeal = if (isAtMaxDeals) 1 else gameState.currentDeal + 1
+                                viewModel.changeDeal(nextDeal)
+                            },
+                            enabled = !isReserve,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (isAtMaxDeals) Icons.Default.Refresh else Icons.Default.Add,
+                                contentDescription = if (isAtMaxDeals) "Reiniciar a reparto 1" else "Siguiente reparto",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .height(210.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Tarjeta Equipo A (si no está en reserva)
                 if (showTeamA) {
@@ -313,7 +431,7 @@ fun ScoreBoardScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Selector interactivo o indicador de equipo propio con botón para cambiar
-            if (isMultiplayerClient) {
+            if (isMultiplayer) {
                 val myTeamName = when (uiState.myTeam) {
                     Team.TEAM_A -> gameState.nameTeamA
                     Team.TEAM_B -> gameState.nameTeamB
@@ -330,7 +448,7 @@ fun ScoreBoardScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -394,45 +512,82 @@ fun ScoreBoardScreen(
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Cantar:",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    val teams = buildList {
-                        if (showTeamA) add(Team.TEAM_A to gameState.nameTeamA)
-                        if (showTeamB) add(Team.TEAM_B to gameState.nameTeamB)
-                        if (showTeamC) add(Team.TEAM_C to gameState.nameTeamC)
-                        if (showTeamD) add(Team.TEAM_D to gameState.nameTeamD)
-                    }
-
-                    teams.forEach { (team, name) ->
-                        FilterChip(
-                            selected = selectedTeamForCanto == team,
-                            onClick = { selectedTeamForCanto = team },
-                            label = { Text(name, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center) },
-                            modifier = Modifier.weight(1f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Cantar a:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+
+                        val teams = buildList {
+                            if (showTeamA) add(Team.TEAM_A to gameState.nameTeamA)
+                            if (showTeamB) add(Team.TEAM_B to gameState.nameTeamB)
+                            if (showTeamC) add(Team.TEAM_C to gameState.nameTeamC)
+                            if (showTeamD) add(Team.TEAM_D to gameState.nameTeamD)
+                        }
+
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            teams.forEach { (team, name) ->
+                                FilterChip(
+                                    selected = selectedTeamForCanto == team,
+                                    onClick = { selectedTeamForCanto = team },
+                                    label = {
+                                        Text(
+                                            text = name,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+
+                        if (hasTeamC || hasTeamD) {
+                            FilledTonalButton(
+                                onClick = { showSwitchTeamDialog = true },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Equipos", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Botonera de Cantos (Ronda +1, Parranda +3, Caracol +4, Caracolillo +5)
-            val cantoTargetTeam = if (isMultiplayerClient) uiState.myTeam else selectedTeamForCanto
+            // Botonera de Jugadas y Cantos en Cuadrícula Simétrica de 2 Columnas (Material 3)
+            val cantoTargetTeam = if (isMultiplayer) uiState.myTeam else selectedTeamForCanto
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Fila 1: Cantos básicos de mano
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -442,9 +597,17 @@ fun ScoreBoardScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.RONDA.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.RONDA.displayName,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     FilledTonalButton(
@@ -452,12 +615,21 @@ fun ScoreBoardScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.PARRANDA.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.PARRANDA.displayName,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
+                // Fila 2: Cantos mayores de mano
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -467,9 +639,17 @@ fun ScoreBoardScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.CARACOL.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.CARACOL.displayName,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     FilledTonalButton(
@@ -478,168 +658,217 @@ fun ScoreBoardScreen(
                             .weight(1f)
                             .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     ) {
-                        Text(CantoType.CARACOLILLO.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.CARACOLILLO.displayName,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
-                // Fila 3: Jugadas de Mesa (Majo, Limpiar, Majo y Limpio)
+                // Fila 3: Jugadas de mesa (Majo y Limpiar)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilledTonalButton(
                         onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.MAJO) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp),
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.MAJO.displayName, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.MAJO.displayName,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     FilledTonalButton(
                         onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.LIMPIAR) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp),
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.LIMPIAR.displayName, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.MAJO_Y_LIMPIO) },
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Text(CantoType.MAJO_Y_LIMPIO.displayName, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.LIMPIAR.displayName,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
-                // Fila 4: Cadena de Majos (Contramajo, Requetemajo, Requetecontramajo)
+                // Fila 4: Jugadas de mesa dobles (Majo y Limpio, Contramajo)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    FilledTonalButton(
+                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.MAJO_Y_LIMPIO) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = CantoType.MAJO_Y_LIMPIO.displayName,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
                     FilledTonalButton(
                         onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.CONTRAMAJO) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp),
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     ) {
-                        Text(CantoType.CONTRAMAJO.displayName, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.CONTRAMAJO.displayName,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
+                }
 
+                // Fila 5: Cadena de majos de alto valor (Requetemajo, Requetecontramajo)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     FilledTonalButton(
                         onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.REQUETEMAJO) },
                         modifier = Modifier
-                            .weight(1.05f)
-                            .height(44.dp),
+                            .weight(1f)
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(CantoType.REQUETEMAJO.displayName, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.REQUETEMAJO.displayName,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     FilledTonalButton(
                         onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.REQUETECONTRAMAJO) },
                         modifier = Modifier
-                            .weight(1.35f)
-                            .height(44.dp),
+                            .weight(1f)
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+                        )
                     ) {
-                        Text(CantoType.REQUETECONTRAMAJO.displayName, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = CantoType.REQUETECONTRAMAJO.displayName,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Fila de acciones rápidas: Deshacer última jugada y Ver registro
+            // Fila fija de acciones principales: Deshacer y Terminar Partida (50% de ancho c/u)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = { viewModel.undoLastMove() },
                     enabled = gameState.moveHistory.isNotEmpty(),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
                     shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Deshacer", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Deshacer",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
                 }
 
                 OutlinedButton(
-                    onClick = { showMoveHistoryDialog = true },
-                    modifier = Modifier.weight(1.2f),
+                    onClick = { showEndGameConfirmation = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.secondary
-                    )
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (gameState.moveHistory.isEmpty()) "Registro" else "Registro (${gameState.moveHistory.size})",
-                        fontSize = 12.sp,
+                        text = "Terminar Partida",
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Botón para Sumar Piedras de Golpe (+N)
-            OutlinedButton(
-                onClick = { customAdjustTeam = cantoTargetTeam },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.AddCircleOutline, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Sumar Piedras de Golpe (+N)", fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Botón para Finalizar Partida
-            OutlinedButton(
-                onClick = { showEndGameConfirmation = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Icon(Icons.Default.StopCircle, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Terminar Partida", fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
@@ -651,6 +880,8 @@ fun ScoreBoardScreen(
             nameTeamB = gameState.nameTeamB,
             nameTeamC = gameState.nameTeamC,
             nameTeamD = gameState.nameTeamD,
+            currentDeal = gameState.currentDeal,
+            maxDeals = maxDeals,
             onUndo = { viewModel.undoLastMove() },
             onDismiss = { showMoveHistoryDialog = false }
         )
@@ -934,14 +1165,14 @@ fun RondaScoreCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (isCompact) 8.dp else 12.dp),
+                .padding(if (isCompact) 8.dp else 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = teamName,
-                    fontSize = if (isCompact) 14.sp else 18.sp,
+                    fontSize = if (isCompact) 14.5.sp else 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     maxLines = 1
@@ -953,7 +1184,7 @@ fun RondaScoreCard(
                 ) {
                     Text(
                         text = "🏆 $wins ${if (wins == 1) "victoria" else "victorias"}",
-                        fontSize = if (isCompact) 9.sp else 11.sp,
+                        fontSize = if (isCompact) 9.5.sp else 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (wins > 0) Color.Black else contentColor.copy(alpha = 0.75f),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
@@ -965,29 +1196,29 @@ fun RondaScoreCard(
             if (score.isInBuenas) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Brush.horizontalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))))
-                        .padding(horizontal = if (isCompact) 6.dp else 10.dp, vertical = 3.dp)
+                        .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = if (isCompact) "🌟 BUENAS (${score.buenas}/10)" else "🌟 ¡EN BUENAS! (${score.buenas}/10)",
                         color = Color.Black,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (isCompact) 10.sp else 12.sp
+                        fontSize = if (isCompact) 10.5.sp else 12.sp
                     )
                 }
             } else {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(contentColor.copy(alpha = 0.12f))
-                        .padding(horizontal = if (isCompact) 6.dp else 10.dp, vertical = 3.dp)
+                        .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = "Malas (${score.malas}/11)",
                         color = contentColor,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = if (isCompact) 10.sp else 12.sp
+                        fontSize = if (isCompact) 10.5.sp else 12.sp
                     )
                 }
             }
@@ -996,82 +1227,136 @@ fun RondaScoreCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "${score.totalPiedras}",
-                    fontSize = if (isCompact) 42.sp else 58.sp,
+                    fontSize = if (isCompact) 36.sp else 46.sp,
                     fontWeight = FontWeight.Black,
                     color = contentColor
                 )
                 Text(
                     text = "Piedras / 21",
-                    fontSize = if (isCompact) 9.sp else 11.sp,
+                    fontSize = if (isCompact) 9.5.sp else 11.sp,
                     color = contentColor.copy(alpha = 0.7f),
                     fontWeight = FontWeight.Medium
                 )
             }
 
-            // Botones de ajuste manual (+1 / -1) o indicador de Equipo Rival bloqueado
+            // Botones de ajuste manual (+1 / -1 / +N) o indicador de Equipo Rival bloqueado
             if (!canModify) {
                 Surface(
-                    color = contentColor.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    color = contentColor.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .defaultMinSize(minHeight = 48.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             Icons.Default.Lock,
-                            contentDescription = "Solo editable por el equipo rival",
-                            tint = contentColor.copy(alpha = 0.6f),
-                            modifier = Modifier.size(14.dp)
+                            contentDescription = "Equipo rival bloqueado",
+                            tint = contentColor.copy(alpha = 0.75f),
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Equipo Rival",
-                            fontSize = if (isCompact) 10.sp else 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = contentColor.copy(alpha = 0.7f)
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
             } else {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilledIconButton(
+                    // Botón Restar (-)
+                    FilledTonalButton(
                         onClick = { onManualAdjust(-1) },
                         enabled = score.totalPiedras > 0,
-                        modifier = Modifier.size(if (isCompact) 32.dp else 40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = contentColor.copy(alpha = 0.15f))
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = contentColor.copy(alpha = 0.14f),
+                            contentColor = contentColor
+                        )
                     ) {
-                        Icon(Icons.Default.Remove, contentDescription = "Restar piedra", tint = contentColor)
+                        Text(
+                            text = "−",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
-                    FilledIconButton(
+                    // Botón Sumar (+)
+                    FilledTonalButton(
                         onClick = { onManualAdjust(1) },
                         enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
-                        modifier = Modifier.size(if (isCompact) 32.dp else 40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = contentColor.copy(alpha = 0.25f))
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = contentColor.copy(alpha = 0.22f),
+                            contentColor = contentColor
+                        )
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Sumar piedra", tint = contentColor)
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
+                    // Botón Sumar Golpe (+N)
                     if (onCustomAdjustClick != null) {
-                        FilledIconButton(
+                        FilledTonalButton(
                             onClick = onCustomAdjustClick,
                             enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
-                            modifier = Modifier.size(if (isCompact) 32.dp else 40.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = contentColor.copy(alpha = 0.35f))
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = contentColor.copy(alpha = 0.32f),
+                                contentColor = contentColor
+                            )
                         ) {
                             Text(
                                 text = "+N",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Black,
-                                fontSize = if (isCompact) 11.sp else 13.sp,
-                                color = contentColor
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -1474,9 +1759,9 @@ fun SwitchTeamDialog(
                     }
                     val headerText = when {
                         isLocal && maxPlayers == 3 -> "👑 Gestión de Suplente:"
-                        isLocal -> "👑 Equipos en Reserva:"
+                        isLocal -> "⚔️ Equipos que van a jugar (2 activos):"
                         maxPlayers == 3 -> "👑 Gestión de Suplente (Anfitrión):"
-                        else -> "👑 Rotar Equipos en Reserva (Anfitrión):"
+                        else -> "👑 Equipos que van a jugar (Solo Anfitrión):"
                     }
                     Text(
                         text = headerText,
@@ -1485,7 +1770,7 @@ fun SwitchTeamDialog(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = if (maxPlayers == 3) "Toca un jugador para ponerlo de suplente (ej. baño), o desmárcalo para que jueguen los 3." else "Solo los equipos activos saldrán en el marcador.",
+                        text = if (maxPlayers == 3) "Toca un jugador para ponerlo de suplente (ej. baño), o desmárcalo para que jueguen los 3." else "Selecciona qué 2 equipos juegan en mesa (los otros 2 quedan en reserva).",
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1538,20 +1823,21 @@ fun SwitchTeamDialog(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     rowTeams.forEach { (team, name) ->
-                                        val isRes = reserveTeams.contains(team)
+                                        val isPlaying = !reserveTeams.contains(team)
                                         FilterChip(
-                                            selected = isRes,
+                                            selected = isPlaying,
                                             onClick = {
-                                                val newRes = if (isRes) {
-                                                    if (reserveTeams.size > 1) reserveTeams - team else reserveTeams
-                                                } else {
-                                                    if (reserveTeams.size < 2) reserveTeams + team else listOf(reserveTeams.last(), team)
+                                                if (isHost && !isPlaying) {
+                                                    val currentPlaying = availableTeams.map { it.first }.filter { !reserveTeams.contains(it) }
+                                                    val newPlaying = (currentPlaying.takeLast(1) + team).toSet()
+                                                    val newRes = availableTeams.map { it.first }.filter { !newPlaying.contains(it) }
+                                                    onUpdateReserveTeams(newRes)
                                                 }
-                                                onUpdateReserveTeams(newRes)
                                             },
+                                            enabled = isHost,
                                             label = {
                                                 Text(
-                                                    text = if (isRes) "💤 Reserva ($name)" else name,
+                                                    text = if (isPlaying) "⚔️ Juega ($name)" else "💤 Reserva ($name)",
                                                     fontSize = 11.5.sp,
                                                     maxLines = 2,
                                                     textAlign = TextAlign.Center,
@@ -1584,6 +1870,8 @@ fun MoveHistoryDialog(
     nameTeamB: String,
     nameTeamC: String,
     nameTeamD: String,
+    currentDeal: Int = 1,
+    maxDeals: Int = 3,
     onUndo: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1626,75 +1914,151 @@ fun MoveHistoryDialog(
                         )
                     }
                 } else {
-                    Text(
-                        text = "Movimientos realizados (${history.size}):",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Movimientos (${history.size}):",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "En curso: Reparto $currentDeal de $maxDeals",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    val groupedDeals = remember(history) {
+                        history.groupBy { it.dealNumber.coerceAtLeast(1) }
+                            .toList()
+                            .sortedByDescending { it.first }
+                    }
 
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(history.asReversed()) { move ->
-                            val teamName = when (move.teamId) {
-                                Team.TEAM_A -> nameTeamA
-                                Team.TEAM_B -> nameTeamB
-                                Team.TEAM_C -> nameTeamC
-                                Team.TEAM_D -> nameTeamD
-                                else -> "Equipo"
-                            }
-                            val isPositive = move.deltaPiedras > 0
-                            val deltaColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            val deltaBadgeBg = if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
+                        groupedDeals.forEach { (dealNum, movesInDeal) ->
+                            item(key = "deal_header_$dealNum") {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .padding(top = 4.dp, bottom = 2.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.Style,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Reparto $dealNum de $maxDeals",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.5.sp,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
                                         Text(
-                                            text = teamName,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-
-                                        Text(
-                                            text = move.reason + if (move.authorName != null) " (por ${move.authorName})" else "",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-
-                                        Text(
-                                            text = "${move.previousTotalPiedras} ➔ ${move.newTotalPiedras} piedras",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 10.sp
+                                            text = "${movesInDeal.size} ${if (movesInDeal.size == 1) "jugada" else "jugadas"}",
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                         )
                                     }
+                                }
+                            }
 
-                                    Surface(
-                                        color = deltaBadgeBg,
-                                        shape = RoundedCornerShape(6.dp)
+                            items(movesInDeal.asReversed(), key = { it.id }) { move ->
+                                val teamName = when (move.teamId) {
+                                    Team.TEAM_A -> nameTeamA
+                                    Team.TEAM_B -> nameTeamB
+                                    Team.TEAM_C -> nameTeamC
+                                    Team.TEAM_D -> nameTeamD
+                                    else -> "Equipo"
+                                }
+                                val isPositive = move.deltaPiedras > 0
+                                val deltaColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                val deltaBadgeBg = if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = if (isPositive) "+${move.deltaPiedras}" else "${move.deltaPiedras}",
-                                            color = deltaColor,
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 14.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = teamName,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "R${move.dealNumber.coerceAtLeast(1)}",
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Text(
+                                                text = move.reason + if (move.authorName != null) " (por ${move.authorName})" else "",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Text(
+                                                text = "${move.previousTotalPiedras} ➔ ${move.newTotalPiedras} piedras",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+
+                                        Surface(
+                                            color = deltaBadgeBg,
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isPositive) "+${move.deltaPiedras}" else "${move.deltaPiedras}",
+                                                color = deltaColor,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 14.sp,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }

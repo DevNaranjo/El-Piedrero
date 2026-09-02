@@ -15,7 +15,8 @@ enum class MessageType {
     HEARTBEAT_PING,
     HEARTBEAT_PONG,
     SWITCH_TEAM,
-    UNDO_LAST_MOVE
+    UNDO_LAST_MOVE,
+    UPDATE_DEAL
 }
 
 @Serializable
@@ -115,7 +116,8 @@ data class GameMove(
     val previousTotalPiedras: Int,
     val newTotalPiedras: Int,
     val authorName: String? = null,
-    val previousReserveTeams: List<Team> = emptyList()
+    val previousReserveTeams: List<Team> = emptyList(),
+    val dealNumber: Int = 1
 )
 
 @Serializable
@@ -139,8 +141,17 @@ data class GameState(
     val version: Long = 0L,
     val connectedPlayers: List<Player> = emptyList(),
     val moveHistory: List<GameMove> = emptyList(),
-    val reserveTeams: List<Team> = emptyList()
-)
+    val reserveTeams: List<Team> = emptyList(),
+    val currentDeal: Int = 1
+) {
+    fun maxDeals(): Int = getMaxDeals(maxPlayers)
+}
+
+fun getMaxDeals(maxPlayers: Int): Int = when (maxPlayers) {
+    2 -> 6
+    3 -> 4
+    else -> 3
+}
 
 @Serializable
 data class JoinRequestPayload(
@@ -194,6 +205,11 @@ data class EndGamePayload(
 )
 
 @Serializable
+data class UpdateDealPayload(
+    val dealNumber: Int
+)
+
+@Serializable
 data class NetworkEnvelope(
     val type: MessageType,
     val id: String = UUID.randomUUID().toString(),
@@ -206,5 +222,6 @@ data class NetworkEnvelope(
     val soundTrigger: SoundTriggerPayload? = null,
     val endGame: EndGamePayload? = null,
     val switchTeam: SwitchTeamPayload? = null,
+    val updateDeal: UpdateDealPayload? = null,
     val gameStateBroadcast: GameState? = null
 )
