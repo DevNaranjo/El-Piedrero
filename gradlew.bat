@@ -37,6 +37,11 @@ for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 
 @rem Find java.exe
+echo "%JAVA_HOME%" | findstr /i "jdk-25 25." >NUL
+if %ERRORLEVEL% equ 0 (
+    if exist "C:\Program Files\BlueJ\jdk\bin\java.exe" set "JAVA_HOME=C:\Program Files\BlueJ\jdk"
+)
+
 if defined JAVA_HOME goto findJavaFromJavaHome
 
 set JAVA_EXE=java.exe
