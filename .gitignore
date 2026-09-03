@@ -19,15 +19,20 @@ captures/
 
 # Output packaging artifacts
 *.apk
-!ElPiedrero.apk
 *.ap_
 *.aab
 *.dex
 output-metadata.json
+checksums.txt
 
-# Keystores & Signing Secrets
+# Keystores, Certificates & Signing Secrets
 *.keystore
 *.jks
+*.p12
+*.pem
+*.key
+release.keystore
+debug.keystore
 keystore.properties
 signing.properties
 

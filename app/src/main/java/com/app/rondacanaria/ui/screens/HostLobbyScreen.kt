@@ -1,5 +1,6 @@
 package com.app.rondacanaria.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,13 +38,25 @@ fun HostLobbyScreen(
     val qrBitmap = remember(connectionInfo) {
         connectionInfo?.toJson()?.let { QrCodeGenerator.generateQrBitmap(it, 512) }
     }
+    var showIncompletePlayersDialog by remember { mutableStateOf(false) }
+    var showExitHostRoomConfirmation by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (showIncompletePlayersDialog) {
+            showIncompletePlayersDialog = false
+        } else if (showExitHostRoomConfirmation) {
+            showExitHostRoomConfirmation = false
+        } else {
+            showExitHostRoomConfirmation = true
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Mesa Anfitrión - El Piedrero", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.exitGame() }) {
+                    IconButton(onClick = { showExitHostRoomConfirmation = true }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
@@ -221,26 +234,28 @@ fun HostLobbyScreen(
                                 if (isPlayerReserve) {
                                     FilledTonalButton(
                                         onClick = { viewModel.switchPlayerTeam(player.id, myOriginalTeam) },
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.filledTonalButtonColors(
                                             containerColor = Color(0xFFFFE082),
                                             contentColor = Color(0xFF5D4037)
                                         )
                                     ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "Activar jugador", modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Activar", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                                     }
                                 } else {
                                     OutlinedButton(
                                         onClick = { viewModel.switchPlayerTeam(player.id, Team.RESERVE) },
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Icon(Icons.Default.PauseCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.PauseCircle, contentDescription = "Poner jugador en reserva", modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Reserva", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        Text("Reserva", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                                     }
                                 }
                             } else {
@@ -256,7 +271,9 @@ fun HostLobbyScreen(
                                             Team.SPECTATOR -> MaterialTheme.colorScheme.surfaceVariant
                                         },
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.clickable { showTeamMenu = true }
+                                        modifier = Modifier
+                                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                            .clickable { showTeamMenu = true }
                                     ) {
                                         val (teamColor, teamLabel) = when (player.team) {
                                             Team.TEAM_A -> MaterialTheme.colorScheme.onPrimaryContainer to uiState.gameState.nameTeamA
@@ -460,7 +477,14 @@ fun HostLobbyScreen(
             }
 
             Button(
-                onClick = { viewModel.navigateToScoreboard() },
+                onClick = {
+                    val currentCount = uiState.gameState.connectedPlayers.size
+                    if (currentCount < maxCapacity) {
+                        showIncompletePlayersDialog = true
+                    } else {
+                        viewModel.navigateToScoreboard()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -471,6 +495,110 @@ fun HostLobbyScreen(
                 Text("Ir al Marcador de Piedras", fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             }
         }
+    }
+
+    // Advertencia si se inicia la partida multijugador sin todos los jugadores
+    if (showIncompletePlayersDialog) {
+        val currentCount = uiState.gameState.connectedPlayers.size
+        val effectiveCapacity = if (uiState.gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) {
+            uiState.gameState.maxPlayers
+        } else if (uiState.maxPlayers in listOf(2, 3, 4, 6, 8)) {
+            uiState.maxPlayers
+        } else {
+            4
+        }
+
+        AlertDialog(
+            onDismissRequest = { showIncompletePlayersDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Seguro que quieres iniciar la partida",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Aún no están todos los jugadores conectados ($currentCount de $effectiveCapacity).",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showIncompletePlayersDialog = false
+                        viewModel.navigateToScoreboard()
+                    }
+                ) {
+                    Text("Sí, empezar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showIncompletePlayersDialog = false }
+                ) {
+                    Text("No, esperar", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    // Diálogo de confirmación para salir de la sala del Anfitrión
+    if (showExitHostRoomConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitHostRoomConfirmation = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Seguro que quieres salir, se cerrará la sala",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Si sales al menú principal, la sala se cerrará y se desconectará a los jugadores unidos.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitHostRoomConfirmation = false
+                        viewModel.exitGame()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Sí", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showExitHostRoomConfirmation = false }
+                ) {
+                    Text("No", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     // Diálogo de autorización de cambio de equipo en el lobby para el Anfitrión

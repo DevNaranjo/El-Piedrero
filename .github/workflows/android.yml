@@ -34,12 +34,31 @@ jobs:
       - name: Run Unit Tests
         run: ./gradlew test --stacktrace
 
-      - name: Assemble Release APK
-        run: ./gradlew assembleRelease --stacktrace
+      - name: Run Lint Analysis
+        run: ./gradlew lintVitalRelease --stacktrace
+
+      - name: Build Release APK and App Bundle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease bundleRelease --stacktrace
+
+      - name: Generate Checksums
+        run: |
+          cd app/build/outputs/apk/release/
+          sha256sum *.apk > checksums.txt || true
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: ElPiedrero-APK
-          path: app/build/outputs/apk/release/app-release.apk
+          name: ElPiedrero-Release-APK
+          path: app/build/outputs/apk/release/
+          retention-days: 14
+
+      - name: Upload Release Bundle (AAB)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElPiedrero-Release-Bundle
+          path: app/build/outputs/bundle/release/
           retention-days: 14

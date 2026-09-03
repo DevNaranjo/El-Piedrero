@@ -51,6 +51,7 @@ enum class SoundType {
     JUGADA_MAJO_Y_LIMPIO,
     JUGADA_CONTRAMAJO,
     JUGADA_REQUETEMAJO,
+    JUGADA_SOBREMAJO,
     JUGADA_REQUETECONTRAMAJO,
     PIEDRA_ADD,
     PIEDRA_SUBTRACT
@@ -67,7 +68,8 @@ enum class CantoType(val defaultPiedras: Int, val displayName: String, val sound
     MAJO_Y_LIMPIO(2, "Majo y Limpio (+2)", SoundType.JUGADA_MAJO_Y_LIMPIO),
     CONTRAMAJO(2, "Contramajo (+2)", SoundType.JUGADA_CONTRAMAJO),
     REQUETEMAJO(3, "Requetemajo (+3)", SoundType.JUGADA_REQUETEMAJO),
-    REQUETECONTRAMAJO(4, "Requetecontramajo (+4)", SoundType.JUGADA_REQUETECONTRAMAJO),
+    SOBREMAJO(4, "Sobremajo (+4)", SoundType.JUGADA_SOBREMAJO),
+    REQUETECONTRAMAJO(4, "Sobremajo (+4)", SoundType.JUGADA_SOBREMAJO),
     MANUAL_ADJUST(0, "Ajuste Manual", SoundType.CARD_PLAYED)
 }
 
@@ -214,6 +216,7 @@ data class NetworkEnvelope(
     val type: MessageType,
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
+    val sequenceNumber: Long = 0L,
     val senderId: String,
     val joinRequest: JoinRequestPayload? = null,
     val joinResponse: JoinResponsePayload? = null,

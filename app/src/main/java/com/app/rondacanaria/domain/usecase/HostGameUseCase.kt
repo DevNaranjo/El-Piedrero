@@ -44,6 +44,9 @@ class HostGameUseCase(
 
     private var currentRoomToken: String = ""
     private var currentEncryptionKey: String = ""
+    private val assignedPlayerSeats = java.util.concurrent.ConcurrentHashMap<String, Team>()
+    private val clientLastSequence = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val outgoingSequence = java.util.concurrent.atomic.AtomicLong(0)
 
     val roomToken: String get() = currentRoomToken
     val encryptionKey: String get() = currentEncryptionKey
@@ -69,12 +72,17 @@ class HostGameUseCase(
         currentEncryptionKey = com.app.rondacanaria.data.network.crypto.RondaCipher.generateKey()
         socketServer.setEncryptionKey(currentEncryptionKey)
 
+        assignedPlayerSeats.clear()
+        clientLastSequence.clear()
+        outgoingSequence.set(0)
+
         val hostPlayer = Player(
             id = UUID.randomUUID().toString(),
             name = hostPlayerName,
             team = Team.TEAM_A,
             isHost = true
         )
+        assignedPlayerSeats[hostPlayer.id] = hostPlayer.team
 
         // Para 2 y 3 jugadores:
         // - Si el nombre de equipo ya viene relleno (local), usarlo tal cual.
@@ -149,6 +157,21 @@ class HostGameUseCase(
     }
 
     private suspend fun handleClientMessage(clientId: String, envelope: NetworkEnvelope) {
+        // Validación anti-replay y obsolescencia temporal (>60s)
+        val now = System.currentTimeMillis()
+        if (Math.abs(now - envelope.timestamp) > 60_000L) {
+            android.util.Log.w("HostGameUseCase", "Trama descartada por antigüedad/desfase temporal excesivo: ${envelope.timestamp} vs $now")
+            return
+        }
+        if (envelope.sequenceNumber > 0) {
+            val lastSeq = clientLastSequence[envelope.senderId] ?: 0L
+            if (envelope.sequenceNumber <= lastSeq) {
+                android.util.Log.w("HostGameUseCase", "Trama descartada por secuencia duplicada o ataque de replay: seq=${envelope.sequenceNumber} <= lastSeq=$lastSeq")
+                return
+            }
+            clientLastSequence[envelope.senderId] = envelope.sequenceNumber
+        }
+
         when (envelope.type) {
             MessageType.JOIN_REQUEST -> {
                 val joinReq = envelope.joinRequest ?: return
@@ -157,6 +180,7 @@ class HostGameUseCase(
                 if (currentRoomToken.isNotBlank() && joinReq.roomToken != currentRoomToken) {
                     val reject = NetworkEnvelope(
                         type = MessageType.JOIN_RESPONSE,
+                        sequenceNumber = outgoingSequence.incrementAndGet(),
                         senderId = "HOST",
                         joinResponse = JoinResponsePayload(
                             accepted = false,
@@ -177,12 +201,14 @@ class HostGameUseCase(
                     if (existingPlayer == null && currentPlayers.size >= maxCapacity) {
                         Pair(false, null)
                     } else {
+                        val assignedTeam = assignedPlayerSeats[envelope.senderId] ?: assignBalancedTeam()
                         val player = existingPlayer?.copy(name = joinReq.playerName) ?: Player(
                             id = envelope.senderId,
                             name = joinReq.playerName,
-                            team = assignBalancedTeam(),
+                            team = assignedTeam,
                             isHost = false
                         )
+                        assignedPlayerSeats[player.id] = player.team
 
                         val updatedClients = _connectedClients.value.toMutableMap()
                         updatedClients[clientId] = player
@@ -353,11 +379,15 @@ class HostGameUseCase(
             updatedClients.remove(clientId)
             _connectedClients.value = updatedClients
 
-            val updatedPlayers = _gameState.value.connectedPlayers.filter { it.id != disconnectedPlayer.id }
-            _gameState.value = _gameState.value.copy(
-                version = _gameState.value.version + 1,
-                connectedPlayers = updatedPlayers
-            )
+            // Si la partida está activa (PLAYING), no eliminamos al jugador de connectedPlayers
+            // para que su asiento, equipo y tanteo queden preservados ante microcortes de red o bloqueo de pantalla
+            if (_gameState.value.status != GameStatus.PLAYING) {
+                val updatedPlayers = _gameState.value.connectedPlayers.filter { it.id != disconnectedPlayer.id }
+                _gameState.value = _gameState.value.copy(
+                    version = _gameState.value.version + 1,
+                    connectedPlayers = updatedPlayers
+                )
+            }
         }
         broadcastCurrentState()
     }

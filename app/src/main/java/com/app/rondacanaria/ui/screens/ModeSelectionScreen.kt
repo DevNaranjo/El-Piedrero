@@ -1,5 +1,6 @@
 package com.app.rondacanaria.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,10 +9,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.app.rondacanaria.ui.components.AudioSettingsDialog
+import com.app.rondacanaria.ui.components.PrivacyPolicyDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +32,7 @@ import com.app.rondacanaria.R
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.LicensesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +41,9 @@ fun ModeSelectionScreen(
     viewModel: ScoreViewModel
 ) {
     var showLocalSetupDialog by remember { mutableStateOf(false) }
+    var showAudioSettingsDialog by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
     var localMaxPlayers by remember { mutableStateOf(4) }
     var localTeamA by remember { mutableStateOf("Equipo A") }
     var localTeamB by remember { mutableStateOf("Equipo B") }
@@ -42,11 +52,30 @@ fun ModeSelectionScreen(
     var localReserve6 by remember { mutableStateOf(Team.TEAM_C) }
     var localReserves8 by remember { mutableStateOf(setOf(Team.TEAM_C, Team.TEAM_D)) }
 
+    // Al pulsar atrás en el menú principal: cerrar diálogos abiertos en vez de salir de la app
+    BackHandler(enabled = showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
+        if (showLicensesDialog) {
+            showLicensesDialog = false
+        } else if (showPrivacyDialog) {
+            showPrivacyDialog = false
+        } else if (showAudioSettingsDialog) {
+            showAudioSettingsDialog = false
+        } else if (showLocalSetupDialog) {
+            showLocalSetupDialog = false
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("El Piedrero 🃏", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { showPrivacyDialog = true }) {
+                        Icon(Icons.Default.Shield, contentDescription = "Privacidad y Uso de Datos")
+                    }
+                    IconButton(onClick = { showAudioSettingsDialog = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido")
+                    }
                     IconButton(onClick = { viewModel.goToHistory() }) {
                         Icon(Icons.Default.History, contentDescription = "Ver Historial")
                     }
@@ -209,6 +238,90 @@ fun ModeSelectionScreen(
                     fontSize = 15.sp,
                     textAlign = TextAlign.Center
                 )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Subapartado: Privacidad y Protección de Datos
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPrivacyDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = "Privacidad y Uso de Datos",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Privacidad y Uso de Datos",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "100% Offline & P2P · Cero recopilación · Licencia MIT",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Subapartado: Licencias de Código Abierto (Atribución Apache 2.0 / MIT)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLicensesDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Licencias de Software Libre",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Licencias de Código Abierto",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "ZXing, AndroidX, Jetpack Compose · Apache 2.0",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }
@@ -471,6 +584,34 @@ fun ModeSelectionScreen(
                     Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
+        )
+    }
+
+    if (showAudioSettingsDialog) {
+        AudioSettingsDialog(
+            masterVolume = uiState.masterVolume,
+            musicVolume = uiState.musicVolume,
+            sfxVolume = uiState.sfxVolume,
+            isMusicEnabled = uiState.isMusicEnabled,
+            isSfxEnabled = uiState.isSfxEnabled,
+            onMasterVolumeChange = { viewModel.setMasterVolume(it) },
+            onMusicVolumeChange = { viewModel.setMusicVolume(it) },
+            onSfxVolumeChange = { viewModel.setSfxVolume(it) },
+            onToggleMusic = { viewModel.toggleMusic(it) },
+            onToggleSfx = { viewModel.toggleSfx(it) },
+            onDismiss = { showAudioSettingsDialog = false }
+        )
+    }
+
+    if (showPrivacyDialog) {
+        PrivacyPolicyDialog(
+            onDismiss = { showPrivacyDialog = false }
+        )
+    }
+
+    if (showLicensesDialog) {
+        LicensesDialog(
+            onDismiss = { showLicensesDialog = false }
         )
     }
 }

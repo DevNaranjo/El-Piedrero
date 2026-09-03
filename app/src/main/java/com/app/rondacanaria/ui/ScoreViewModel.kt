@@ -26,7 +26,7 @@ enum class AppScreen {
 
 data class ScoreUiState(
     val currentScreen: AppScreen = AppScreen.MODE_SELECTION,
-    val playerName: String = "Jugador Canario",
+    val playerName: String = "",
     val teamAName: String = "Equipo A",
     val teamBName: String = "Equipo B",
     val teamCName: String = "Equipo C",
@@ -38,7 +38,12 @@ data class ScoreUiState(
     val gameState: GameState = GameState(gameId = ""),
     val hostConnectionInfo: ConnectionInfo? = null,
     val sessionStatus: SessionStatus = SessionStatus.IDLE,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isMusicEnabled: Boolean = true,
+    val isSfxEnabled: Boolean = true,
+    val masterVolume: Float = 1.0f,
+    val musicVolume: Float = 0.5f,
+    val sfxVolume: Float = 1.0f
 )
 
 class ScoreViewModel(
@@ -52,7 +57,15 @@ class ScoreViewModel(
     val gameHistory: StateFlow<List<GameHistoryRecord>> = historyRepository.history
     private var lastRecordedGameId: String? = null
 
-    private val _uiState = MutableStateFlow(ScoreUiState())
+    private val _uiState = MutableStateFlow(
+        ScoreUiState(
+            isMusicEnabled = audioPlayer.isMusicEnabled,
+            isSfxEnabled = audioPlayer.isSfxEnabled,
+            masterVolume = audioPlayer.masterVolume,
+            musicVolume = audioPlayer.musicVolume,
+            sfxVolume = audioPlayer.sfxVolume
+        )
+    )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
 
     init {
@@ -474,9 +487,47 @@ class ScoreViewModel(
         _uiState.update {
             ScoreUiState(
                 currentScreen = AppScreen.MODE_SELECTION,
-                playerName = it.playerName
+                playerName = it.playerName,
+                isMusicEnabled = audioPlayer.isMusicEnabled,
+                isSfxEnabled = audioPlayer.isSfxEnabled,
+                masterVolume = audioPlayer.masterVolume,
+                musicVolume = audioPlayer.musicVolume,
+                sfxVolume = audioPlayer.sfxVolume
             )
         }
+    }
+
+    fun pauseBackgroundMusic() {
+        audioPlayer.pauseBackgroundMusic()
+    }
+
+    fun resumeBackgroundMusic() {
+        audioPlayer.resumeBackgroundMusic()
+    }
+
+    fun toggleMusic(enabled: Boolean) {
+        audioPlayer.isMusicEnabled = enabled
+        _uiState.update { it.copy(isMusicEnabled = enabled) }
+    }
+
+    fun toggleSfx(enabled: Boolean) {
+        audioPlayer.isSfxEnabled = enabled
+        _uiState.update { it.copy(isSfxEnabled = enabled) }
+    }
+
+    fun setMasterVolume(volume: Float) {
+        audioPlayer.masterVolume = volume
+        _uiState.update { it.copy(masterVolume = volume) }
+    }
+
+    fun setMusicVolume(volume: Float) {
+        audioPlayer.musicVolume = volume
+        _uiState.update { it.copy(musicVolume = volume) }
+    }
+
+    fun setSfxVolume(volume: Float) {
+        audioPlayer.sfxVolume = volume
+        _uiState.update { it.copy(sfxVolume = volume) }
     }
 
     override fun onCleared() {

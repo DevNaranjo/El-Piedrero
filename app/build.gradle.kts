@@ -16,8 +16,8 @@ android {
         applicationId = "com.app.rondacanaria"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.02092026.2"
+        versionCode = 2
+        versionName = "1.0.03092026"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -27,22 +27,24 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = file("${rootDir}/release.keystore")
+            val envKeystorePath = System.getenv("KEYSTORE_PATH")
+            val keystoreFile = if (!envKeystorePath.isNullOrBlank()) file(envKeystorePath) else file("${rootDir}/release.keystore")
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
-                storePassword = "elPiedreroKey2026!"
-                keyAlias = "elpiedrero"
-                keyPassword = "elPiedreroKey2026!"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: (project.findProperty("KEYSTORE_PASSWORD") as? String) ?: ""
+                keyAlias = System.getenv("KEY_ALIAS") ?: (project.findProperty("KEY_ALIAS") as? String) ?: "elpiedrero"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: (project.findProperty("KEY_PASSWORD") as? String) ?: ""
             }
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            val releaseKeystore = file("${rootDir}/release.keystore")
-            signingConfig = if (releaseKeystore.exists()) {
-                signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile?.exists() == true && !releaseSigning.storePassword.isNullOrBlank()) {
+                releaseSigning
             } else {
                 signingConfigs.getByName("debug")
             }
@@ -70,7 +72,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    aaptOptions {
+    androidResources {
         noCompress += listOf("mp3", "wav", "ogg", "m4a")
     }
 }

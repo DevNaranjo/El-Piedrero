@@ -1,9 +1,12 @@
 package com.app.rondacanaria.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -11,13 +14,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.CanarianNames
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,7 +31,13 @@ fun LobbyScreen(
     uiState: ScoreUiState,
     viewModel: ScoreViewModel
 ) {
+    val context = LocalContext.current
     var playerName by remember { mutableStateOf(uiState.playerName) }
+    var showNameError by remember { mutableStateOf(false) }
+    var showCameraNoticeDialog by remember { mutableStateOf(false) }
+    val randomExampleName = remember { CanarianNames.getRandomName() }
+    val isNameValid = playerName.trim().isNotBlank()
+
     var teamAName by remember { mutableStateOf(uiState.teamAName) }
     var teamBName by remember { mutableStateOf(uiState.teamBName) }
     var teamCName by remember { mutableStateOf(uiState.teamCName) }
@@ -77,9 +89,28 @@ fun LobbyScreen(
                 onValueChange = {
                     playerName = it
                     viewModel.setPlayerName(it)
+                    if (it.trim().isNotBlank()) {
+                        showNameError = false
+                    }
                 },
-                label = { Text("Tu Nombre / Alias") },
+                label = { Text("Tu Nombre / Alias *") },
+                placeholder = {
+                    Text(
+                        text = "(ej: $randomExampleName)",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                isError = showNameError && !isNameValid,
+                supportingText = {
+                    if (showNameError && !isNameValid) {
+                        Text(
+                            text = "Es obligatorio poner un nombre antes de entrar a una partida",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -87,14 +118,21 @@ fun LobbyScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { showHostDialog = true },
+                onClick = {
+                    if (isNameValid) {
+                        showNameError = false
+                        showHostDialog = true
+                    } else {
+                        showNameError = true
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Icon(Icons.Default.PlayArrow, contentDescription = "Crear Mesa Host")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Crear Mesa (Host con QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             }
@@ -102,17 +140,78 @@ fun LobbyScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = { viewModel.openScanner() },
+                onClick = {
+                    if (isNameValid) {
+                        showNameError = false
+                        val hasCamPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasCamPermission) {
+                            viewModel.openScanner()
+                        } else {
+                            showCameraNoticeDialog = true
+                        }
+                    } else {
+                        showNameError = true
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Icon(Icons.Default.QrCodeScanner, contentDescription = "Escanear código QR")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Unirse a Mesa (Escanear QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             }
         }
+    }
+
+    // Diálogo de aviso: se requieren permisos de cámara para escanear el QR
+    if (showCameraNoticeDialog) {
+        AlertDialog(
+            onDismissRequest = { showCameraNoticeDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Aviso de Permisos de Cámara",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Se necesitan los permisos para acceder a la cámara si se quiere escanear el código QR y unirse a la partida multijugador.\n\nAl continuar, la aplicación te solicitará la autorización para usar la cámara trasera.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCameraNoticeDialog = false
+                        viewModel.openScanner()
+                    }
+                ) {
+                    Text("Continuar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCameraNoticeDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     if (showHostDialog) {

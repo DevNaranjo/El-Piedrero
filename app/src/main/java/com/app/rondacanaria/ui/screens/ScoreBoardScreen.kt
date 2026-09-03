@@ -1,5 +1,6 @@
 package com.app.rondacanaria.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,6 +34,7 @@ import com.app.rondacanaria.data.model.*
 import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.AudioSettingsDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,10 +49,31 @@ fun ScoreBoardScreen(
     var selectedTeamForCanto by remember(uiState.myTeam, isMultiplayerClient) {
         mutableStateOf(if (isMultiplayerClient && uiState.myTeam != Team.SPECTATOR && uiState.myTeam != Team.RESERVE) uiState.myTeam else Team.TEAM_A)
     }
+    var showExitConfirmationDialog by remember { mutableStateOf(false) }
     var showEndGameConfirmation by remember { mutableStateOf(false) }
     var customAdjustTeam by remember { mutableStateOf<Team?>(null) }
     var showSwitchTeamDialog by remember { mutableStateOf(false) }
     var showMoveHistoryDialog by remember { mutableStateOf(false) }
+    var showAudioSettingsDialog by remember { mutableStateOf(false) }
+
+    // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
+    BackHandler {
+        if (showAudioSettingsDialog) {
+            showAudioSettingsDialog = false
+        } else if (showMoveHistoryDialog) {
+            showMoveHistoryDialog = false
+        } else if (showSwitchTeamDialog) {
+            showSwitchTeamDialog = false
+        } else if (customAdjustTeam != null) {
+            customAdjustTeam = null
+        } else if (showExitConfirmationDialog) {
+            showExitConfirmationDialog = false
+        } else if (showEndGameConfirmation) {
+            showEndGameConfirmation = false
+        } else {
+            showExitConfirmationDialog = true
+        }
+    }
 
     val hasTeamC = gameState.maxPlayers in listOf(3, 6, 8) || uiState.maxPlayers in listOf(3, 6, 8)
     val hasTeamD = gameState.maxPlayers == 8 || uiState.maxPlayers == 8
@@ -149,7 +172,7 @@ fun ScoreBoardScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.exitGame() }) {
+                    IconButton(onClick = { showExitConfirmationDialog = true }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Salir")
                     }
                 },
@@ -189,6 +212,9 @@ fun ScoreBoardScreen(
                         IconButton(onClick = { viewModel.resetGame() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Reiniciar Puntos")
                         }
+                    }
+                    IconButton(onClick = { showAudioSettingsDialog = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -291,8 +317,8 @@ fun ScoreBoardScreen(
                             onClick = { viewModel.changeDeal(gameState.currentDeal - 1) },
                             enabled = !isReserve && gameState.currentDeal > 1,
                             modifier = Modifier
-                                .size(44.dp)
-                                .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp),
+                                .size(48.dp)
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(
@@ -305,7 +331,7 @@ fun ScoreBoardScreen(
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(44.dp)
+                            modifier = Modifier.height(48.dp)
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
@@ -316,7 +342,7 @@ fun ScoreBoardScreen(
                                 Text(
                                     text = "${gameState.currentDeal}º / $maxDeals",
                                     fontWeight = FontWeight.Black,
-                                    fontSize = 13.5.sp,
+                                    fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
@@ -330,8 +356,8 @@ fun ScoreBoardScreen(
                             },
                             enabled = !isReserve,
                             modifier = Modifier
-                                .size(44.dp)
-                                .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp),
+                                .size(48.dp)
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
@@ -791,7 +817,7 @@ fun ScoreBoardScreen(
                     }
 
                     FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.REQUETECONTRAMAJO) },
+                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.SOBREMAJO) },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -803,8 +829,8 @@ fun ScoreBoardScreen(
                         )
                     ) {
                         Text(
-                            text = CantoType.REQUETECONTRAMAJO.displayName,
-                            fontSize = 11.sp,
+                            text = CantoType.SOBREMAJO.displayName,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -870,6 +896,23 @@ fun ScoreBoardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Diálogo de Ajustes de Audio (Música y Efectos de Sonido)
+    if (showAudioSettingsDialog) {
+        AudioSettingsDialog(
+            masterVolume = uiState.masterVolume,
+            musicVolume = uiState.musicVolume,
+            sfxVolume = uiState.sfxVolume,
+            isMusicEnabled = uiState.isMusicEnabled,
+            isSfxEnabled = uiState.isSfxEnabled,
+            onMasterVolumeChange = { viewModel.setMasterVolume(it) },
+            onMusicVolumeChange = { viewModel.setMusicVolume(it) },
+            onSfxVolumeChange = { viewModel.setSfxVolume(it) },
+            onToggleMusic = { viewModel.toggleMusic(it) },
+            onToggleSfx = { viewModel.toggleSfx(it) },
+            onDismiss = { showAudioSettingsDialog = false }
+        )
     }
 
     // Diálogo con el registro de movimientos de la partida actual
@@ -1019,6 +1062,71 @@ fun ScoreBoardScreen(
                     Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
+        )
+    }
+
+    // Diálogo de confirmación para Salir de la Sala / Partida
+    if (showExitConfirmationDialog) {
+        val isMultiplayer = !uiState.isLocalGame
+        val hostPlayerName = gameState.connectedPlayers.find { it.isHost }?.name
+            ?: uiState.hostConnectionInfo?.hostName
+            ?: "el anfitrión"
+
+        val dialogTitle = when {
+            isMultiplayer && uiState.isHost -> "Seguro que quieres salir, se cerrará la sala"
+            isMultiplayer && !uiState.isHost -> "estás seguro que quieres salir de la sala de $hostPlayerName"
+            else -> "¿Seguro que deseas salir de la partida?"
+        }
+
+        val dialogDescription = when {
+            isMultiplayer && uiState.isHost -> "Al salir al menú se cerrará la sala y todos los jugadores conectados serán desconectados."
+            isMultiplayer && !uiState.isHost -> "Abandonarás la mesa de juego y volverás a la pantalla principal."
+            else -> "Se cancelará el tanteo actual y volverás al menú principal."
+        }
+
+        AlertDialog(
+            onDismissRequest = { showExitConfirmationDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = dialogTitle,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = dialogDescription,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirmationDialog = false
+                        viewModel.exitGame()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Sí", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showExitConfirmationDialog = false }
+                ) {
+                    Text("No", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1172,22 +1280,22 @@ fun RondaScoreCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = teamName,
-                    fontSize = if (isCompact) 14.5.sp else 17.sp,
+                    fontSize = if (isCompact) 15.sp else 17.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Surface(
-                    color = if (wins > 0) Color(0xFFFFB300) else contentColor.copy(alpha = 0.12f),
+                    color = if (wins > 0) Color(0xFFFFB300) else contentColor.copy(alpha = 0.18f),
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
                         text = "🏆 $wins ${if (wins == 1) "victoria" else "victorias"}",
-                        fontSize = if (isCompact) 9.5.sp else 11.sp,
+                        fontSize = if (isCompact) 11.5.sp else 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (wins > 0) Color.Black else contentColor.copy(alpha = 0.75f),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                        color = if (wins > 0) Color.Black else contentColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
@@ -1204,21 +1312,21 @@ fun RondaScoreCard(
                         text = if (isCompact) "🌟 BUENAS (${score.buenas}/10)" else "🌟 ¡EN BUENAS! (${score.buenas}/10)",
                         color = Color.Black,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (isCompact) 10.5.sp else 12.sp
+                        fontSize = if (isCompact) 12.sp else 13.5.sp
                     )
                 }
             } else {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(contentColor.copy(alpha = 0.12f))
+                        .background(contentColor.copy(alpha = 0.18f))
                         .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = "Malas (${score.malas}/11)",
                         color = contentColor,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = if (isCompact) 10.5.sp else 12.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isCompact) 12.sp else 13.5.sp
                     )
                 }
             }
@@ -1233,16 +1341,16 @@ fun RondaScoreCard(
                 )
                 Text(
                     text = "Piedras / 21",
-                    fontSize = if (isCompact) 9.5.sp else 11.sp,
-                    color = contentColor.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Medium
+                    fontSize = if (isCompact) 11.5.sp else 13.sp,
+                    color = contentColor,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
             // Botones de ajuste manual (+1 / -1 / +N) o indicador de Equipo Rival bloqueado
             if (!canModify) {
                 Surface(
-                    color = contentColor.copy(alpha = 0.12f),
+                    color = contentColor.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1258,8 +1366,8 @@ fun RondaScoreCard(
                     ) {
                         Icon(
                             Icons.Default.Lock,
-                            contentDescription = "Equipo rival bloqueado",
-                            tint = contentColor.copy(alpha = 0.75f),
+                            contentDescription = "Equipo rival bloqueado para modificación",
+                            tint = contentColor.copy(alpha = 0.85f),
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1267,7 +1375,7 @@ fun RondaScoreCard(
                             text = "Equipo Rival",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = contentColor.copy(alpha = 0.85f),
+                            color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center
@@ -1293,14 +1401,14 @@ fun RondaScoreCard(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = contentColor.copy(alpha = 0.14f),
+                            containerColor = contentColor.copy(alpha = 0.18f),
                             contentColor = contentColor
                         )
                     ) {
                         Text(
                             text = "−",
                             style = MaterialTheme.typography.titleMedium,
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1318,14 +1426,14 @@ fun RondaScoreCard(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = contentColor.copy(alpha = 0.22f),
+                            containerColor = contentColor.copy(alpha = 0.25f),
                             contentColor = contentColor
                         )
                     ) {
                         Text(
                             text = "+",
                             style = MaterialTheme.typography.titleMedium,
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()

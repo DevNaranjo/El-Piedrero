@@ -122,9 +122,16 @@ fun QrCameraScanner(
                             )
                         }
 
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                    // Forzar estrictamente y de forma exclusiva la cámara trasera (LENS_FACING_BACK)
+                    val cameraSelector = CameraSelector.Builder()
+                        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                        .build()
 
                     try {
+                        if (!cameraProvider.hasCamera(cameraSelector)) {
+                            onScanError("No se detectó cámara trasera disponible en el dispositivo.")
+                            return@addListener
+                        }
                         cameraProvider.unbindAll()
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
@@ -133,7 +140,7 @@ fun QrCameraScanner(
                             imageAnalysis
                         )
                     } catch (e: Exception) {
-                        onScanError("Error al iniciar la cámara: ${e.localizedMessage}")
+                        onScanError("Error al iniciar la cámara trasera: ${e.localizedMessage}")
                     }
                 }, ContextCompat.getMainExecutor(ctx))
 

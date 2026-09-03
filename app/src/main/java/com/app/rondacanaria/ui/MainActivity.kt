@@ -2,6 +2,7 @@ package com.app.rondacanaria.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
@@ -31,6 +32,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val uiState by viewModel.uiState.collectAsState()
 
+                    // Interceptar el botón físico o gesto de "Atrás" de Android para no cerrar la app
+                    BackHandler(enabled = uiState.currentScreen != AppScreen.MODE_SELECTION && uiState.currentScreen != AppScreen.SCOREBOARD && uiState.currentScreen != AppScreen.HOST_LOBBY) {
+                        when (uiState.currentScreen) {
+                            AppScreen.HISTORY -> viewModel.goToModeSelection()
+                            AppScreen.LOBBY -> viewModel.goToModeSelection()
+                            AppScreen.CLIENT_SCANNER -> viewModel.goToNetworkLobby()
+                            else -> {}
+                        }
+                    }
+
                     Crossfade(targetState = uiState.currentScreen, label = "ScreenTransition") { screen ->
                         when (screen) {
                             AppScreen.MODE_SELECTION -> ModeSelectionScreen(uiState = uiState, viewModel = viewModel)
@@ -44,5 +55,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.resumeBackgroundMusic()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        viewModel.pauseBackgroundMusic()
     }
 }

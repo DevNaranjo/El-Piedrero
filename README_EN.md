@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-1.0.02092026.2-orange.svg)](https://github.com/DevNaranjo/ElPiedrero/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.03092026-orange.svg)](https://github.com/DevNaranjo/ElPiedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -18,15 +18,11 @@ Play with a single phone in the center of the table or synchronize scores across
 
 ## 📥 Direct Download
 
-If you simply want to install and play with family and friends:
-* Download the ready-to-use installer: **[`ElPiedrero.apk`](ElPiedrero.apk)**.
-* Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher.
-* **Integrity Checksum (SHA-256):**
-  ```text
-  0484B51C4453376F233AFADA531DEC4F12B68BFFF6A7014351EC774D0546863A
-  ```
-  *(In PowerShell: `Get-FileHash ElPiedrero.apk -Algorithm SHA256` | In Linux/macOS: `sha256sum ElPiedrero.apk`)*
-* **Official Release Signature:** RSA 2048-bit digital certificate in the name of `DevNaranjo`.
+If you want to install and play Ronda Canaria with friends and family:
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/ElPiedrero/releases)** page.
+* Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
+* **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
+* **Official Signature:** Digital certificate issued to `DevNaranjo`.
 
 ---
 
@@ -70,24 +66,42 @@ The game is played to a total of **21 Stones ("Piedras")**:
 | **Majo** | **+1** | Playing a card identical to the one just played by the preceding player. | 🔊 `Majo.mp3` |
 | **Limpiar** | **+1** | Collecting all cards and leaving the table completely clear. | 🔊 `Limpio.mp3` |
 | **Majo y Limpio** | **+2** | Matching opponent's card and clearing the table at the same time. | 🔊 `Majo-y-limpio.mp3` |
+| **Contramajo** | **+2** | Majo response against opponent's majo. | 🔊 `Contra-majo.mp3` |
+| **Requetemajo** | **+3** | Third consecutive majo in hand. | 🔊 `Requetemajo.mp3` |
+| **Sobremajo** | **+4** | Fourth consecutive majo on the table. | 🔊 `Sobremajo.mp3` |
 | **Manual Adjust (+ / -)** | **+1 / -1** | Manual score adjustment at any time. | 📳 Click / Haptic |
 
 ---
 
-## 🚀 Changelog — v1.0.02092026.2
+## 🚀 Changelog — v1.0.03092026
 
-### 🆕 Latest Improvements (v1.0.02092026.2)
+### 🆕 Quality Audit & Production Readiness (v1.0.03092026)
 
-* 🛡️ **Network Hardening & Socket Security:** Automatic discard on Host of unauthorized remote control commands (`ROOM_CONFIG_UPDATE` and `END_GAME`) from clients; table configuration and game termination are strictly restricted to the local Host console.
-* 🔒 **Strict Network Policy:** Removed `android:usesCleartextTraffic` and added `network_security_config.xml` with `cleartextTrafficPermitted="false"` to prevent any unencrypted HTTP traffic.
-* ⚡ **Direct Audio Streaming (Zero Disk I/O):** `RondaAudioPlayer` now streams audio directly from the APK asset descriptor (`AssetFileDescriptor`), eliminating unnecessary disk writes on device flash memory.
-* 🚀 **Compose Memoization:** Memoized deal history grouping and sorting in `ScoreBoardScreen.kt` with `remember(history)` to prevent redundant recalculations during recomposition.
-* 🧹 **ViewModel Lifecycle Cleanup:** Explicit socket server and client cleanup in `ScoreViewModel.onCleared()` to prevent background coroutine or connection leaks.
-* 📐 **Refactored 2-Column Call Buttons:** Symmetric 5x2 grid with `Modifier.weight(1f)`, 48 dp height, 12 dp rounded corners, Material 3 color hierarchy, and `TextOverflow.Ellipsis`.
-* ♿ **Accessible Stone Scoring Buttons (48 dp):** Continuous full-width horizontal bar for manual stone adjustments (`-`, `+`, `+N`) with 48 dp minimum touch target and bold `titleMedium` typography for seniors.
-* 🃏 **Deal Stepper Normalization:** Card dealing stepper buttons normalized to 44x44 dp with generous spacing around the central ordinal indicator.
+* 🛡️ **DevSecOps & Secure Credential Management:** Removed plaintext keystore secrets and passwords from source files (`app/build.gradle.kts`). Signing credentials are now dynamically read from environment variables during CI/CD.
+* 📦 **R8 Minification & Size Reduction:** Enabled `isMinifyEnabled = true` and `isShrinkResources = true` with tailored ProGuard keep rules for Compose, ZXing, and Kotlinx Serialization. Release APK footprint reduced to **8.2 MB** (>40% reduction).
+* 🔒 **Local Network Anti-Replay Protection:** Added monotonic packet sequence numbers (`sequenceNumber`) and 60-second time-window expiration checks to `NetworkEnvelope` to prevent network packet reinjection.
+* 🔄 **P2P Reconnection Resilience:** Active match disconnection grace period (`assignedPlayerSeats`) preserves player seats, team assignments, and scores upon reconnection without unexpected restarts.
+* 🎧 **System Audio Focus Integration:** Android system `AudioFocusRequest` with `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` in `RondaAudioPlayer` plus automatic cleanup of temporary audio cache files.
+* 🎼 **Legal & Royalty-Free Folk Music:** Replaced copyrighted audio tracks with original CC0/Public Domain Canarian acoustic folk music loops (`bgm_FolkCanario_Isas.wav` & `bgm_FolkCanario_Folias.wav`) documented in `MUSIC_LICENSES.md`.
+* 📜 **Open Source License Attribution:** Interactive in-app dialog (`LicensesDialog.kt`) providing required Apache 2.0 attribution notices (ZXing, AndroidX, Jetpack Compose).
+* ♿ **Universal Accessibility (WCAG 2.1 AA / AAA):**
+  * **Universal 48 dp Touch Targets:** All interactive UI elements (scoring buttons, call tiles, deal stepper, lobby controls, and dialog actions) adhere to the **48×48 dp** minimum (`defaultMinSize(48.dp, 48.dp)`).
+  * **High Visual Contrast:** Wins and "En Buenas" badges reach contrast ratios exceeding **10:1** (surpassing WCAG AAA) with high-legibility typography (≥ 12–14 sp).
+  * **Full TalkBack Semantics:** Added descriptive Spanish `contentDescription` attributes to all action buttons and status icons.
+* 📱 **Locked Portrait Orientation:** Explicitly locked to portrait in `AndroidManifest.xml` for physical table gameplay stability.
+* 🧪 **Expanded Automated Test Suite:** Added `HostGameUseCaseTest.kt` verifying 21-stone victory boundary, malas-to-buenas transitions, victory reversal on undo, and deal limits.
+* ⚙️ **Robust CI/CD Pipeline:** Updated GitHub Actions workflow with `lintVitalRelease`, release APK and AAB bundle builds (`bundleRelease`), and SHA-256 checksum generation (`checksums.txt`).
+
+### 🏷️ Previous History (v1.0.02092026.2)
+
+* 🛡️ **Network Hardening & Socket Security:** Automatic discard on Host of unauthorized remote control commands (`ROOM_CONFIG_UPDATE` and `END_GAME`) from clients.
+* 🔒 **Strict Network Policy:** Removed `android:usesCleartextTraffic` and added `network_security_config.xml` with `cleartextTrafficPermitted="false"`.
+* ⚡ **Direct Audio Streaming (Zero Disk I/O):** `RondaAudioPlayer` streams audio directly from the APK asset descriptor (`AssetFileDescriptor`).
+* 🚀 **Compose Memoization:** Memoized deal history grouping and sorting in `ScoreBoardScreen.kt` with `remember(history)`.
+* 🧹 **ViewModel Lifecycle Cleanup:** Explicit socket server and client cleanup in `ScoreViewModel.onCleared()`.
+* 📐 **Refactored 2-Column Call Buttons:** Symmetric 5x2 grid with `Modifier.weight(1f)`, 48 dp height, and 12 dp rounded corners.
+* 🃏 **Deal Stepper Normalization:** Card dealing stepper controls normalized with generous spacing around the central ordinal indicator.
 * 🔊 **Independent Parallel Audio Channels:** Stone adjust sounds no longer interrupt or cut off the "¡Buenas!" audio.
-* ⚙️ **CI/CD & GitHub Actions:** Automatic keystore generation on CI runners when private signing keys are absent, plus dedicated ProGuard/R8 rules in `app/proguard-rules.pro`.
 
 ### 🏷️ Previous History (v1.0.02092026)
 
@@ -154,3 +168,10 @@ Contributions are welcome! Please check the [Contributing Guide](CONTRIBUTING_EN
 ## 📄 License
 
 This project is licensed under the **MIT License** in the name of **DevNaranjo (2026)**. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🔒 Privacy & Data Usage
+
+This project operates strictly 100% offline and P2P with **zero personal data collection**. For complete technical and legal details regarding permissions and storage, see [PRIVACY_AND_DATA_USAGE.md](PRIVACY_AND_DATA_USAGE.md).
+

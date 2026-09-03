@@ -34,6 +34,7 @@ class ClientGameUseCase(
     private var localPlayerName: String = "Jugador"
     private var targetRoomToken: String = ""
     val localPlayerId: String = UUID.randomUUID().toString()
+    private val outgoingSequence = java.util.concurrent.atomic.AtomicLong(0)
 
     private val _sessionStatus = MutableStateFlow(SessionStatus.IDLE)
     val sessionStatus: StateFlow<SessionStatus> = _sessionStatus.asStateFlow()
@@ -124,6 +125,7 @@ class ClientGameUseCase(
     private suspend fun sendJoinRequest() {
         val envelope = NetworkEnvelope(
             type = MessageType.JOIN_REQUEST,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             joinRequest = JoinRequestPayload(
                 playerName = localPlayerName,
@@ -179,6 +181,7 @@ class ClientGameUseCase(
     suspend fun requestCanto(teamId: Team, canto: CantoType) {
         val envelope = NetworkEnvelope(
             type = MessageType.SCORE_UPDATE,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             scoreUpdate = ScoreUpdatePayload(
                 teamId = teamId,
@@ -193,6 +196,7 @@ class ClientGameUseCase(
     suspend fun requestManualScoreChange(teamId: Team, deltaPiedras: Int, reason: String = "Ajuste manual") {
         val envelope = NetworkEnvelope(
             type = MessageType.SCORE_UPDATE,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             scoreUpdate = ScoreUpdatePayload(
                 teamId = teamId,
@@ -207,6 +211,7 @@ class ClientGameUseCase(
     suspend fun requestEndGame(reason: String = "Fin de partida solicitado") {
         val envelope = NetworkEnvelope(
             type = MessageType.END_GAME,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             endGame = EndGamePayload(reason = reason)
         )
@@ -219,6 +224,7 @@ class ClientGameUseCase(
         if (_gameState.value?.maxPlayers == 3 && _gameState.value?.moveHistory?.isNotEmpty() == true) return
         val envelope = NetworkEnvelope(
             type = MessageType.SWITCH_TEAM,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             switchTeam = SwitchTeamPayload(
                 playerId = localPlayerId,
@@ -232,6 +238,7 @@ class ClientGameUseCase(
     suspend fun requestUndoLastMove() {
         val envelope = NetworkEnvelope(
             type = MessageType.UNDO_LAST_MOVE,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId
         )
         socketClient.sendMessage(envelope)
@@ -241,6 +248,7 @@ class ClientGameUseCase(
         if (newDeal < 1) return
         val envelope = NetworkEnvelope(
             type = MessageType.UPDATE_DEAL,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             updateDeal = UpdateDealPayload(dealNumber = newDeal)
         )
@@ -254,6 +262,7 @@ class ClientGameUseCase(
                 delay(3000L)
                 val ping = NetworkEnvelope(
                     type = MessageType.HEARTBEAT_PING,
+                    sequenceNumber = outgoingSequence.incrementAndGet(),
                     senderId = localPlayerId
                 )
                 socketClient.sendMessage(ping)
