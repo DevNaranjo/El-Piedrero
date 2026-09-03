@@ -3,12 +3,12 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.03092026-orange.svg)](https://github.com/DevNaranjo/ElPiedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-1.0.03092026-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-blue.svg?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Android CI](https://github.com/DevNaranjo/ElPiedrero/actions/workflows/android.yml/badge.svg)](https://github.com/DevNaranjo/ElPiedrero/actions)
+[![Android CI](https://github.com/DevNaranjo/El-Piedrero/actions/workflows/android.yml/badge.svg)](https://github.com/DevNaranjo/El-Piedrero/actions)
 
 **El Piedrero** es una aplicación móvil nativa de código abierto para Android diseñada para llevar el tanteo de la tradicional **Ronda Canaria** de forma cómoda, automática y 100% offline (sin conexión a Internet).
 
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/ElPiedrero/releases)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -134,8 +134,8 @@ app/src/main/java/com/app/rondacanaria/
 ### Comandos de Terminal
 ```bash
 # Clonar el repositorio
-git clone https://github.com/DevNaranjo/ElPiedrero.git
-cd ElPiedrero
+git clone https://github.com/DevNaranjo/El-Piedrero.git
+cd El-Piedrero
 
 # Ejecutar la suite de pruebas unitarias
 ./gradlew test
