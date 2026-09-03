@@ -33,6 +33,7 @@ class ClientGameUseCase(
     private var targetPort: Int = NetworkUtils.DEFAULT_PORT
     private var localPlayerName: String = "Jugador"
     private var targetRoomToken: String = ""
+    private var targetHostName: String = ""
     val localPlayerId: String = UUID.randomUUID().toString()
     private val outgoingSequence = java.util.concurrent.atomic.AtomicLong(0)
 
@@ -56,12 +57,14 @@ class ClientGameUseCase(
         port: Int = NetworkUtils.DEFAULT_PORT,
         playerName: String,
         roomToken: String = "",
-        encryptionKey: String = ""
+        encryptionKey: String = "",
+        hostName: String = ""
     ) {
         this.targetHost = host
         this.targetPort = port
         this.localPlayerName = playerName
         this.targetRoomToken = roomToken
+        this.targetHostName = hostName
         this.socketClient.setEncryptionKey(encryptionKey)
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -104,7 +107,8 @@ class ClientGameUseCase(
                     }
                     is ClientConnectionState.Error -> {
                         stopHeartbeat()
-                        _errorMessage.value = state.message
+                        val hostLabel = if (targetHostName.isNotBlank()) "la mesa de $targetHostName" else "la mesa del anfitrión"
+                        _errorMessage.value = "Fallo al conectar con $hostLabel. Comprueba que ambos teléfonos estén en la misma red Wi-Fi o Zona Wi-Fi."
                         if (_sessionStatus.value == SessionStatus.CONNECTED || _sessionStatus.value == SessionStatus.RECONNECTING) {
                             triggerAutoReconnect()
                         } else {
@@ -295,7 +299,8 @@ class ClientGameUseCase(
 
             if (socketClient.connectionState.value !is ClientConnectionState.Connected) {
                 _sessionStatus.value = SessionStatus.DISCONNECTED
-                _errorMessage.value = "Se perdió la conexión con el Host."
+                val hostLabel = if (targetHostName.isNotBlank()) "la mesa de $targetHostName" else "la mesa del anfitrión"
+                _errorMessage.value = "Se perdió la conexión con $hostLabel."
             }
         }
     }
@@ -308,6 +313,7 @@ class ClientGameUseCase(
         useCaseScope?.cancel()
         useCaseScope = null
         targetRoomToken = ""
+        targetHostName = ""
         _sessionStatus.value = SessionStatus.DISCONNECTED
         _gameState.value = null
     }

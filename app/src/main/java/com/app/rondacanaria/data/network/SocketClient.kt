@@ -119,7 +119,7 @@ class SocketClient(
                     }
                 }
             } catch (e: Exception) {
-                _connectionState.value = ClientConnectionState.Error("Fallo al conectar con $host:$port", e)
+                _connectionState.value = ClientConnectionState.Error("Fallo al conectar con el servidor", e)
                 disconnectInternal()
             }
         }

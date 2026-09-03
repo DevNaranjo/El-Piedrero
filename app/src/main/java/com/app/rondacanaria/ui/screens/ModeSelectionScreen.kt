@@ -594,11 +594,13 @@ fun ModeSelectionScreen(
             sfxVolume = uiState.sfxVolume,
             isMusicEnabled = uiState.isMusicEnabled,
             isSfxEnabled = uiState.isSfxEnabled,
+            isVibrationEnabled = uiState.isVibrationEnabled,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
+            onToggleVibration = { viewModel.toggleVibration(it) },
             onDismiss = { showAudioSettingsDialog = false }
         )
     }

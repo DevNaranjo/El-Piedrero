@@ -39,11 +39,13 @@ data class ScoreUiState(
     val hostConnectionInfo: ConnectionInfo? = null,
     val sessionStatus: SessionStatus = SessionStatus.IDLE,
     val errorMessage: String? = null,
+    val connectingHostName: String? = null,
     val isMusicEnabled: Boolean = true,
     val isSfxEnabled: Boolean = true,
+    val isVibrationEnabled: Boolean = true,
     val masterVolume: Float = 1.0f,
     val musicVolume: Float = 0.5f,
-    val sfxVolume: Float = 1.0f
+    val sfxVolume: Float = 0.9f
 )
 
 class ScoreViewModel(
@@ -61,6 +63,7 @@ class ScoreViewModel(
         ScoreUiState(
             isMusicEnabled = audioPlayer.isMusicEnabled,
             isSfxEnabled = audioPlayer.isSfxEnabled,
+            isVibrationEnabled = audioPlayer.isVibrationEnabled,
             masterVolume = audioPlayer.masterVolume,
             musicVolume = audioPlayer.musicVolume,
             sfxVolume = audioPlayer.sfxVolume
@@ -138,7 +141,20 @@ class ScoreViewModel(
     }
 
     fun goToNetworkLobby() {
-        _uiState.update { it.copy(currentScreen = AppScreen.LOBBY) }
+        if (_uiState.value.isHost) {
+            hostUseCase.stopHost()
+        } else {
+            clientUseCase.leaveGame()
+        }
+        _uiState.update {
+            it.copy(
+                currentScreen = AppScreen.LOBBY,
+                hostConnectionInfo = null,
+                connectingHostName = null,
+                errorMessage = null,
+                sessionStatus = SessionStatus.IDLE
+            )
+        }
     }
 
     fun startLocalGame(
@@ -271,24 +287,45 @@ class ScoreViewModel(
     }
 
     fun openScanner() {
+        clientUseCase.leaveGame()
         _uiState.update {
             it.copy(
                 isHost = false,
                 isLocalGame = false,
                 currentScreen = AppScreen.CLIENT_SCANNER,
-                errorMessage = null
+                connectingHostName = null,
+                errorMessage = null,
+                sessionStatus = SessionStatus.IDLE
+            )
+        }
+    }
+
+    fun resetScannerConnection() {
+        clientUseCase.leaveGame()
+        _uiState.update {
+            it.copy(
+                connectingHostName = null,
+                errorMessage = null,
+                sessionStatus = SessionStatus.IDLE
             )
         }
     }
 
     fun onQrScanned(info: ConnectionInfo) {
         val name = _uiState.value.playerName
+        _uiState.update {
+            it.copy(
+                connectingHostName = info.hostName,
+                errorMessage = null
+            )
+        }
         clientUseCase.joinGame(
             host = info.ip,
             port = info.port,
             playerName = name,
             roomToken = info.roomToken,
-            encryptionKey = info.secretKey
+            encryptionKey = info.secretKey,
+            hostName = info.hostName
         )
     }
 
@@ -490,6 +527,7 @@ class ScoreViewModel(
                 playerName = it.playerName,
                 isMusicEnabled = audioPlayer.isMusicEnabled,
                 isSfxEnabled = audioPlayer.isSfxEnabled,
+                isVibrationEnabled = audioPlayer.isVibrationEnabled,
                 masterVolume = audioPlayer.masterVolume,
                 musicVolume = audioPlayer.musicVolume,
                 sfxVolume = audioPlayer.sfxVolume
@@ -513,6 +551,11 @@ class ScoreViewModel(
     fun toggleSfx(enabled: Boolean) {
         audioPlayer.isSfxEnabled = enabled
         _uiState.update { it.copy(isSfxEnabled = enabled) }
+    }
+
+    fun toggleVibration(enabled: Boolean) {
+        audioPlayer.isVibrationEnabled = enabled
+        _uiState.update { it.copy(isVibrationEnabled = enabled) }
     }
 
     fun setMasterVolume(volume: Float) {

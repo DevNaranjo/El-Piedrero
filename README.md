@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.03092026-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)
+[![Versión](https://img.shields.io/badge/Versión-1.0.03.092026.2-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -73,9 +73,21 @@ La partida se disputa a un total de **21 Piedras**:
 
 ---
 
-## 🚀 Registro de Cambios — v1.0.03092026
+## 🚀 Registro de Cambios
+ 
+### 🆕 Experiencia de Conexión, Audio Dinámico y Ajustes Visuales (v1.0.03.092026.2)
 
-### 🆕 Auditoría de Calidad y Preparación para Producción (v1.0.03092026)
+* 🔄 **Flujo de Escaneo QR y Desvinculación Inmediata de Cámara:** Cierre y liberación instantánea del hardware de la cámara (`unbindAll`) en el momento exacto en que se reconoce el código QR, previniendo el sobreuso de recursos y batería. La aplicación pasa automáticamente a una pantalla de carga dedicada (`ConnectionLoadingView`) que informa al usuario que se está sincronizando con la mesa.
+* 🛡️ **Privacidad de Red y Diagnóstico Amigable sin IP:** Eliminación absoluta de direcciones IP y puertos en mensajes de error visibles. En caso de fallo de conexión, se presenta la pantalla `ConnectionErrorView` indicando el nombre del anfitrión (*"No se pudo conectar a la mesa de [Anfitrión]"*) con sugerencias claras de conectividad (Wi-Fi o Zona Wi-Fi) y opciones para reintentar el escaneo o volver al menú.
+* 🔘 **Visualización Estable de Botones en Buenas:** Optimización del diseño en `RondaScoreCard`: el indicador de "En Buenas" se compacta en una sola línea protegida (`maxLines = 1`), se ajusta la escala del contador de piedras y se fija una altura mínima garantizada de 44 dp en los botones de ajuste (`+`, `−`, `+N`), evitando que se encojan o queden fuera de pantalla en teléfonos físicos con fuentes grandes o paneles estrechos.
+* 🔊 **Volumen de Piedras Proporcional y Sincronizado:** El sonido acústico de sumar y restar piedras (`ToneGenerator`) ahora responde en tiempo real a los deslizadores de volumen general y de efectos.
+* 🔉 **Volúmenes Iniciales Moderados:** Reducción de los valores de volumen por defecto de la aplicación (General al 80%, Efectos al 70%, Música al 35%) y atenuación de la ganancia máxima de piedras para evitar sonidos estridentes.
+* 📳 **Control de Respuesta Háptica:** Nuevo interruptor de **Vibración** en el diálogo de ajustes de audio, permitiendo silenciar o activar la respuesta háptica de toques, cantos y victorias según la preferencia del jugador.
+* ⚠️ **Avisos de Confirmación en Multijugador:**
+  * Alerta de confirmación al anfitrión al iniciar una partida cuando aún faltan jugadores por unirse a la sala (*"No, esperar"* / *"Sí, empezar"*).
+  * Diálogo de confirmación al salir de la sala (avisando del cierre de sala para el anfitrión o del abandono de la mesa para los clientes unidos).
+
+### 🏷️ Auditoría de Calidad y Preparación para Producción (v1.0.03092026)
 
 * 🛡️ **DevSecOps y Gestión Segura de Credenciales:** Eliminación total de contraseñas y almacenes de claves en texto plano del código fuente (`app/build.gradle.kts`). Las credenciales de firma se consumen dinámicamente mediante variables de entorno en el pipeline de CI/CD.
 * 📦 **Ofuscación R8 y Reducción de Tamaño:** Habilitación de `isMinifyEnabled = true` y `isShrinkResources = true` con reglas ProGuard adaptadas para Compose, ZXing y serialización Kotlinx. El tamaño del APK en release se reduce a **8.2 MB** (reducción >40%).

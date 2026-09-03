@@ -26,6 +26,7 @@ class RondaAudioPlayer(private val context: Context) {
 
     private val tag = "RondaAudioPlayer"
     private var toneGenerator: ToneGenerator? = null
+    private var currentToneVolume = -1
     private var activeMediaPlayer: MediaPlayer? = null
     private var sfxMediaPlayer: MediaPlayer? = null
     private var bgmMediaPlayer: MediaPlayer? = null
@@ -138,6 +139,13 @@ class RondaAudioPlayer(private val context: Context) {
                 stopActiveMediaPlayerOnly()
                 stopSfxMediaPlayer()
             }
+            updateToneGenerator()
+        }
+
+    var isVibrationEnabled: Boolean
+        get() = prefs.getBoolean(KEY_VIBRATION_ENABLED, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_VIBRATION_ENABLED, value).apply()
         }
 
     var masterVolume: Float
@@ -145,6 +153,7 @@ class RondaAudioPlayer(private val context: Context) {
         set(value) {
             prefs.edit().putFloat(KEY_MASTER_VOLUME, value.coerceIn(0f, 1f)).apply()
             updateBgmVolume()
+            updateToneGenerator()
         }
 
     var musicVolume: Float
@@ -155,10 +164,30 @@ class RondaAudioPlayer(private val context: Context) {
         }
 
     var sfxVolume: Float
-        get() = prefs.getFloat(KEY_SFX_VOLUME, 1.0f)
+        get() = prefs.getFloat(KEY_SFX_VOLUME, 0.9f)
         set(value) {
             prefs.edit().putFloat(KEY_SFX_VOLUME, value.coerceIn(0f, 1f)).apply()
+            updateToneGenerator()
         }
+
+    private fun getToneGeneratorVolume(): Int {
+        if (!isSfxEnabled) return 0
+        // Reducir la ganancia base del tono sintético para que no aturda (escala a máx 60)
+        return (masterVolume * sfxVolume * 60f).toInt().coerceIn(0, 100)
+    }
+
+    private fun updateToneGenerator() {
+        val targetVolume = getToneGeneratorVolume()
+        if (currentToneVolume != targetVolume) {
+            try {
+                toneGenerator?.release()
+                toneGenerator = if (targetVolume > 0) ToneGenerator(AudioManager.STREAM_MUSIC, targetVolume) else null
+                currentToneVolume = targetVolume
+            } catch (e: Exception) {
+                Log.e(tag, "Error actualizando ToneGenerator", e)
+            }
+        }
+    }
 
     fun getEffectiveSfxVolume(nominalVolume: Float = 1.0f): Float {
         if (!isSfxEnabled) return 0f
@@ -177,15 +206,12 @@ class RondaAudioPlayer(private val context: Context) {
         const val KEY_SFX_VOLUME = "audio_sfx_volume"
         const val KEY_MUSIC_ENABLED = "audio_music_enabled"
         const val KEY_SFX_ENABLED = "audio_sfx_enabled"
+        const val KEY_VIBRATION_ENABLED = "audio_vibration_enabled"
         const val MAX_BGM_GAIN = 0.24f // Techo máximo de ganancia BGM para mantenerla siempre en nivel ambiental
     }
 
     init {
-        try {
-            toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-        } catch (e: Exception) {
-            Log.e(tag, "No se pudo inicializar ToneGenerator", e)
-        }
+        updateToneGenerator()
         loadBgmPlaylist()
         if (isMusicEnabled) {
             startBackgroundMusic()
@@ -628,24 +654,27 @@ class RondaAudioPlayer(private val context: Context) {
     }
 
     private fun playSyntheticFallback(type: SoundType) {
+        if (!isSfxEnabled) return
+        updateToneGenerator()
+        val tg = toneGenerator ?: return
         try {
             when (type) {
-                SoundType.CANTO_RONDA -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 250)
-                SoundType.CANTO_PARRANDA -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 350)
-                SoundType.CANTO_CARACOL -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_PIP, 400)
-                SoundType.CANTO_CARACOLILLO -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 450)
-                SoundType.JUGADA_LIMPIAR -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 220)
-                SoundType.JUGADA_MAJO -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_PIP, 260)
-                SoundType.JUGADA_MAJO_Y_LIMPIO -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 360)
-                SoundType.JUGADA_CONTRAMAJO -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_PIP, 280)
-                SoundType.JUGADA_REQUETEMAJO -> toneGenerator?.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 360)
+                SoundType.CANTO_RONDA -> tg.startTone(ToneGenerator.TONE_PROP_BEEP, 250)
+                SoundType.CANTO_PARRANDA -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 350)
+                SoundType.CANTO_CARACOL -> tg.startTone(ToneGenerator.TONE_CDMA_PIP, 400)
+                SoundType.CANTO_CARACOLILLO -> tg.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 450)
+                SoundType.JUGADA_LIMPIAR -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 220)
+                SoundType.JUGADA_MAJO -> tg.startTone(ToneGenerator.TONE_CDMA_PIP, 260)
+                SoundType.JUGADA_MAJO_Y_LIMPIO -> tg.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 360)
+                SoundType.JUGADA_CONTRAMAJO -> tg.startTone(ToneGenerator.TONE_CDMA_PIP, 280)
+                SoundType.JUGADA_REQUETEMAJO -> tg.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 360)
                 SoundType.JUGADA_SOBREMAJO,
-                SoundType.JUGADA_REQUETECONTRAMAJO -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 420)
-                SoundType.ENTERED_BUENAS -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
-                SoundType.GAME_WON -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
+                SoundType.JUGADA_REQUETECONTRAMAJO -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 420)
+                SoundType.ENTERED_BUENAS -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
+                SoundType.GAME_WON -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
                 SoundType.CARD_PLAYED,
-                SoundType.PIEDRA_ADD -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
-                SoundType.PIEDRA_SUBTRACT -> toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 70)
+                SoundType.PIEDRA_ADD -> tg.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
+                SoundType.PIEDRA_SUBTRACT -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 70)
             }
         } catch (e: Exception) {
             Log.e(tag, "Error al emitir tono sintético", e)
@@ -653,6 +682,7 @@ class RondaAudioPlayer(private val context: Context) {
     }
 
     private fun triggerHapticFeedback(type: SoundType) {
+        if (!isVibrationEnabled) return
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager

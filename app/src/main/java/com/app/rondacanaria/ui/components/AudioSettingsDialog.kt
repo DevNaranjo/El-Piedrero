@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -26,11 +28,13 @@ fun AudioSettingsDialog(
     sfxVolume: Float,
     isMusicEnabled: Boolean,
     isSfxEnabled: Boolean,
+    isVibrationEnabled: Boolean = true,
     onMasterVolumeChange: (Float) -> Unit,
     onMusicVolumeChange: (Float) -> Unit,
     onSfxVolumeChange: (Float) -> Unit,
     onToggleMusic: (Boolean) -> Unit,
     onToggleSfx: (Boolean) -> Unit,
+    onToggleVibration: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -244,6 +248,61 @@ fun AudioSettingsDialog(
                             valueRange = 0f..1f,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+
+                // 4. Interruptor: Vibración háptica en jugadas y cantos
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = if (isVibrationEnabled) Icons.Default.Vibration else Icons.Default.Smartphone,
+                                contentDescription = null,
+                                tint = if (isVibrationEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Vibración",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Badge(
+                                containerColor = if (isVibrationEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isVibrationEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = if (isVibrationEnabled) "Activada" else "Desactivada",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                            Switch(
+                                checked = isVibrationEnabled,
+                                onCheckedChange = onToggleVibration,
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
                     }
                 }
             }

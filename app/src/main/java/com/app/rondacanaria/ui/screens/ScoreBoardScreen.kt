@@ -378,7 +378,7 @@ fun ScoreBoardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp),
+                    .height(225.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Tarjeta Equipo A (si no está en reserva)
@@ -906,11 +906,13 @@ fun ScoreBoardScreen(
             sfxVolume = uiState.sfxVolume,
             isMusicEnabled = uiState.isMusicEnabled,
             isSfxEnabled = uiState.isSfxEnabled,
+            isVibrationEnabled = uiState.isVibrationEnabled,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
+            onToggleVibration = { viewModel.toggleVibration(it) },
             onDismiss = { showAudioSettingsDialog = false }
         )
     }
@@ -1280,22 +1282,23 @@ fun RondaScoreCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = teamName,
-                    fontSize = if (isCompact) 15.sp else 17.5.sp,
+                    fontSize = if (isCompact) 14.sp else 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Surface(
                     color = if (wins > 0) Color(0xFFFFB300) else contentColor.copy(alpha = 0.18f),
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
                         text = "🏆 $wins ${if (wins == 1) "victoria" else "victorias"}",
-                        fontSize = if (isCompact) 11.5.sp else 13.sp,
+                        fontSize = if (isCompact) 10.sp else 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (wins > 0) Color.Black else contentColor,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                     )
                 }
             }
@@ -1306,13 +1309,15 @@ fun RondaScoreCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(Brush.horizontalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))))
-                        .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
+                        .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (isCompact) "🌟 BUENAS (${score.buenas}/10)" else "🌟 ¡EN BUENAS! (${score.buenas}/10)",
+                        text = "🌟 Buenas (${score.buenas}/10)",
                         color = Color.Black,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (isCompact) 12.sp else 13.5.sp
+                        fontSize = if (isCompact) 10.5.sp else 11.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             } else {
@@ -1320,13 +1325,15 @@ fun RondaScoreCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(contentColor.copy(alpha = 0.18f))
-                        .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
+                        .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "Malas (${score.malas}/11)",
                         color = contentColor,
                         fontWeight = FontWeight.Bold,
-                        fontSize = if (isCompact) 12.sp else 13.5.sp
+                        fontSize = if (isCompact) 10.5.sp else 11.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1335,13 +1342,14 @@ fun RondaScoreCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "${score.totalPiedras}",
-                    fontSize = if (isCompact) 36.sp else 46.sp,
+                    fontSize = if (isCompact) 30.sp else 36.sp,
                     fontWeight = FontWeight.Black,
-                    color = contentColor
+                    color = contentColor,
+                    lineHeight = if (isCompact) 32.sp else 38.sp
                 )
                 Text(
                     text = "Piedras / 21",
-                    fontSize = if (isCompact) 11.5.sp else 13.sp,
+                    fontSize = if (isCompact) 10.sp else 11.5.sp,
                     color = contentColor,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1354,8 +1362,8 @@ fun RondaScoreCard(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .defaultMinSize(minHeight = 48.dp)
+                        .height(44.dp)
+                        .defaultMinSize(minHeight = 44.dp)
                 ) {
                     Row(
                         modifier = Modifier
@@ -1368,12 +1376,12 @@ fun RondaScoreCard(
                             Icons.Default.Lock,
                             contentDescription = "Equipo rival bloqueado para modificación",
                             tint = contentColor.copy(alpha = 0.85f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Equipo Rival",
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = contentColor,
                             maxLines = 1,
@@ -1386,8 +1394,8 @@ fun RondaScoreCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .height(44.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Botón Restar (-)
@@ -1396,8 +1404,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras > 0,
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                            .height(44.dp)
+                            .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -1408,7 +1416,7 @@ fun RondaScoreCard(
                         Text(
                             text = "−",
                             style = MaterialTheme.typography.titleMedium,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1421,8 +1429,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                            .height(44.dp)
+                            .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -1433,7 +1441,7 @@ fun RondaScoreCard(
                         Text(
                             text = "+",
                             style = MaterialTheme.typography.titleMedium,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1447,8 +1455,8 @@ fun RondaScoreCard(
                             enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                .height(44.dp)
+                                .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -1459,7 +1467,7 @@ fun RondaScoreCard(
                             Text(
                                 text = "+N",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Black,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,

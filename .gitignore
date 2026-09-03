@@ -5,6 +5,7 @@
 build/
 /*/build/
 app/build/
+.kotlin/
 
 # Local SDK and user machine paths
 local.properties

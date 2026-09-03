@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-1.0.03092026-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)
+[![Version](https://img.shields.io/badge/Version-1.0.03.092026.2-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Play with a single phone in the center of the table or synchronize scores across
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03092026)** page.
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)** page.
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.
@@ -73,9 +73,19 @@ The game is played to a total of **21 Stones ("Piedras")**:
 
 ---
 
-## 🚀 Changelog — v1.0.03092026
+## 🚀 Changelog
+ 
+### 🆕 Connection Experience, Dynamic Audio & Visual Polish (v1.0.03.092026.2)
 
-### 🆕 Quality Audit & Production Readiness (v1.0.03092026)
+* 🔄 **QR Scan Lifecycle & Instant Camera Release:** Immediately unbinds and releases camera hardware (`unbindAll`) upon scanning a valid QR code, preventing unnecessary battery and CPU drain. Displays a dedicated loading screen (`ConnectionLoadingView`) informing the user that the phone is synchronizing with the host table.
+* 🛡️ **Network Privacy & Host-Based Error Diagnostics (No IPs):** Completely stripped IP addresses and port numbers from all user-visible error dialogs. Connection failures trigger `ConnectionErrorView` showing the host's name (*"Could not connect to [Host]'s table"*) with actionable local Wi-Fi guidance and instant retry / back actions.
+* 🔘 **Stable Buenas Badge & Scorecard Buttons:** Compacted the "En Buenas" badge to a protected single line (`maxLines = 1`), adjusted stone counter typography, and established guaranteed minimum 44 dp touch targets on scorecard adjustment buttons (`+`, `−`, `+N`), preventing squeezing or clipping on devices with large system fonts.
+* 🔊 **Proportional Stone Volume Synchronization:** Acoustic stone scoring feedback (`ToneGenerator`) is now dynamically modulated by master and SFX volume sliders in real-time.
+* 🔉 **Tempered Default Volume Levels:** Lowered default volumes (Master to 80%, SFX to 70%, BGM to 35%) and reduced maximum acoustic tone gain to eliminate harsh beeps.
+* 📳 **Haptic Feedback Toggle:** Added a **Vibration** switch to the audio settings dialog, allowing players to mute or enable tactile feedback for button presses, calls, and victories.
+* ⚠️ **Multiplayer Safety Dialogs:** Added warnings when starting a match with incomplete players (*"No, esperar"* / *"Sí, empezar"*) and when exiting an active multiplayer room.
+
+### 🏷️ Quality Audit & Production Readiness (v1.0.03092026)
 
 * 🛡️ **DevSecOps & Secure Credential Management:** Removed plaintext keystore secrets and passwords from source files (`app/build.gradle.kts`). Signing credentials are now dynamically read from environment variables during CI/CD.
 * 📦 **R8 Minification & Size Reduction:** Enabled `isMinifyEnabled = true` and `isShrinkResources = true` with tailored ProGuard keep rules for Compose, ZXing, and Kotlinx Serialization. Release APK footprint reduced to **8.2 MB** (>40% reduction).
