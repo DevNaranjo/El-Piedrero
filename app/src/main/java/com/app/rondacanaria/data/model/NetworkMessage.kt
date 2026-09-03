@@ -40,6 +40,7 @@ enum class GameStatus {
 @Serializable
 enum class SoundType {
     ENTERED_BUENAS,
+    ONE_STONE_TO_WIN,
     GAME_WON,
     CARD_PLAYED,
     CANTO_RONDA,
@@ -119,7 +120,8 @@ data class GameMove(
     val newTotalPiedras: Int,
     val authorName: String? = null,
     val previousReserveTeams: List<Team> = emptyList(),
-    val dealNumber: Int = 1
+    val dealNumber: Int = 1,
+    val handNumber: Int = 1
 )
 
 @Serializable
@@ -144,7 +146,9 @@ data class GameState(
     val connectedPlayers: List<Player> = emptyList(),
     val moveHistory: List<GameMove> = emptyList(),
     val reserveTeams: List<Team> = emptyList(),
-    val currentDeal: Int = 1
+    val currentDeal: Int = 1,
+    val currentHand: Int = 1,
+    val dealerPlayerId: String? = null
 ) {
     fun maxDeals(): Int = getMaxDeals(maxPlayers)
 }

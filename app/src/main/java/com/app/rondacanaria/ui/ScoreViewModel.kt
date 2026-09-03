@@ -71,12 +71,14 @@ class ScoreViewModel(
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
 
+    val localPlayerId: String get() = clientUseCase.localPlayerId
+
     init {
         // Observar estado del Host
         viewModelScope.launch {
             hostUseCase.gameState.collect { state ->
                 if (_uiState.value.isHost) {
-                    _uiState.update { it.copy(gameState = state, maxPlayers = state.maxPlayers) }
+                    _uiState.update { it.copy(gameState = state) }
                     checkAndRecordVictory(state)
                 }
             }
@@ -93,7 +95,25 @@ class ScoreViewModel(
         viewModelScope.launch {
             clientUseCase.gameState.collect { state ->
                 if (!_uiState.value.isHost && state != null) {
-                    _uiState.update { it.copy(gameState = state) }
+                    val myPlayer = state.connectedPlayers.find { 
+                        it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == _uiState.value.playerName && !it.isHost)
+                    }
+                    val resolvedTeam = myPlayer?.team ?: clientUseCase.myTeam.value
+
+                    _uiState.update { current ->
+                        val targetScreen = if (state.status == GameStatus.PLAYING && current.currentScreen == AppScreen.HOST_LOBBY) {
+                            AppScreen.SCOREBOARD
+                        } else if (state.status == GameStatus.WAITING && current.currentScreen == AppScreen.SCOREBOARD) {
+                            AppScreen.HOST_LOBBY
+                        } else {
+                            current.currentScreen
+                        }
+                        current.copy(
+                            gameState = state,
+                            currentScreen = targetScreen,
+                            myTeam = if (resolvedTeam != Team.SPECTATOR) resolvedTeam else current.myTeam
+                        )
+                    }
                     checkAndRecordVictory(state)
                 }
             }
@@ -110,9 +130,18 @@ class ScoreViewModel(
         viewModelScope.launch {
             clientUseCase.sessionStatus.collect { status ->
                 if (!_uiState.value.isHost) {
-                    _uiState.update { it.copy(sessionStatus = status) }
-                    if (status == SessionStatus.CONNECTED && _uiState.value.currentScreen == AppScreen.CLIENT_SCANNER) {
-                        _uiState.update { it.copy(currentScreen = AppScreen.SCOREBOARD) }
+                    val resolvedTeam = clientUseCase.myTeam.value
+                    _uiState.update { current ->
+                        val targetScreen = if (status == SessionStatus.CONNECTED && current.currentScreen == AppScreen.CLIENT_SCANNER) {
+                            if (current.gameState.status == GameStatus.PLAYING) AppScreen.SCOREBOARD else AppScreen.HOST_LOBBY
+                        } else {
+                            current.currentScreen
+                        }
+                        current.copy(
+                            sessionStatus = status,
+                            currentScreen = targetScreen,
+                            myTeam = if (resolvedTeam != Team.SPECTATOR) resolvedTeam else current.myTeam
+                        )
                     }
                 }
             }
@@ -120,7 +149,7 @@ class ScoreViewModel(
 
         viewModelScope.launch {
             clientUseCase.myTeam.collect { team ->
-                if (!_uiState.value.isHost) {
+                if (!_uiState.value.isHost && team != Team.SPECTATOR) {
                     _uiState.update { it.copy(myTeam = team) }
                 }
             }
@@ -163,7 +192,8 @@ class ScoreViewModel(
         teamC: String = "Equipo C",
         teamD: String = "Equipo D",
         maxPlayers: Int,
-        reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList()
+        reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList(),
+        customPlayers: List<Pair<String, Team>>? = null
     ) {
         val effectiveReserves = when {
             maxPlayers == 8 -> if (reserveTeams.size == 2) reserveTeams else listOf(Team.TEAM_C, Team.TEAM_D)
@@ -171,6 +201,57 @@ class ScoreViewModel(
             else -> reserveTeams
         }
         val state = _uiState.value
+        val localPlayers = if (!customPlayers.isNullOrEmpty()) {
+            customPlayers.mapIndexed { index, (name, team) ->
+                Player(
+                    id = "local_${index + 1}",
+                    name = name.ifBlank { "Jugador ${index + 1}" },
+                    team = team,
+                    isHost = index == 0
+                )
+            }
+        } else {
+            when (maxPlayers) {
+                2 -> listOf(
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false)
+                )
+                3 -> listOf(
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_3", name = teamC, team = Team.TEAM_C, isHost = false)
+                )
+                4 -> listOf(
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false)
+                )
+                6 -> listOf(
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false),
+                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false)
+                )
+                8 -> listOf(
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false),
+                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false),
+                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false),
+                    Player(id = "local_7", name = "$teamD (J1)", team = Team.TEAM_D, isHost = false),
+                    Player(id = "local_8", name = "$teamD (J2)", team = Team.TEAM_D, isHost = false)
+                )
+                else -> listOf(
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false)
+                )
+            }
+        }
+
         hostUseCase.startHost(
             hostPlayerName = state.playerName,
             teamAName = teamA,
@@ -178,7 +259,8 @@ class ScoreViewModel(
             teamCName = teamC,
             teamDName = teamD,
             maxPlayers = maxPlayers,
-            reserveTeams = effectiveReserves
+            reserveTeams = effectiveReserves,
+            initialPlayers = localPlayers
         )
         _uiState.update {
             it.copy(
@@ -193,6 +275,14 @@ class ScoreViewModel(
                 currentScreen = AppScreen.SCOREBOARD,
                 sessionStatus = SessionStatus.CONNECTED
             )
+        }
+    }
+
+    fun setDealer(dealerPlayerId: String) {
+        if (_uiState.value.isHost) {
+            viewModelScope.launch {
+                hostUseCase.setDealer(dealerPlayerId)
+            }
         }
     }
 
@@ -315,6 +405,7 @@ class ScoreViewModel(
         val name = _uiState.value.playerName
         _uiState.update {
             it.copy(
+                hostConnectionInfo = info,
                 connectingHostName = info.hostName,
                 errorMessage = null
             )
@@ -330,6 +421,11 @@ class ScoreViewModel(
     }
 
     fun navigateToScoreboard() {
+        if (_uiState.value.isHost) {
+            viewModelScope.launch {
+                hostUseCase.setGameStatus(GameStatus.PLAYING)
+            }
+        }
         _uiState.update { it.copy(currentScreen = AppScreen.SCOREBOARD) }
     }
 
@@ -337,8 +433,15 @@ class ScoreViewModel(
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            if (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR) return
-            if (state.myTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
+            val effectiveMyTeam = if (state.myTeam != Team.SPECTATOR) {
+                state.myTeam
+            } else {
+                state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
+                    ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
+                    ?: state.myTeam
+            }
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR) return
+            if (effectiveMyTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
         }
 
         val author = state.playerName
@@ -355,8 +458,15 @@ class ScoreViewModel(
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            if (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR) return
-            if (state.myTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
+            val effectiveMyTeam = if (state.myTeam != Team.SPECTATOR) {
+                state.myTeam
+            } else {
+                state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
+                    ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
+                    ?: state.myTeam
+            }
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR) return
+            if (effectiveMyTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
         }
 
         val author = state.playerName
@@ -371,7 +481,14 @@ class ScoreViewModel(
 
     fun undoLastMove() {
         val state = _uiState.value
-        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE || state.myTeam == Team.SPECTATOR)) return
+        val effectiveMyTeam = if (state.myTeam != Team.SPECTATOR) {
+            state.myTeam
+        } else {
+            state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
+                ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
+                ?: state.myTeam
+        }
+        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR)) return
 
         viewModelScope.launch {
             if (state.isHost) {
@@ -401,22 +518,74 @@ class ScoreViewModel(
         }
     }
 
+    fun applyCardCount(cardCounts: Map<Team, Int>) {
+        val state = _uiState.value
+        val threshold = if (state.gameState.maxPlayers == 3) 13 else 20
+        viewModelScope.launch {
+            if (state.isHost || state.isLocalGame) {
+                hostUseCase.applyCardCount(cardCounts, state.playerName)
+            } else {
+                val effectiveMyTeam = if (state.myTeam != Team.SPECTATOR) {
+                    state.myTeam
+                } else {
+                    state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team ?: state.myTeam
+                }
+                val myCount = cardCounts[effectiveMyTeam] ?: 0
+                val extra = (myCount - threshold).coerceAtLeast(0)
+                if (extra > 0) {
+                    clientUseCase.requestManualScoreChange(
+                        teamId = effectiveMyTeam,
+                        deltaPiedras = extra,
+                        reason = "Recuento de cartas: $myCount cartas (+$extra)"
+                    )
+                }
+                clientUseCase.requestUpdateDeal(1)
+            }
+        }
+    }
+
+    fun restartHand() {
+        val state = _uiState.value
+        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        viewModelScope.launch {
+            if (state.isHost || state.isLocalGame) {
+                hostUseCase.restartHand()
+            } else {
+                clientUseCase.requestUpdateDeal(1)
+            }
+        }
+    }
+
+    fun returnToHostLobby() {
+        if (_uiState.value.isHost && !_uiState.value.isLocalGame) {
+            viewModelScope.launch {
+                hostUseCase.resetGame(resetWins = false, newStatus = GameStatus.WAITING)
+            }
+            _uiState.update { it.copy(currentScreen = AppScreen.HOST_LOBBY) }
+        }
+    }
+
     fun terminateGame() {
         viewModelScope.launch {
-            if (_uiState.value.isHost || _uiState.value.isLocalGame) {
-                hostUseCase.endGame("Partida finalizada por el Host")
+            if (_uiState.value.isHost && !_uiState.value.isLocalGame) {
+                // En multijugador, terminar la partida vuelve a la sala (HOST_LOBBY) sin cerrarla
+                hostUseCase.resetGame(resetWins = false, newStatus = GameStatus.WAITING)
+                _uiState.update { it.copy(currentScreen = AppScreen.HOST_LOBBY) }
+            } else if (_uiState.value.isLocalGame) {
+                // En partida local, reiniciar piedras a 0 manteniendo la sesión activa en el marcador
+                hostUseCase.resetGame(resetWins = false, newStatus = GameStatus.PLAYING)
             } else {
                 clientUseCase.leaveGame()
+                _uiState.update { it.copy(currentScreen = AppScreen.MODE_SELECTION) }
             }
-            exitGame()
         }
     }
 
     fun resetGame(resetWins: Boolean = false) {
         lastRecordedGameId = null
-        if (_uiState.value.isHost) {
+        if (_uiState.value.isHost || _uiState.value.isLocalGame) {
             viewModelScope.launch {
-                hostUseCase.resetGame(resetWins)
+                hostUseCase.resetGame(resetWins, newStatus = GameStatus.PLAYING)
             }
         }
     }

@@ -59,7 +59,8 @@ class HostGameUseCase(
         teamDName: String = "Equipo D",
         maxPlayers: Int = 4,
         port: Int = NetworkUtils.DEFAULT_PORT,
-        reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList()
+        reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList(),
+        initialPlayers: List<Player>? = null
     ) {
         if (_isHostRunning.value) {
             stopHost()
@@ -82,7 +83,8 @@ class HostGameUseCase(
             team = Team.TEAM_A,
             isHost = true
         )
-        assignedPlayerSeats[hostPlayer.id] = hostPlayer.team
+        val players = if (!initialPlayers.isNullOrEmpty()) initialPlayers else listOf(hostPlayer)
+        players.forEach { assignedPlayerSeats[it.id] = it.team }
 
         // Para 2 y 3 jugadores:
         // - Si el nombre de equipo ya viene relleno (local), usarlo tal cual.
@@ -126,11 +128,12 @@ class HostGameUseCase(
             winsTeamC = 0,
             winsTeamD = 0,
             maxPlayers = maxPlayers,
-            status = GameStatus.PLAYING,
+            status = GameStatus.WAITING,
             winnerTeam = null,
             version = 1L,
-            connectedPlayers = listOf(hostPlayer),
-            reserveTeams = actualReserveTeams
+            connectedPlayers = players,
+            reserveTeams = actualReserveTeams,
+            dealerPlayerId = players.firstOrNull()?.id
         )
 
         socketServer.start(port)
@@ -312,10 +315,12 @@ class HostGameUseCase(
 
             MessageType.SCORE_UPDATE -> {
                 val scoreUpdate = envelope.scoreUpdate ?: return
-                val senderPlayer = _connectedClients.value[clientId]
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
 
                 // Regla de seguridad multijugador: Los clientes no pueden modificar el tanteo de equipos contrarios ni los reservas
                 if (senderPlayer != null && (senderPlayer.team != scoreUpdate.teamId || _gameState.value.reserveTeams.contains(senderPlayer.team) || senderPlayer.team == Team.RESERVE)) {
+                    android.util.Log.w("HostGameUseCase", "Petición de tanteo descartada: el jugador ${senderPlayer.name} pertenece a ${senderPlayer.team} pero intentó puntuar a ${scoreUpdate.teamId}")
                     return
                 }
 
@@ -336,7 +341,8 @@ class HostGameUseCase(
             }
 
             MessageType.UNDO_LAST_MOVE -> {
-                val senderPlayer = _connectedClients.value[clientId]
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
                 if (senderPlayer != null && (_gameState.value.reserveTeams.contains(senderPlayer.team) || senderPlayer.team == Team.RESERVE)) {
                     return
                 }
@@ -447,13 +453,19 @@ class HostGameUseCase(
                     newTotalPiedras = newTotal,
                     authorName = authorName,
                     previousReserveTeams = current.reserveTeams,
-                    dealNumber = current.currentDeal
+                    dealNumber = current.currentDeal,
+                    handNumber = current.currentHand
                 )
             } else {
                 current.moveHistory
             }
 
-            // Detección de paso a "Buenas" (cruce del umbral de 11 malas)
+            val isOneStoneToWinA = oldScoreA.totalPiedras < (TeamScore.TOTAL_PIEDRAS_VICTORY - 1) && newScoreA.totalPiedras == (TeamScore.TOTAL_PIEDRAS_VICTORY - 1)
+            val isOneStoneToWinB = oldScoreB.totalPiedras < (TeamScore.TOTAL_PIEDRAS_VICTORY - 1) && newScoreB.totalPiedras == (TeamScore.TOTAL_PIEDRAS_VICTORY - 1)
+            val isOneStoneToWinC = oldScoreC.totalPiedras < (TeamScore.TOTAL_PIEDRAS_VICTORY - 1) && newScoreC.totalPiedras == (TeamScore.TOTAL_PIEDRAS_VICTORY - 1)
+            val isOneStoneToWinD = oldScoreD.totalPiedras < (TeamScore.TOTAL_PIEDRAS_VICTORY - 1) && newScoreD.totalPiedras == (TeamScore.TOTAL_PIEDRAS_VICTORY - 1)
+
+            // Detección de paso a "Buenas" (cruce del umbral de 11 malas) o a falta de 1 piedra para ganar (20 piedras)
             if (teamId == Team.TEAM_A && !oldScoreA.isInBuenas && newScoreA.isInBuenas) {
                 soundToTrigger = SoundTriggerPayload(SoundType.ENTERED_BUENAS, Team.TEAM_A)
             } else if (teamId == Team.TEAM_B && !oldScoreB.isInBuenas && newScoreB.isInBuenas) {
@@ -462,6 +474,14 @@ class HostGameUseCase(
                 soundToTrigger = SoundTriggerPayload(SoundType.ENTERED_BUENAS, Team.TEAM_C)
             } else if (teamId == Team.TEAM_D && !oldScoreD.isInBuenas && newScoreD.isInBuenas) {
                 soundToTrigger = SoundTriggerPayload(SoundType.ENTERED_BUENAS, Team.TEAM_D)
+            } else if (teamId == Team.TEAM_A && isOneStoneToWinA) {
+                soundToTrigger = SoundTriggerPayload(SoundType.ONE_STONE_TO_WIN, Team.TEAM_A)
+            } else if (teamId == Team.TEAM_B && isOneStoneToWinB) {
+                soundToTrigger = SoundTriggerPayload(SoundType.ONE_STONE_TO_WIN, Team.TEAM_B)
+            } else if (teamId == Team.TEAM_C && isOneStoneToWinC) {
+                soundToTrigger = SoundTriggerPayload(SoundType.ONE_STONE_TO_WIN, Team.TEAM_C)
+            } else if (teamId == Team.TEAM_D && isOneStoneToWinD) {
+                soundToTrigger = SoundTriggerPayload(SoundType.ONE_STONE_TO_WIN, Team.TEAM_D)
             }
 
             val isWinnerA = newScoreA.totalPiedras >= TeamScore.TOTAL_PIEDRAS_VICTORY
@@ -586,7 +606,7 @@ class HostGameUseCase(
         broadcastCurrentState()
     }
 
-    suspend fun resetGame(resetWins: Boolean = false) {
+    suspend fun resetGame(resetWins: Boolean = false, newStatus: GameStatus = GameStatus.PLAYING) {
         stateMutex.withLock {
             val current = _gameState.value
             val winner = current.winnerTeam
@@ -620,13 +640,27 @@ class HostGameUseCase(
                 winsTeamB = if (resetWins) 0 else current.winsTeamB,
                 winsTeamC = if (resetWins) 0 else current.winsTeamC,
                 winsTeamD = if (resetWins) 0 else current.winsTeamD,
-                status = GameStatus.PLAYING,
+                status = newStatus,
                 winnerTeam = null,
                 reserveTeams = nextReserves,
                 version = current.version + 1,
                 moveHistory = emptyList(),
-                currentDeal = 1
+                currentDeal = 1,
+                currentHand = 1
             )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun setGameStatus(newStatus: GameStatus) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            if (current.status != newStatus) {
+                _gameState.value = current.copy(
+                    status = newStatus,
+                    version = current.version + 1
+                )
+            }
         }
         broadcastCurrentState()
     }
@@ -685,6 +719,10 @@ class HostGameUseCase(
         if (maxP == 2) return
         stateMutex.withLock {
             val currentPlayers = _gameState.value.connectedPlayers
+            val maxPerTeam = when (maxP) {
+                2, 3 -> 1
+                else -> 2 // Máximo 2 personas por equipo
+            }
             val playerIndex = currentPlayers.indexOfFirst { it.id == playerId }
             val origTeam = when (playerIndex) {
                 0 -> Team.TEAM_A
@@ -693,6 +731,22 @@ class HostGameUseCase(
                 else -> Team.TEAM_A
             }
             val resolvedTeam = if (maxP == 3 && newTeam != Team.RESERVE) origTeam else newTeam
+
+            if (resolvedTeam != Team.RESERVE && resolvedTeam != Team.SPECTATOR) {
+                val countInTarget = currentPlayers.count { it.id != playerId && it.team == resolvedTeam }
+                if (countInTarget >= maxPerTeam) {
+                    return@withLock
+                }
+            }
+
+            assignedPlayerSeats[playerId] = resolvedTeam
+            val updatedClients = _connectedClients.value.toMutableMap()
+            for ((cid, p) in updatedClients) {
+                if (p.id == playerId) {
+                    updatedClients[cid] = p.copy(team = resolvedTeam)
+                }
+            }
+            _connectedClients.value = updatedClients
 
             val updated = currentPlayers.map {
                 if (it.id == playerId) it.copy(team = resolvedTeam) else it
@@ -776,14 +830,78 @@ class HostGameUseCase(
             val current = _gameState.value
             val maxDeals = getMaxDeals(current.maxPlayers)
             val effectiveDeal = if (newDeal > maxDeals || newDeal < 1) 1 else newDeal
-            if (current.currentDeal != effectiveDeal) {
+            val isRestartingHand = (current.currentDeal >= maxDeals && effectiveDeal == 1)
+            val nextDealer = if (isRestartingHand) getNextDealerId(current) else (current.dealerPlayerId ?: current.connectedPlayers.firstOrNull()?.id)
+            if (current.currentDeal != effectiveDeal || isRestartingHand) {
+                val nextHand = if (isRestartingHand) current.currentHand + 1 else current.currentHand
                 _gameState.value = current.copy(
                     currentDeal = effectiveDeal,
+                    currentHand = nextHand,
+                    moveHistory = current.moveHistory,
+                    dealerPlayerId = nextDealer,
                     version = current.version + 1
                 )
             }
         }
         broadcastCurrentState()
+    }
+
+    suspend fun applyCardCount(cardCounts: Map<Team, Int>, author: String? = null) {
+        val maxP = _gameState.value.maxPlayers
+        val threshold = if (maxP == 3) 13 else 20
+
+        cardCounts.forEach { (team, count) ->
+            val extra = (count - threshold).coerceAtLeast(0)
+            if (extra > 0) {
+                applyScoreUpdate(
+                    teamId = team,
+                    cantoType = CantoType.MANUAL_ADJUST,
+                    piedras = extra,
+                    reason = "Recuento de cartas: $count cartas (+$extra)",
+                    authorName = author
+                )
+            }
+        }
+        restartHand()
+    }
+
+    suspend fun restartHand() {
+        stateMutex.withLock {
+            val current = _gameState.value
+            val nextDealer = getNextDealerId(current)
+            _gameState.value = current.copy(
+                currentDeal = 1,
+                currentHand = current.currentHand + 1,
+                moveHistory = current.moveHistory,
+                dealerPlayerId = nextDealer,
+                version = current.version + 1
+            )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun setDealer(dealerPlayerId: String) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            if (current.dealerPlayerId != dealerPlayerId) {
+                _gameState.value = current.copy(
+                    dealerPlayerId = dealerPlayerId,
+                    version = current.version + 1
+                )
+            }
+        }
+        broadcastCurrentState()
+    }
+
+    private fun getNextDealerId(current: GameState): String? {
+        val activePlayers = current.connectedPlayers.filter {
+            !current.reserveTeams.contains(it.team) && it.team != Team.RESERVE && it.team != Team.SPECTATOR
+        }.ifEmpty { current.connectedPlayers }
+
+        if (activePlayers.isEmpty()) return null
+        val currentIdx = activePlayers.indexOfFirst { it.id == current.dealerPlayerId }
+        val nextIdx = if (currentIdx != -1) (currentIdx + 1) % activePlayers.size else 0
+        return activePlayers.getOrNull(nextIdx)?.id ?: current.dealerPlayerId
     }
 
     private suspend fun broadcastCurrentState() {

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,8 +47,18 @@ fun ScoreBoardScreen(
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
 
-    var selectedTeamForCanto by remember(uiState.myTeam, isMultiplayerClient) {
-        mutableStateOf(if (isMultiplayerClient && uiState.myTeam != Team.SPECTATOR && uiState.myTeam != Team.RESERVE) uiState.myTeam else Team.TEAM_A)
+    val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers) {
+        if (uiState.myTeam != Team.SPECTATOR) {
+            uiState.myTeam
+        } else {
+            gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }?.team
+                ?: gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost }?.team
+                ?: uiState.myTeam
+        }
+    }
+
+    var selectedTeamForCanto by remember(effectiveMyTeam, isMultiplayerClient) {
+        mutableStateOf(if (isMultiplayerClient && effectiveMyTeam != Team.SPECTATOR && effectiveMyTeam != Team.RESERVE) effectiveMyTeam else Team.TEAM_A)
     }
     var showExitConfirmationDialog by remember { mutableStateOf(false) }
     var showEndGameConfirmation by remember { mutableStateOf(false) }
@@ -55,11 +66,14 @@ fun ScoreBoardScreen(
     var showSwitchTeamDialog by remember { mutableStateOf(false) }
     var showMoveHistoryDialog by remember { mutableStateOf(false) }
     var showAudioSettingsDialog by remember { mutableStateOf(false) }
+    var showCardCountDialog by remember { mutableStateOf(false) }
 
     // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
     BackHandler {
         if (showAudioSettingsDialog) {
             showAudioSettingsDialog = false
+        } else if (showCardCountDialog) {
+            showCardCountDialog = false
         } else if (showMoveHistoryDialog) {
             showMoveHistoryDialog = false
         } else if (showSwitchTeamDialog) {
@@ -94,6 +108,26 @@ fun ScoreBoardScreen(
         else -> 3
     }
 
+    val dealerPlayer = remember(gameState.dealerPlayerId, gameState.connectedPlayers) {
+        val dId = gameState.dealerPlayerId ?: gameState.connectedPlayers.firstOrNull()?.id
+        gameState.connectedPlayers.find { it.id == dId } ?: gameState.connectedPlayers.firstOrNull()
+    }
+    val dealerName = dealerPlayer?.name ?: (if (isTwoPlayers || isThreePlayers) gameState.nameTeamA else "Jugador 1")
+
+    val isDealerInA = dealerPlayer?.team == Team.TEAM_A
+    val isDealerInB = dealerPlayer?.team == Team.TEAM_B
+    val isDealerInC = dealerPlayer?.team == Team.TEAM_C
+    val isDealerInD = dealerPlayer?.team == Team.TEAM_D
+
+    val nextDealerName = remember(gameState.dealerPlayerId, gameState.connectedPlayers, gameState.reserveTeams) {
+        val activePlayers = gameState.connectedPlayers.filter {
+            !gameState.reserveTeams.contains(it.team) && it.team != Team.RESERVE && it.team != Team.SPECTATOR
+        }.ifEmpty { gameState.connectedPlayers }
+        val currentIdx = activePlayers.indexOfFirst { it.id == dealerPlayer?.id }
+        val nextIdx = if (currentIdx != -1) (currentIdx + 1) % activePlayers.size else 0
+        activePlayers.getOrNull(nextIdx)?.name ?: "Siguiente jugador"
+    }
+
     // En tríos solo se puede usar la opción de suplente ANTES de contar cualquier piedra.
     val noPiedrasAun = gameState.moveHistory.isEmpty()
 
@@ -120,14 +154,14 @@ fun ScoreBoardScreen(
     val showTeamD = hasTeamD && !isTeamDReserve
 
     val isMultiplayer = !uiState.isLocalGame
-    val isReserve = isMultiplayer && (uiState.myTeam == Team.RESERVE || effectiveReserveTeams.contains(uiState.myTeam) || uiState.myTeam == Team.SPECTATOR)
+    val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.SPECTATOR)
 
     // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
     // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO.
-    val canModifyA = showTeamA && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_A && !isReserve))
-    val canModifyB = showTeamB && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_B && !isReserve))
-    val canModifyC = showTeamC && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_C && !isReserve))
-    val canModifyD = showTeamD && (uiState.isLocalGame || (uiState.myTeam == Team.TEAM_D && !isReserve))
+    val canModifyA = showTeamA && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_A && !isReserve))
+    val canModifyB = showTeamB && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_B && !isReserve))
+    val canModifyC = showTeamC && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_C && !isReserve))
+    val canModifyD = showTeamD && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_D && !isReserve))
 
     val activeTeamsCount = listOf(showTeamA, showTeamB, showTeamC, showTeamD).count { it }
     val isCompactCards = activeTeamsCount > 2
@@ -271,103 +305,216 @@ fun ScoreBoardScreen(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
+            // Aviso de espera si el anfitrión regresó a la sala
+            if (gameState.status == GameStatus.WAITING && !uiState.isLocalGame && !uiState.isHost) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "El anfitrión está en la sala. Esperando a que inicie la partida...",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Aviso de Quién Reparte (Inicio de partida / Reparto actual)
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🃏", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (gameState.currentDeal == 1 && gameState.moveHistory.isEmpty()) {
+                                "¡Inicio de partida! Empieza repartiendo:"
+                            } else {
+                                "Reparte las cartas:"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "$dealerName 🃏",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontSize = 14.sp
+                        )
+                    }
+                    if (uiState.isHost) {
+                        TextButton(
+                            onClick = {
+                                val activePlayers = gameState.connectedPlayers.filter {
+                                    !gameState.reserveTeams.contains(it.team) && it.team != Team.RESERVE && it.team != Team.SPECTATOR
+                                }.ifEmpty { gameState.connectedPlayers }
+                                val currentIdx = activePlayers.indexOfFirst { it.id == dealerPlayer?.id }
+                                val nextIdx = if (currentIdx != -1) (currentIdx + 1) % activePlayers.size else 0
+                                activePlayers.getOrNull(nextIdx)?.id?.let { viewModel.setDealer(it) }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Cambiar ↺", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            val isAtMaxDeals = gameState.currentDeal >= maxDeals
+
             // Sumador de Reparto de Cartas
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Style,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
-                            Text(
-                                text = "Reparto de cartas:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = "Mano / Reparto ${gameState.currentDeal} de $maxDeals",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        FilledTonalIconButton(
-                            onClick = { viewModel.changeDeal(gameState.currentDeal - 1) },
-                            enabled = !isReserve && gameState.currentDeal > 1,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                Icons.Default.Remove,
-                                contentDescription = "Reparto anterior",
-                                modifier = Modifier.size(20.dp)
+                                Icons.Default.Style,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
                             )
-                        }
-
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(48.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 14.dp)
-                            ) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Reparto de cartas:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                        fontSize = 10.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "🃏 $dealerName",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 10.5.sp
+                                    )
+                                }
                                 Text(
-                                    text = "${gameState.currentDeal}º / $maxDeals",
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    text = "Mano / Reparto ${gameState.currentDeal} de $maxDeals",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 13.sp
                                 )
                             }
                         }
 
-                        val isAtMaxDeals = gameState.currentDeal >= maxDeals
-                        FilledIconButton(
-                            onClick = {
-                                val nextDeal = if (isAtMaxDeals) 1 else gameState.currentDeal + 1
-                                viewModel.changeDeal(nextDeal)
-                            },
-                            enabled = !isReserve,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = if (isAtMaxDeals) Icons.Default.Refresh else Icons.Default.Add,
-                                contentDescription = if (isAtMaxDeals) "Reiniciar a reparto 1" else "Siguiente reparto",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            FilledTonalIconButton(
+                                onClick = { viewModel.changeDeal(gameState.currentDeal - 1) },
+                                enabled = !isReserve && gameState.currentDeal > 1,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Remove,
+                                    contentDescription = "Reparto anterior",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(48.dp)
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 14.dp)
+                                ) {
+                                    Text(
+                                        text = "${gameState.currentDeal}º / $maxDeals",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+
+                            FilledIconButton(
+                                onClick = {
+                                    if (isAtMaxDeals) {
+                                        showCardCountDialog = true
+                                    } else {
+                                        viewModel.changeDeal(gameState.currentDeal + 1)
+                                    }
+                                },
+                                enabled = !isReserve,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = if (isAtMaxDeals) Icons.Default.Style else Icons.Default.Add,
+                                    contentDescription = if (isAtMaxDeals) "Recuento de cartas fin de mano" else "Siguiente reparto",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (isAtMaxDeals && !isReserve) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = { showCardCountDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("🃏 Finalizar Mano: Recuento de Cartas", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -378,14 +525,14 @@ fun ScoreBoardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(225.dp),
+                    .height(242.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Tarjeta Equipo A (si no está en reserva)
                 if (showTeamA) {
                     RondaScoreCard(
                         modifier = Modifier.weight(1f),
-                        teamName = gameState.nameTeamA,
+                        teamName = if (isDealerInA && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamA} 🃏" else gameState.nameTeamA,
                         score = gameState.scoreTeamA,
                         wins = gameState.winsTeamA,
                         isSelected = selectedTeamForCanto == Team.TEAM_A,
@@ -403,7 +550,7 @@ fun ScoreBoardScreen(
                 if (showTeamB) {
                     RondaScoreCard(
                         modifier = Modifier.weight(1f),
-                        teamName = gameState.nameTeamB,
+                        teamName = if (isDealerInB && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamB} 🃏" else gameState.nameTeamB,
                         score = gameState.scoreTeamB,
                         wins = gameState.winsTeamB,
                         isSelected = selectedTeamForCanto == Team.TEAM_B,
@@ -421,7 +568,7 @@ fun ScoreBoardScreen(
                 if (showTeamC) {
                     RondaScoreCard(
                         modifier = Modifier.weight(1f),
-                        teamName = gameState.nameTeamC,
+                        teamName = if (isDealerInC && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamC} 🃏" else gameState.nameTeamC,
                         score = gameState.scoreTeamC,
                         wins = gameState.winsTeamC,
                         isSelected = selectedTeamForCanto == Team.TEAM_C,
@@ -439,12 +586,12 @@ fun ScoreBoardScreen(
                 if (showTeamD) {
                     RondaScoreCard(
                         modifier = Modifier.weight(1f),
-                        teamName = gameState.nameTeamD,
+                        teamName = if (isDealerInD && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamD} 🃏" else gameState.nameTeamD,
                         score = gameState.scoreTeamD,
                         wins = gameState.winsTeamD,
                         isSelected = selectedTeamForCanto == Team.TEAM_D,
-                        teamColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        teamColor = MaterialTheme.colorScheme.outlineVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                         isCompact = isCompactCards,
                         canModify = canModifyD,
                         onSelect = { if (canModifyD) selectedTeamForCanto = Team.TEAM_D },
@@ -458,7 +605,7 @@ fun ScoreBoardScreen(
 
             // Selector interactivo o indicador de equipo propio con botón para cambiar
             if (isMultiplayer) {
-                val myTeamName = when (uiState.myTeam) {
+                val myTeamName = when (effectiveMyTeam) {
                     Team.TEAM_A -> gameState.nameTeamA
                     Team.TEAM_B -> gameState.nameTeamB
                     Team.TEAM_C -> gameState.nameTeamC
@@ -487,8 +634,12 @@ fun ScoreBoardScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Column {
+                                val isMeDealing = dealerPlayer?.id == (if (uiState.isHost) gameState.connectedPlayers.find { it.isHost }?.id else viewModel.localPlayerId)
                                 Text(
-                                    text = if (isThreePlayers || isTwoPlayers) "Jugador: $myTeamName" else "Equipo: $myTeamName",
+                                    text = buildString {
+                                        append(if (isThreePlayers || isTwoPlayers) "Jugador: $myTeamName" else "Equipo: $myTeamName")
+                                        if (isMeDealing) append(" 🃏 (Repartes tú)")
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -607,7 +758,7 @@ fun ScoreBoardScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Botonera de Jugadas y Cantos en Cuadrícula Simétrica de 2 Columnas (Material 3)
-            val cantoTargetTeam = if (isMultiplayer) uiState.myTeam else selectedTeamForCanto
+            val cantoTargetTeam = if (isMultiplayer) effectiveMyTeam else selectedTeamForCanto
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -926,8 +1077,10 @@ fun ScoreBoardScreen(
             nameTeamC = gameState.nameTeamC,
             nameTeamD = gameState.nameTeamD,
             currentDeal = gameState.currentDeal,
+            currentHand = gameState.currentHand,
             maxDeals = maxDeals,
             onUndo = { viewModel.undoLastMove() },
+            onRestartHand = { viewModel.restartHand() },
             onDismiss = { showMoveHistoryDialog = false }
         )
     }
@@ -963,7 +1116,7 @@ fun ScoreBoardScreen(
     // Diálogo interactivo para Cambiar de Equipo o pasar a Reserva
     if (canOpenReserveOrTeamDialog && showSwitchTeamDialog) {
         SwitchTeamDialog(
-            currentTeam = uiState.myTeam,
+            currentTeam = effectiveMyTeam,
             teamAName = gameState.nameTeamA,
             teamBName = gameState.nameTeamB,
             teamCName = gameState.nameTeamC,
@@ -985,6 +1138,32 @@ fun ScoreBoardScreen(
                     Toast.makeText(context, "Solicitud enviada al Anfitrión. Esperando autorización...", Toast.LENGTH_SHORT).show()
                 }
             }
+        )
+    }
+
+    // Diálogo de recuento de cartas al final de la mano
+    if (showCardCountDialog) {
+        val activeTeamsList = buildList {
+            if (showTeamA) add(Team.TEAM_A to gameState.nameTeamA)
+            if (showTeamB) add(Team.TEAM_B to gameState.nameTeamB)
+            if (showTeamC) add(Team.TEAM_C to gameState.nameTeamC)
+            if (showTeamD) add(Team.TEAM_D to gameState.nameTeamD)
+        }
+        CardCountDialog(
+            activeTeams = activeTeamsList,
+            maxPlayers = if (isThreePlayers) 3 else (if (isTwoPlayers) 2 else gameState.maxPlayers),
+            currentDeal = gameState.currentDeal,
+            maxDeals = maxDeals,
+            nextDealerName = nextDealerName,
+            onApplyCount = { counts ->
+                viewModel.applyCardCount(counts)
+                showCardCountDialog = false
+            },
+            onSkipWithoutCards = {
+                viewModel.restartHand()
+                showCardCountDialog = false
+            },
+            onDismiss = { showCardCountDialog = false }
         )
     }
 
@@ -1044,19 +1223,51 @@ fun ScoreBoardScreen(
 
     // Diálogo de confirmación para Terminar Partida
     if (showEndGameConfirmation) {
+        val isMultiplayer = !uiState.isLocalGame
         AlertDialog(
             onDismissRequest = { showEndGameConfirmation = false },
             title = { Text("¿Terminar Partida?") },
-            text = { Text("Esta acción finalizará la partida actual y notificará el fin a todos los jugadores.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.terminateGame()
-                        showEndGameConfirmation = false
+            text = {
+                Text(
+                    if (isMultiplayer && uiState.isHost) {
+                        "¿Qué deseas hacer con la partida actual? La sala se mantendrá abierta y los jugadores seguirán conectados en la mesa."
+                    } else {
+                        "¿Deseas finalizar la partida actual y reiniciar las piedras a 0?"
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Terminar", textAlign = TextAlign.Center)
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                if (isMultiplayer && uiState.isHost) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                viewModel.returnToHostLobby()
+                                showEndGameConfirmation = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Volver a la Sala", textAlign = TextAlign.Center)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.resetGame(resetWins = false)
+                                showEndGameConfirmation = false
+                            }
+                        ) {
+                            Text("Nueva Partida", textAlign = TextAlign.Center)
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            viewModel.terminateGame()
+                            showEndGameConfirmation = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Terminar", textAlign = TextAlign.Center)
+                    }
                 }
             },
             dismissButton = {
@@ -1228,21 +1439,29 @@ fun ScoreBoardScreen(
                         Text("Siguiente Partida", textAlign = TextAlign.Center)
                     }
                 } else {
-                    Button(onClick = { viewModel.exitGame() }) {
-                        Text("Salir", textAlign = TextAlign.Center)
+                    OutlinedButton(onClick = { showExitConfirmationDialog = true }) {
+                        Text("Salir de la Sala", textAlign = TextAlign.Center)
                     }
                 }
             },
             dismissButton = {
                 if (uiState.isHost) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = { viewModel.exitGame() }) {
-                            Text("Salir al Menú", textAlign = TextAlign.Center)
+                        TextButton(onClick = { viewModel.returnToHostLobby() }) {
+                            Text("Volver a la Sala", textAlign = TextAlign.Center)
                         }
                         TextButton(onClick = { viewModel.resetGame(resetWins = true) }) {
                             Text("Reiniciar a 0", textAlign = TextAlign.Center)
                         }
                     }
+                } else {
+                    Text(
+                        text = "⏳ Esperando al anfitrión...",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
                 }
             }
         )
@@ -1275,7 +1494,7 @@ fun RondaScoreCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (isCompact) 8.dp else 10.dp),
+                .padding(horizontal = 6.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1303,22 +1522,57 @@ fun RondaScoreCard(
                 }
             }
 
-            // Badge de Estado: Malas vs Buenas
+            // Badge de Estado: Malas vs Buenas y Contador regresivo para ganar
             if (score.isInBuenas) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))))
-                        .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "🌟 Buenas (${score.buenas}/10)",
-                        color = Color.Black,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (isCompact) 10.5.sp else 11.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                val remainingStones = (TeamScore.TOTAL_PIEDRAS_VICTORY - score.totalPiedras).coerceAtLeast(0)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))))
+                            .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (score.totalPiedras >= TeamScore.TOTAL_PIEDRAS_VICTORY) "🏆 ¡Ganador!" else "🌟 Buenas (${score.buenas}/10)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = if (isCompact) 10.5.sp else 11.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (remainingStones in 1..10) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val cantosPhrase = when (remainingStones) {
+                            1 -> "A falta de una ronda"
+                            2 -> "A falta de ronda de bufos"
+                            3 -> "A falta de una parranda"
+                            4 -> "A falta de un caracol"
+                            5 -> "A falta de un caracolillo"
+                            6 -> "A falta de un caracol de bufos"
+                            7 -> "A falta de un caracolillo de bufos"
+                            else -> "A falta de $remainingStones piedras"
+                        }
+                        Surface(
+                            color = Color(0xFFFF8F00).copy(alpha = 0.22f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🎯 $cantosPhrase",
+                                fontSize = if (isCompact) 8.sp else 9.sp,
+                                lineHeight = if (isCompact) 10.sp else 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = contentColor,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             } else {
                 Box(
@@ -1349,8 +1603,8 @@ fun RondaScoreCard(
                 )
                 Text(
                     text = "Piedras / 21",
-                    fontSize = if (isCompact) 10.sp else 11.5.sp,
-                    color = contentColor,
+                    fontSize = if (isCompact) 9.5.sp else 11.sp,
+                    color = contentColor.copy(alpha = 0.8f),
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -1362,8 +1616,8 @@ fun RondaScoreCard(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
-                        .defaultMinSize(minHeight = 44.dp)
+                        .height(40.dp)
+                        .defaultMinSize(minHeight = 40.dp)
                 ) {
                     Row(
                         modifier = Modifier
@@ -1394,7 +1648,7 @@ fun RondaScoreCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
+                        .height(40.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1404,8 +1658,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras > 0,
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
-                            .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
+                            .height(40.dp)
+                            .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -1429,8 +1683,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
-                            .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
+                            .height(40.dp)
+                            .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -1455,8 +1709,8 @@ fun RondaScoreCard(
                             enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp)
-                                .defaultMinSize(minWidth = 40.dp, minHeight = 44.dp),
+                                .height(40.dp)
+                                .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -1987,10 +2241,19 @@ fun MoveHistoryDialog(
     nameTeamC: String,
     nameTeamD: String,
     currentDeal: Int = 1,
+    currentHand: Int = 1,
     maxDeals: Int = 3,
     onUndo: () -> Unit,
+    onRestartHand: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
+    var selectedFilterHand by remember { mutableStateOf<Int?>(null) }
+
+    val distinctHands = remember(history, currentHand) {
+        val fromHistory = history.map { it.handNumber.coerceAtLeast(1) }.toSet()
+        (fromHistory + currentHand).sortedDescending()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -2044,80 +2307,61 @@ fun MoveHistoryDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "En curso: Reparto $currentDeal de $maxDeals",
+                            text = "En curso: Registro $currentHand · R$currentDeal/$maxDeals",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    val groupedDeals = remember(history) {
-                        history.groupBy { it.dealNumber.coerceAtLeast(1) }
-                            .toList()
-                            .sortedByDescending { it.first }
+                    if (distinctHands.size > 1) {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = selectedFilterHand == null,
+                                    onClick = { selectedFilterHand = null },
+                                    label = { Text("Todos", fontSize = 11.sp) }
+                                )
+                            }
+                            items(distinctHands) { handNum ->
+                                val isCurrent = handNum == currentHand
+                                FilterChip(
+                                    selected = selectedFilterHand == handNum,
+                                    onClick = { selectedFilterHand = handNum },
+                                    label = {
+                                        Text(
+                                            text = "Registro $handNum" + if (isCurrent) " 🟢" else "",
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selectedFilterHand == handNum) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
+
+                    val handsToDisplay = if (selectedFilterHand != null) listOf(selectedFilterHand!!) else distinctHands
 
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        groupedDeals.forEach { (dealNum, movesInDeal) ->
-                            item(key = "deal_header_$dealNum") {
+                        handsToDisplay.forEach { handNum ->
+                            val isCurrent = handNum == currentHand
+                            val movesInThisHand = history.filter { it.handNumber.coerceAtLeast(1) == handNum }
+
+                            item(key = "hand_header_$handNum") {
                                 Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 4.dp, bottom = 2.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Default.Style,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Reparto $dealNum de $maxDeals",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.5.sp,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                        }
-                                        Text(
-                                            text = "${movesInDeal.size} ${if (movesInDeal.size == 1) "jugada" else "jugadas"}",
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        )
-                                    }
-                                }
-                            }
-
-                            items(movesInDeal.asReversed(), key = { it.id }) { move ->
-                                val teamName = when (move.teamId) {
-                                    Team.TEAM_A -> nameTeamA
-                                    Team.TEAM_B -> nameTeamB
-                                    Team.TEAM_C -> nameTeamC
-                                    Team.TEAM_D -> nameTeamD
-                                    else -> "Equipo"
-                                }
-                                val isPositive = move.deltaPiedras > 0
-                                val deltaColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
-                                val deltaBadgeBg = if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -2126,54 +2370,150 @@ fun MoveHistoryDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (isCurrent) Icons.Default.PlayCircle else Icons.Default.Bookmark,
+                                                contentDescription = null,
+                                                tint = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Registro $handNum" + if (isCurrent) " (En curso)" else " (Guardado)",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                        Text(
+                                            text = "${movesInThisHand.size} ${if (movesInThisHand.size == 1) "jugada" else "jugadas"}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = (if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer).copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (movesInThisHand.isEmpty()) {
+                                item(key = "empty_moves_$handNum") {
+                                    Text(
+                                        text = "Sin jugadas registradas en este registro.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                    )
+                                }
+                            } else {
+                                val groupedDeals = movesInThisHand.groupBy { it.dealNumber.coerceAtLeast(1) }
+                                    .toList()
+                                    .sortedByDescending { it.first }
+
+                                groupedDeals.forEach { (dealNum, movesInDeal) ->
+                                    item(key = "deal_header_${handNum}_$dealNum") {
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
                                                 Text(
-                                                    text = teamName,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.Bold
+                                                    text = "Reparto $dealNum de $maxDeals",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.5.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "${movesInDeal.size} ${if (movesInDeal.size == 1) "jugada" else "jugadas"}",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    items(movesInDeal.asReversed(), key = { it.id }) { move ->
+                                        val teamName = when (move.teamId) {
+                                            Team.TEAM_A -> nameTeamA
+                                            Team.TEAM_B -> nameTeamB
+                                            Team.TEAM_C -> nameTeamC
+                                            Team.TEAM_D -> nameTeamD
+                                            else -> "Equipo"
+                                        }
+                                        val isPositive = move.deltaPiedras > 0
+                                        val deltaColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                        val deltaBadgeBg = if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = teamName,
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                            shape = RoundedCornerShape(4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "Reg. ${move.handNumber.coerceAtLeast(1)} · R${move.dealNumber.coerceAtLeast(1)}",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Text(
+                                                        text = move.reason + if (move.authorName != null) " (por ${move.authorName})" else "",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+
+                                                    Text(
+                                                        text = "${move.previousTotalPiedras} ➔ ${move.newTotalPiedras} piedras",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+
                                                 Surface(
-                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                                    shape = RoundedCornerShape(4.dp)
+                                                    color = deltaBadgeBg,
+                                                    shape = RoundedCornerShape(6.dp)
                                                 ) {
                                                     Text(
-                                                        text = "R${move.dealNumber.coerceAtLeast(1)}",
-                                                        fontSize = 9.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                        text = if (isPositive) "+${move.deltaPiedras}" else "${move.deltaPiedras}",
+                                                        color = deltaColor,
+                                                        fontWeight = FontWeight.Black,
+                                                        fontSize = 14.sp,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                                     )
                                                 }
                                             }
-
-                                            Text(
-                                                text = move.reason + if (move.authorName != null) " (por ${move.authorName})" else "",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-
-                                            Text(
-                                                text = "${move.previousTotalPiedras} ➔ ${move.newTotalPiedras} piedras",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 10.sp
-                                            )
-                                        }
-
-                                        Surface(
-                                            color = deltaBadgeBg,
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Text(
-                                                text = if (isPositive) "+${move.deltaPiedras}" else "${move.deltaPiedras}",
-                                                color = deltaColor,
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 14.sp,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
                                         }
                                     }
                                 }
@@ -2198,9 +2538,370 @@ fun MoveHistoryDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar", textAlign = TextAlign.Center)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (history.isNotEmpty() && onRestartHand != null) {
+                    TextButton(
+                        onClick = {
+                            onRestartHand()
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Reiniciar Mano", textAlign = TextAlign.Center)
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cerrar", textAlign = TextAlign.Center)
+                }
             }
         }
     )
+}
+
+@Composable
+fun CardCountDialog(
+    activeTeams: List<Pair<Team, String>>,
+    maxPlayers: Int,
+    currentDeal: Int,
+    maxDeals: Int,
+    nextDealerName: String,
+    onApplyCount: (Map<Team, Int>) -> Unit,
+    onSkipWithoutCards: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val threshold = if (maxPlayers == 3) 13 else 20
+    val totalDeckCards = if (maxPlayers == 3) 39 else 40
+
+    // Campos de texto para indicar manualmente cuántas cartas se contaron
+    val textInputs = remember {
+        mutableStateMapOf<Team, String>().apply {
+            activeTeams.forEach { put(it.first, "") }
+        }
+    }
+    var showExcessCardsDialog by remember { mutableStateOf(false) }
+
+    val totalSum = activeTeams.sumOf { (team, _) -> textInputs[team]?.toIntOrNull() ?: 0 }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🃏", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Recuento de Cartas",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Indica cuántas cartas contaste (Mano $currentDeal de $maxDeals)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (maxPlayers == 3) {
+                            "ℹ️ En tríos, puntúan las cartas superiores a 13 (14 cartas = 1 piedra, 15 = 2 piedras...)"
+                        } else {
+                            "ℹ️ Puntúan las cartas superiores a 20 (21 cartas = 1 piedra, 22 = 2 piedras...)"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+
+                activeTeams.forEach { (team, name) ->
+                    val currentText = textInputs[team] ?: ""
+                    val count = currentText.toIntOrNull() ?: 0
+                    val extraStones = if (currentText.isNotBlank()) (count - threshold).coerceAtLeast(0) else 0
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "¿Cuántas cartas contaste?",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Surface(
+                                    color = if (currentText.isBlank()) {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    } else if (extraStones > 0) {
+                                        Color(0xFFFFB300)
+                                    } else {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (currentText.isBlank()) {
+                                            "Sin indicar"
+                                        } else if (extraStones > 0) {
+                                            "+$extraStones ${if (extraStones == 1) "piedra" else "piedras"}"
+                                        } else {
+                                            "0 piedras"
+                                        },
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 12.sp,
+                                        color = if (extraStones > 0) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Entrada manual directa de cartas con teclado numérico y botones de ajuste
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        val newC = ((currentText.toIntOrNull() ?: threshold) - 1).coerceAtLeast(0)
+                                        textInputs[team] = newC.toString()
+                                    },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "-1", modifier = Modifier.size(20.dp))
+                                }
+
+                                OutlinedTextField(
+                                    value = currentText,
+                                    onValueChange = { input ->
+                                        if (input.all { it.isDigit() } && input.length <= 2) {
+                                            textInputs[team] = input
+                                        }
+                                    },
+                                    label = { Text("Cartas contadas") },
+                                    placeholder = { Text("Ej. 22") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    textStyle = MaterialTheme.typography.titleMedium.copy(
+                                        textAlign = TextAlign.Center,
+                                        fontWeight = FontWeight.Black
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        val newC = ((currentText.toIntOrNull() ?: (threshold - 1)) + 1).coerceAtMost(totalDeckCards)
+                                        textInputs[team] = newC.toString()
+                                    },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "+1", modifier = Modifier.size(20.dp))
+                                }
+                            }
+
+                            // Botones de acceso rápido para facilitar marcar las cantidades habituales
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val presets = if (maxPlayers == 3) listOf(11, 12, 13, 14, 15, 16) else listOf(18, 19, 20, 21, 22, 23)
+                                presets.forEach { preset ->
+                                    val isSelected = currentText == preset.toString()
+                                    Surface(
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { textInputs[team] = preset.toString() }
+                                    ) {
+                                        Text(
+                                            text = "$preset",
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Resumen del total de cartas indicadas
+                if (totalSum > 0) {
+                    val isExcess = totalSum > totalDeckCards
+                    Surface(
+                        color = if (isExcess) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isExcess) Icons.Default.Warning else Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = if (isExcess) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isExcess) {
+                                    "Total sumado: $totalSum / $totalDeckCards cartas. ¡Supera las $totalDeckCards cartas!"
+                                } else {
+                                    "Total sumado: $totalSum / $totalDeckCards cartas"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isExcess) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "🃏 Al aplicar las piedras, comenzará la siguiente mano y repartirá $nextDealerName.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (totalSum > totalDeckCards) {
+                        showExcessCardsDialog = true
+                    } else {
+                        val finalCounts = activeTeams.associate { (team, _) ->
+                            team to (textInputs[team]?.toIntOrNull() ?: 0)
+                        }
+                        onApplyCount(finalCounts)
+                    }
+                },
+                enabled = totalSum > 0
+            ) {
+                Text("Aplicar Piedras y Siguiente Mano", textAlign = TextAlign.Center)
+            }
+        },
+        dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onSkipWithoutCards) {
+                    Text("Pasar sin Contar", textAlign = TextAlign.Center)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancelar", textAlign = TextAlign.Center)
+                }
+            }
+        }
+    )
+
+    if (showExcessCardsDialog) {
+        AlertDialog(
+            onDismissRequest = { showExcessCardsDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Aviso de Recuento",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Se han sumado más de 40 cartas, es necesario hacer un recuento",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "Total sumado: $totalSum / $totalDeckCards cartas",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        activeTeams.forEach { textInputs[it.first] = "" }
+                        showExcessCardsDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Recuento", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }

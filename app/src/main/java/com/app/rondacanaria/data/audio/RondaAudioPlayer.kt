@@ -46,6 +46,7 @@ class RondaAudioPlayer(private val context: Context) {
     private var isPlayingVoice = false
     private var isPlayingBuenas = false
     private var isPlayingVictory = false
+    private var isPlayingOneStoneToWin = false
     private val playerLock = Any()
     private val bgmLock = Any()
 
@@ -172,8 +173,8 @@ class RondaAudioPlayer(private val context: Context) {
 
     private fun getToneGeneratorVolume(): Int {
         if (!isSfxEnabled) return 0
-        // Reducir la ganancia base del tono sintético para que no aturda (escala a máx 60)
-        return (masterVolume * sfxVolume * 60f).toInt().coerceIn(0, 100)
+        // Nivel de volumen para tonos y clics de botones (sumar y restar)
+        return (masterVolume * sfxVolume * 85f).toInt().coerceIn(0, 100)
     }
 
     private fun updateToneGenerator() {
@@ -275,7 +276,7 @@ class RondaAudioPlayer(private val context: Context) {
         triggerHapticFeedback(type)
         if (!isSfxEnabled) return
 
-        if (type == SoundType.ENTERED_BUENAS || type == SoundType.GAME_WON) {
+        if (type == SoundType.ENTERED_BUENAS || type == SoundType.ONE_STONE_TO_WIN || type == SoundType.GAME_WON) {
             // Si hay un cántico de voz sonando, se encola para sonar inmediatamente al terminar dicho cántico sin cortarlo
             synchronized(playerLock) {
                 if (isPlayingVoice) {
@@ -285,19 +286,32 @@ class RondaAudioPlayer(private val context: Context) {
                 isPlayingVoice = true
                 isPlayingBuenas = (type == SoundType.ENTERED_BUENAS)
                 isPlayingVictory = (type == SoundType.GAME_WON)
+                isPlayingOneStoneToWin = (type == SoundType.ONE_STONE_TO_WIN)
             }
             playVoiceType(type)
         } else if (isStoneSound(type)) {
             // El sonido de sumar o restar piedras NO debe cortar el audio de cuando estás en buenas o al ganar la partida
             synchronized(playerLock) {
-                if (isPlayingBuenas || isPlayingVictory) {
-                    // Reproducir el sonido de la piedra en paralelo sin interrumpir el audio de Buenas o Victoria
+                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin) {
+                    // Reproducir el sonido de la piedra en paralelo sin interrumpir el audio de Buenas, Queda Una o Victoria
                     playSfx(type)
                     return
                 }
             }
             playSfx(type)
         } else {
+            // Si está sonando el audio de Buenas (o Queda Una o Victoria),
+            // NO cortar dicho audio si se canta algo: encolar el cántico para que se reproduzca
+            // al terminar, tal y como ocurre a la inversa para no cortar los cánticos.
+            synchronized(playerLock) {
+                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin) {
+                    if (isVoiceAudio(type)) {
+                        voiceAudioQueue.offer(type)
+                    }
+                    return
+                }
+            }
+
             // Los audios de cantos se detendrán si se canta otra jugada
             stopCurrentPlayback()
 
@@ -347,7 +361,8 @@ class RondaAudioPlayer(private val context: Context) {
                         .setUsage(AudioAttributes.USAGE_GAME)
                         .build()
 
-                    val sfxVol = getEffectiveSfxVolume(1.0f)
+                    val stoneBoost = if (type == SoundType.PIEDRA_ADD || type == SoundType.PIEDRA_SUBTRACT || type == SoundType.CARD_PLAYED) 1.25f else 1.0f
+                    val sfxVol = getEffectiveSfxVolume(stoneBoost)
                     sfxMediaPlayer = MediaPlayer().apply {
                         setAudioAttributes(attributes)
                         setDataSource(cachedFile.absolutePath)
@@ -385,7 +400,8 @@ class RondaAudioPlayer(private val context: Context) {
                 .setUsage(AudioAttributes.USAGE_GAME)
                 .build()
 
-            val sfxVol = getEffectiveSfxVolume(1.0f)
+            val stoneBoost = if (assetName.contains("piedra") || assetName.contains("sumar") || assetName.contains("restar")) 1.25f else 1.0f
+            val sfxVol = getEffectiveSfxVolume(stoneBoost)
             sfxMediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(attributes)
                 setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -423,6 +439,7 @@ class RondaAudioPlayer(private val context: Context) {
             SoundType.JUGADA_SOBREMAJO,
             SoundType.JUGADA_REQUETECONTRAMAJO,
             SoundType.ENTERED_BUENAS,
+            SoundType.ONE_STONE_TO_WIN,
             SoundType.GAME_WON -> true
             else -> false
         }
@@ -433,6 +450,7 @@ class RondaAudioPlayer(private val context: Context) {
             isPlayingVoice = true
             isPlayingBuenas = (type == SoundType.ENTERED_BUENAS)
             isPlayingVictory = (type == SoundType.GAME_WON)
+            isPlayingOneStoneToWin = (type == SoundType.ONE_STONE_TO_WIN)
         }
         updateBgmVolume()
         val volume = if (type == SoundType.GAME_WON) getEffectiveSfxVolume(0.35f) else getEffectiveSfxVolume(1.0f)
@@ -443,6 +461,9 @@ class RondaAudioPlayer(private val context: Context) {
                 }
                 if (type == SoundType.GAME_WON) {
                     isPlayingVictory = false
+                }
+                if (type == SoundType.ONE_STONE_TO_WIN) {
+                    isPlayingOneStoneToWin = false
                 }
             }
             onVoiceCompleted()
@@ -456,6 +477,9 @@ class RondaAudioPlayer(private val context: Context) {
                 }
                 if (type == SoundType.GAME_WON) {
                     isPlayingVictory = false
+                }
+                if (type == SoundType.ONE_STONE_TO_WIN) {
+                    isPlayingOneStoneToWin = false
                 }
             }
             onVoiceCompleted()
@@ -471,6 +495,7 @@ class RondaAudioPlayer(private val context: Context) {
                 isPlayingVoice = false
                 isPlayingBuenas = false
                 isPlayingVictory = false
+                isPlayingOneStoneToWin = false
                 updateBgmVolume()
             }
         }
@@ -490,6 +515,15 @@ class RondaAudioPlayer(private val context: Context) {
             SoundType.JUGADA_SOBREMAJO,
             SoundType.JUGADA_REQUETECONTRAMAJO -> listOf("sobremajo", "sobre_majo", "sobrmajo", "requetecontramajo", "requete_contra_majo", "requetecontra")
             SoundType.ENTERED_BUENAS -> listOf("buenas", "buenas_sound", "en_buenas")
+            SoundType.ONE_STONE_TO_WIN -> listOf(
+                "Queda-una-piedra-para-ganar",
+                "queda_una_piedra_para_ganar",
+                "queda-una-piedra-para-ganar",
+                "queda_una_para_ganar",
+                "queda-una-para-ganar",
+                "queda_una",
+                "falta_una"
+            )
             SoundType.GAME_WON -> listOf("victoria", "victoria_sound", "game_won", "win", "ganador")
             SoundType.CARD_PLAYED,
             SoundType.PIEDRA_ADD -> listOf("piedra", "sumar", "piedra_add", "click", "tock", "card_played")
@@ -671,10 +705,11 @@ class RondaAudioPlayer(private val context: Context) {
                 SoundType.JUGADA_SOBREMAJO,
                 SoundType.JUGADA_REQUETECONTRAMAJO -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 420)
                 SoundType.ENTERED_BUENAS -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
+                SoundType.ONE_STONE_TO_WIN -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 450)
                 SoundType.GAME_WON -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
                 SoundType.CARD_PLAYED,
-                SoundType.PIEDRA_ADD -> tg.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
-                SoundType.PIEDRA_SUBTRACT -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 70)
+                SoundType.PIEDRA_ADD -> tg.startTone(ToneGenerator.TONE_PROP_BEEP, 85)
+                SoundType.PIEDRA_SUBTRACT -> tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 85)
             }
         } catch (e: Exception) {
             Log.e(tag, "Error al emitir tono sintético", e)
@@ -698,6 +733,11 @@ class RondaAudioPlayer(private val context: Context) {
                         SoundType.ENTERED_BUENAS -> {
                             val pattern = longArrayOf(0, 150, 100, 250)
                             val amplitudes = intArrayOf(0, 200, 0, 255)
+                            v.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
+                        }
+                        SoundType.ONE_STONE_TO_WIN -> {
+                            val pattern = longArrayOf(0, 150, 80, 150)
+                            val amplitudes = intArrayOf(0, 220, 0, 220)
                             v.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
                         }
                         SoundType.GAME_WON -> {

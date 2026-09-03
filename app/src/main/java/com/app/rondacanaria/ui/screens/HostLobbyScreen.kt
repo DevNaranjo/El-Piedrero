@@ -54,7 +54,23 @@ fun HostLobbyScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mesa Anfitrión - El Piedrero", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text(
+                            text = if (uiState.isHost) "Mesa Anfitrión" else "Sala de Espera",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        val hostName = uiState.gameState.connectedPlayers.find { it.isHost }?.name
+                            ?: uiState.connectingHostName
+                            ?: uiState.hostConnectionInfo?.hostName
+                        Text(
+                            text = if (uiState.isHost) "El Piedrero 🃏" else "Mesa de $hostName 🃏",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { showExitHostRoomConfirmation = true }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -171,8 +187,15 @@ fun HostLobbyScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(uiState.gameState.connectedPlayers) { player ->
+                    val isDealer = (uiState.gameState.dealerPlayerId ?: uiState.gameState.connectedPlayers.firstOrNull()?.id) == player.id
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = if (uiState.isHost) {
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setDealer(player.id) }
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -200,13 +223,29 @@ fun HostLobbyScreen(
                                         .size(12.dp)
                                         .clip(CircleShape)
                                         .background(teamColor)
-                                )
+                                    )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = player.name,
+                                    text = if (isDealer) "${player.name} 🃏" else player.name,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = if (isDealer) FontWeight.Bold else FontWeight.Medium
                                 )
+                                if (isDealer) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Reparte 1º",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                                 if (player.isHost) {
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
@@ -231,31 +270,46 @@ fun HostLobbyScreen(
                                     else -> Team.TEAM_A
                                 }
 
-                                if (isPlayerReserve) {
-                                    FilledTonalButton(
-                                        onClick = { viewModel.switchPlayerTeam(player.id, myOriginalTeam) },
-                                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.filledTonalButtonColors(
-                                            containerColor = Color(0xFFFFE082),
-                                            contentColor = Color(0xFF5D4037)
-                                        )
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = "Activar jugador", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                if (uiState.isHost) {
+                                    if (isPlayerReserve) {
+                                        FilledTonalButton(
+                                            onClick = { viewModel.switchPlayerTeam(player.id, myOriginalTeam) },
+                                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors(
+                                                containerColor = Color(0xFFFFE082),
+                                                contentColor = Color(0xFF5D4037)
+                                            )
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = "Activar jugador", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        }
+                                    } else {
+                                        OutlinedButton(
+                                            onClick = { viewModel.switchPlayerTeam(player.id, Team.RESERVE) },
+                                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Icon(Icons.Default.PauseCircle, contentDescription = "Poner jugador en reserva", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Reserva", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        }
                                     }
                                 } else {
-                                    OutlinedButton(
-                                        onClick = { viewModel.switchPlayerTeam(player.id, Team.RESERVE) },
-                                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    Surface(
+                                        color = if (isPlayerReserve) Color(0xFFFFE082) else MaterialTheme.colorScheme.primaryContainer,
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Icon(Icons.Default.PauseCircle, contentDescription = "Poner jugador en reserva", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Reserva", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        Text(
+                                            text = if (isPlayerReserve) "💤 Reserva" else "En Juego",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isPlayerReserve) Color(0xFF5D4037) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
                                     }
                                 }
                             } else {
@@ -273,7 +327,9 @@ fun HostLobbyScreen(
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier
                                             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                            .clickable { showTeamMenu = true }
+                                            .then(
+                                                if (uiState.isHost) Modifier.clickable { showTeamMenu = true } else Modifier
+                                            )
                                     ) {
                                         val (teamColor, teamLabel) = when (player.team) {
                                             Team.TEAM_A -> MaterialTheme.colorScheme.onPrimaryContainer to uiState.gameState.nameTeamA
@@ -293,13 +349,15 @@ fun HostLobbyScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = teamColor
                                             )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowDropDown,
-                                                contentDescription = "Cambiar equipo",
-                                                modifier = Modifier.size(16.dp),
-                                                tint = teamColor
-                                            )
+                                            if (uiState.isHost) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowDropDown,
+                                                    contentDescription = "Cambiar equipo",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = teamColor
+                                                )
+                                            }
                                         }
                                     }
 
@@ -355,7 +413,7 @@ fun HostLobbyScreen(
             }
 
             // Selección de equipos en reserva (solo anfitrión) para 6 y 8 jugadores
-            if (uiState.gameState.maxPlayers == 6 || uiState.gameState.maxPlayers == 8) {
+            if ((uiState.gameState.maxPlayers == 6 || uiState.gameState.maxPlayers == 8) && uiState.isHost) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -476,23 +534,54 @@ fun HostLobbyScreen(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            Button(
-                onClick = {
-                    val currentCount = uiState.gameState.connectedPlayers.size
-                    if (currentCount < maxCapacity) {
-                        showIncompletePlayersDialog = true
-                    } else {
-                        viewModel.navigateToScoreboard()
+            if (uiState.isHost) {
+                Button(
+                    onClick = {
+                        val currentCount = uiState.gameState.connectedPlayers.size
+                        if (currentCount < maxCapacity) {
+                            showIncompletePlayersDialog = true
+                        } else {
+                            viewModel.navigateToScoreboard()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ir al Marcador de Piedras", fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                }
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Esperando a que el anfitrión inicie la partida...",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Ir al Marcador de Piedras", fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                }
             }
         }
     }
@@ -553,8 +642,13 @@ fun HostLobbyScreen(
         )
     }
 
-    // Diálogo de confirmación para salir de la sala del Anfitrión
+    // Diálogo de confirmación para salir de la sala
     if (showExitHostRoomConfirmation) {
+        val hostPlayerName = uiState.gameState.connectedPlayers.find { it.isHost }?.name
+            ?: uiState.connectingHostName
+            ?: uiState.hostConnectionInfo?.hostName
+            ?: "el anfitrión"
+
         AlertDialog(
             onDismissRequest = { showExitHostRoomConfirmation = false },
             icon = {
@@ -567,14 +661,18 @@ fun HostLobbyScreen(
             },
             title = {
                 Text(
-                    text = "Seguro que quieres salir, se cerrará la sala",
+                    text = if (uiState.isHost) "Seguro que quieres salir, se cerrará la sala" else "estás seguro que quieres salir de la sala de $hostPlayerName",
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
             },
             text = {
                 Text(
-                    text = "Si sales al menú principal, la sala se cerrará y se desconectará a los jugadores unidos.",
+                    text = if (uiState.isHost) {
+                        "Si sales al menú principal, la sala se cerrará y se desconectará a los jugadores unidos."
+                    } else {
+                        "Saldrás de la mesa de juego y volverás al menú de selección de modo."
+                    },
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium
                 )

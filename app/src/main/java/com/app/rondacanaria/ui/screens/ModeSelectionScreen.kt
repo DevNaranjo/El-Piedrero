@@ -51,6 +51,11 @@ fun ModeSelectionScreen(
     var localTeamD by remember { mutableStateOf("Equipo D") }
     var localReserve6 by remember { mutableStateOf(Team.TEAM_C) }
     var localReserves8 by remember { mutableStateOf(setOf(Team.TEAM_C, Team.TEAM_D)) }
+    var localPlayerNames by remember {
+        mutableStateOf(
+            listOf("Jugador 1", "Jugador 2", "Jugador 3", "Jugador 4", "Jugador 5", "Jugador 6", "Jugador 7", "Jugador 8")
+        )
+    }
 
     // Al pulsar atrás en el menú principal: cerrar diálogos abiertos en vez de salir de la app
     BackHandler(enabled = showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
@@ -353,7 +358,9 @@ fun ModeSelectionScreen(
                         ).forEach { (count, subtext) ->
                             val isSelected = localMaxPlayers == count
                             OutlinedButton(
-                                onClick = { localMaxPlayers = count },
+                                onClick = {
+                                    localMaxPlayers = count
+                                },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = if (isSelected) {
@@ -413,40 +420,134 @@ fun ModeSelectionScreen(
                         )
                     }
 
-                    OutlinedTextField(
-                        value = localTeamA,
-                        onValueChange = { localTeamA = it },
-                        label = { Text(if (localMaxPlayers in listOf(2, 3)) "Nombre Jugador 1" else "Nombre Equipo A") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = localTeamB,
-                        onValueChange = { localTeamB = it },
-                        label = { Text(if (localMaxPlayers in listOf(2, 3)) "Nombre Jugador 2" else "Nombre Equipo B") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (localMaxPlayers in listOf(3, 6, 8)) {
+                    if (localMaxPlayers in listOf(2, 3)) {
+                        Text(
+                            text = "👤 Nombres de los Jugadores:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                         OutlinedTextField(
-                            value = localTeamC,
-                            onValueChange = { localTeamC = it },
-                            label = { Text(if (localMaxPlayers == 3) "Nombre Jugador 3" else "Nombre Equipo C") },
+                            value = localPlayerNames[0],
+                            onValueChange = { newN ->
+                                localPlayerNames = localPlayerNames.toMutableList().also { it[0] = newN }
+                                localTeamA = newN
+                            },
+                            label = { Text("Nombre Jugador 1") },
+                            placeholder = { Text("Jugador 1") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                    }
 
-                    if (localMaxPlayers == 8) {
                         OutlinedTextField(
-                            value = localTeamD,
-                            onValueChange = { localTeamD = it },
-                            label = { Text("Nombre Equipo D") },
+                            value = localPlayerNames[1],
+                            onValueChange = { newN ->
+                                localPlayerNames = localPlayerNames.toMutableList().also { it[1] = newN }
+                                localTeamB = newN
+                            },
+                            label = { Text("Nombre Jugador 2") },
+                            placeholder = { Text("Jugador 2") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        if (localMaxPlayers == 3) {
+                            OutlinedTextField(
+                                value = localPlayerNames[2],
+                                onValueChange = { newN ->
+                                    localPlayerNames = localPlayerNames.toMutableList().also { it[2] = newN }
+                                    localTeamC = newN
+                                },
+                                label = { Text("Nombre Jugador 3") },
+                                placeholder = { Text("Jugador 3") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    } else {
+                        // 4, 6 u 8 Jugadores
+                        Text(
+                            text = "👥 Equipos y Jugadores (2 por equipo):",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Personaliza el nombre de cada equipo y de sus 2 integrantes:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        val teamsConfig = when (localMaxPlayers) {
+                            4 -> listOf(
+                                Triple("Equipo A", localTeamA, { v: String -> localTeamA = v }) to (0 to 1),
+                                Triple("Equipo B", localTeamB, { v: String -> localTeamB = v }) to (2 to 3)
+                            )
+                            6 -> listOf(
+                                Triple("Equipo A", localTeamA, { v: String -> localTeamA = v }) to (0 to 1),
+                                Triple("Equipo B", localTeamB, { v: String -> localTeamB = v }) to (2 to 3),
+                                Triple("Equipo C", localTeamC, { v: String -> localTeamC = v }) to (4 to 5)
+                            )
+                            else -> listOf(
+                                Triple("Equipo A", localTeamA, { v: String -> localTeamA = v }) to (0 to 1),
+                                Triple("Equipo B", localTeamB, { v: String -> localTeamB = v }) to (2 to 3),
+                                Triple("Equipo C", localTeamC, { v: String -> localTeamC = v }) to (4 to 5),
+                                Triple("Equipo D", localTeamD, { v: String -> localTeamD = v }) to (6 to 7)
+                            )
+                        }
+
+                        teamsConfig.forEach { (teamInfo, playerIndices) ->
+                            val (defaultName, teamNameVal, onTeamNameChange) = teamInfo
+                            val (idx1, idx2) = playerIndices
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = teamNameVal,
+                                        onValueChange = onTeamNameChange,
+                                        label = { Text("Nombre $defaultName") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = localPlayerNames[idx1],
+                                            onValueChange = { newN ->
+                                                localPlayerNames = localPlayerNames.toMutableList().also { it[idx1] = newN }
+                                            },
+                                            label = { Text("Jugador 1") },
+                                            placeholder = { Text("Jugador ${idx1 + 1}") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = localPlayerNames[idx2],
+                                            onValueChange = { newN ->
+                                                localPlayerNames = localPlayerNames.toMutableList().also { it[idx2] = newN }
+                                            },
+                                            label = { Text("Jugador 2") },
+                                            placeholder = { Text("Jugador ${idx2 + 1}") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Selector de equipos que van a jugar para 6 jugadores (3 equipos de 2)
@@ -562,10 +663,46 @@ fun ModeSelectionScreen(
                         8 -> localReserves8.toList()
                         else -> emptyList()
                     }
-                    val finalTeamA = if (localMaxPlayers in listOf(2, 3)) localTeamA.ifBlank { "Jugador 1" } else localTeamA.ifBlank { "Equipo A" }
-                    val finalTeamB = if (localMaxPlayers in listOf(2, 3)) localTeamB.ifBlank { "Jugador 2" } else localTeamB.ifBlank { "Equipo B" }
-                    val finalTeamC = if (localMaxPlayers == 3) localTeamC.ifBlank { "Jugador 3" } else localTeamC.ifBlank { "Equipo C" }
+                    val finalTeamA = if (localMaxPlayers in listOf(2, 3)) localPlayerNames[0].ifBlank { "Jugador 1" } else localTeamA.ifBlank { "Equipo A" }
+                    val finalTeamB = if (localMaxPlayers in listOf(2, 3)) localPlayerNames[1].ifBlank { "Jugador 2" } else localTeamB.ifBlank { "Equipo B" }
+                    val finalTeamC = if (localMaxPlayers == 3) localPlayerNames[2].ifBlank { "Jugador 3" } else localTeamC.ifBlank { "Equipo C" }
                     val finalTeamD = localTeamD.ifBlank { "Equipo D" }
+
+                    val finalPlayers = if (localMaxPlayers in listOf(2, 3)) {
+                        listOf(
+                            (localPlayerNames[0].ifBlank { "Jugador 1" }) to Team.TEAM_A,
+                            (localPlayerNames[1].ifBlank { "Jugador 2" }) to Team.TEAM_B
+                        ) + if (localMaxPlayers == 3) {
+                            listOf((localPlayerNames[2].ifBlank { "Jugador 3" }) to Team.TEAM_C)
+                        } else emptyList()
+                    } else {
+                        when (localMaxPlayers) {
+                            4 -> listOf(
+                                (localPlayerNames[0].ifBlank { "Jugador 1" }) to Team.TEAM_A,
+                                (localPlayerNames[2].ifBlank { "Jugador 3" }) to Team.TEAM_B,
+                                (localPlayerNames[1].ifBlank { "Jugador 2" }) to Team.TEAM_A,
+                                (localPlayerNames[3].ifBlank { "Jugador 4" }) to Team.TEAM_B
+                            )
+                            6 -> listOf(
+                                (localPlayerNames[0].ifBlank { "Jugador 1" }) to Team.TEAM_A,
+                                (localPlayerNames[2].ifBlank { "Jugador 3" }) to Team.TEAM_B,
+                                (localPlayerNames[1].ifBlank { "Jugador 2" }) to Team.TEAM_A,
+                                (localPlayerNames[3].ifBlank { "Jugador 4" }) to Team.TEAM_B,
+                                (localPlayerNames[4].ifBlank { "Jugador 5" }) to Team.TEAM_C,
+                                (localPlayerNames[5].ifBlank { "Jugador 6" }) to Team.TEAM_C
+                            )
+                            else -> listOf(
+                                (localPlayerNames[0].ifBlank { "Jugador 1" }) to Team.TEAM_A,
+                                (localPlayerNames[2].ifBlank { "Jugador 3" }) to Team.TEAM_B,
+                                (localPlayerNames[1].ifBlank { "Jugador 2" }) to Team.TEAM_A,
+                                (localPlayerNames[3].ifBlank { "Jugador 4" }) to Team.TEAM_B,
+                                (localPlayerNames[4].ifBlank { "Jugador 5" }) to Team.TEAM_C,
+                                (localPlayerNames[5].ifBlank { "Jugador 6" }) to Team.TEAM_C,
+                                (localPlayerNames[6].ifBlank { "Jugador 7" }) to Team.TEAM_D,
+                                (localPlayerNames[7].ifBlank { "Jugador 8" }) to Team.TEAM_D
+                            )
+                        }
+                    }
 
                     viewModel.startLocalGame(
                         teamA = finalTeamA,
@@ -573,7 +710,8 @@ fun ModeSelectionScreen(
                         teamC = finalTeamC,
                         teamD = finalTeamD,
                         maxPlayers = localMaxPlayers,
-                        reserveTeams = reserves
+                        reserveTeams = reserves,
+                        customPlayers = finalPlayers
                     )
                 }) {
                     Text("Empezar Partida", textAlign = TextAlign.Center)

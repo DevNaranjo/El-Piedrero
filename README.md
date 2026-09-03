@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.03.092026.2-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)
+[![Versión](https://img.shields.io/badge/Versión-1.0.03.092026.4-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -75,6 +75,15 @@ La partida se disputa a un total de **21 Piedras**:
 
 ## 🚀 Registro de Cambios
  
+### 🆕 Persistencia de Registro por Manos, Interfaz Compacta y Frases Tradicionales (v1.0.03.092026.4)
+
+* 📜 **Historial Permanente de la Partida ("Registro X"):** Las jugadas y puntos ya no se borran al finalizar las manos o realizar el recuento. Cada mano concluida se preserva de forma permanente catalogada como `Registro X (Guardado)`, mientras que la mano en juego se muestra como `Registro X (En curso)`. Se incluye selector de filtros rápidos (`Todos`, `Registro 1`, `Registro 2`...) y etiquetas por jugada (`Reg. X · R Y`).
+* 👥 **Personalización Compacta de Equipos y Jugadores:** Rediseño completo del diálogo de partida local para 4, 6 y 8 jugadores. Se agrupan los participantes directamente en tarjetas compactas por equipo con los dos jugadores en dos columnas paralelas, eliminando espacios muertos, scrolls excesivos y recortes de botones.
+* 🎯 **Refinamiento de Frases Tradicionales en Buenas:** Eliminación de la coletilla redundante *"para ganar"* en todas las frases de cuenta atrás. Incorporadas las frases tradicionales para 2 piedras (*"A falta de ronda de bufos"*), 6 piedras (*"A falta de un caracol de bufos"*) y 7 piedras (*"A falta de un caracolillo de bufos"*).
+* 🎴 **Estandarización de Simbología:** Sustitución universal del icono por el emoji tradicional de baraja `🃏` en avisos, repartidor y pantallas de recuento.
+* 📊 **Control y Aviso de Recuento Manual de Cartas:** Diálogo con verificación estricta del mazo de 40 cartas; si la suma acumulada supera dicho total, se despliega una pantalla de aviso que solicita y facilita el recuento manual de cartas.
+* 🧹 **Limpieza Visual de Interfaz:** Eliminación de textos amarillos redundantes en el tanteador de todos los modos de juego (tanto local como multijugador).
+
 ### 🆕 Experiencia de Conexión, Audio Dinámico y Ajustes Visuales (v1.0.03.092026.2)
 
 * 🔄 **Flujo de Escaneo QR y Desvinculación Inmediata de Cámara:** Cierre y liberación instantánea del hardware de la cámara (`unbindAll`) en el momento exacto en que se reconoce el código QR, previniendo el sobreuso de recursos y batería. La aplicación pasa automáticamente a una pantalla de carga dedicada (`ConnectionLoadingView`) que informa al usuario que se está sincronizando con la mesa.
@@ -150,10 +159,16 @@ git clone https://github.com/DevNaranjo/El-Piedrero.git
 cd El-Piedrero
 
 # Ejecutar la suite de pruebas unitarias
+# (En Linux, macOS o PowerShell):
 ./gradlew test
+# (En Windows CMD / Símbolo del sistema):
+gradlew test
 
 # Compilar el APK en modo Debug
+# (En Linux, macOS o PowerShell):
 ./gradlew assembleDebug
+# (En Windows CMD / Símbolo del sistema):
+gradlew assembleDebug
 ```
 
 ---

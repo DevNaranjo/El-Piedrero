@@ -20,7 +20,9 @@ class HostGameUseCaseTest {
         hostUseCase.startHost("Anfitrion", "Equipo Norte", "Equipo Sur", maxPlayers = 4)
         val state = hostUseCase.gameState.value
 
-        assertEquals(GameStatus.PLAYING, state.status)
+        assertEquals(GameStatus.WAITING, state.status)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+        assertEquals(GameStatus.PLAYING, hostUseCase.gameState.value.status)
         assertEquals("Equipo Norte", state.nameTeamA)
         assertEquals("Equipo Sur", state.nameTeamB)
         assertEquals(1, state.connectedPlayers.size)
