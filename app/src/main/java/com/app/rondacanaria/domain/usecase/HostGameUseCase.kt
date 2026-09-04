@@ -330,7 +330,7 @@ class HostGameUseCase(
 
             MessageType.SCORE_UPDATE -> {
                 val scoreUpdate = envelope.scoreUpdate ?: return
-                val isTwoPlayers = _gameState.value.maxPlayers == 2 || _gameState.value.connectedPlayers.size == 2
+                val isTwoPlayers = _gameState.value.maxPlayers == 2
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
 
@@ -494,7 +494,8 @@ class HostGameUseCase(
                     authorName = authorName,
                     previousReserveTeams = current.reserveTeams,
                     dealNumber = current.currentDeal,
-                    handNumber = current.currentHand
+                    handNumber = current.currentHand,
+                    previousDealerId = current.dealerPlayerId
                 )
             } else {
                 current.moveHistory
@@ -529,6 +530,7 @@ class HostGameUseCase(
             val isWinnerC = newScoreC.totalPiedras >= TeamScore.TOTAL_PIEDRAS_VICTORY
             val isWinnerD = newScoreD.totalPiedras >= TeamScore.TOTAL_PIEDRAS_VICTORY
 
+            val isNewWin = (isWinnerA || isWinnerB || isWinnerC || isWinnerD) && current.winnerTeam == null
             val newStatus = if (isWinnerA || isWinnerB || isWinnerC || isWinnerD) GameStatus.FINISHED else current.status
             val winner = when {
                 isWinnerA -> Team.TEAM_A
@@ -547,6 +549,32 @@ class HostGameUseCase(
             val newWinsC = if (isWinnerC && current.winnerTeam == null) current.winsTeamC + 1 else current.winsTeamC
             val newWinsD = if (isWinnerD && current.winnerTeam == null) current.winsTeamD + 1 else current.winsTeamD
 
+            val futureReserves = if (isNewWin && winner != null && current.maxPlayers in listOf(6, 8)) {
+                val allTeams = when (current.maxPlayers) {
+                    6 -> listOf(Team.TEAM_A, Team.TEAM_B, Team.TEAM_C)
+                    8 -> listOf(Team.TEAM_A, Team.TEAM_B, Team.TEAM_C, Team.TEAM_D)
+                    else -> emptyList()
+                }
+                val currentRes = if (current.reserveTeams.isNotEmpty()) current.reserveTeams else {
+                    if (current.maxPlayers == 6) listOf(Team.TEAM_C) else listOf(Team.TEAM_C, Team.TEAM_D)
+                }
+                val activeTeams = allTeams - currentRes.toSet()
+                val loser = activeTeams.firstOrNull { it != winner }
+                if (loser != null) {
+                    if (current.maxPlayers == 6) listOf(loser) else (currentRes.drop(1) + loser)
+                } else {
+                    current.reserveTeams
+                }
+            } else {
+                current.reserveTeams
+            }
+
+            val nextDealerOnWin = if (isNewWin) {
+                getNextDealerId(current.copy(reserveTeams = futureReserves))
+            } else {
+                current.dealerPlayerId
+            }
+
             _gameState.value = current.copy(
                 scoreTeamA = newScoreA,
                 scoreTeamB = newScoreB,
@@ -558,6 +586,7 @@ class HostGameUseCase(
                 winsTeamD = newWinsD,
                 status = newStatus,
                 winnerTeam = winner,
+                dealerPlayerId = nextDealerOnWin,
                 version = current.version + 1,
                 moveHistory = updatedHistory
             )
@@ -670,6 +699,17 @@ class HostGameUseCase(
                 current.reserveTeams
             }
 
+            val nextDealer = if (current.winnerTeam != null) {
+                val currentDealerPlayer = current.connectedPlayers.find { it.id == current.dealerPlayerId }
+                if (currentDealerPlayer != null && nextReserves.contains(currentDealerPlayer.team)) {
+                    getNextDealerId(current.copy(reserveTeams = nextReserves))
+                } else {
+                    current.dealerPlayerId ?: getNextDealerId(current.copy(reserveTeams = nextReserves))
+                }
+            } else {
+                getNextDealerId(current.copy(reserveTeams = nextReserves))
+            }
+
             _gameState.value = current.copy(
                 gameId = UUID.randomUUID().toString(),
                 scoreTeamA = TeamScore.calculate(0),
@@ -683,6 +723,7 @@ class HostGameUseCase(
                 status = newStatus,
                 winnerTeam = null,
                 reserveTeams = nextReserves,
+                dealerPlayerId = nextDealer,
                 version = current.version + 1,
                 moveHistory = emptyList(),
                 currentDeal = 1,
@@ -750,6 +791,12 @@ class HostGameUseCase(
                 current.reserveTeams
             }
 
+            val restoredDealer = if (hadWon && lastMove.previousDealerId != null) {
+                lastMove.previousDealerId
+            } else {
+                current.dealerPlayerId
+            }
+
             val updatedHistory = current.moveHistory.dropLast(1)
 
             _gameState.value = current.copy(
@@ -763,6 +810,7 @@ class HostGameUseCase(
                 winsTeamD = newWinsD,
                 status = newStatus,
                 winnerTeam = newWinner,
+                dealerPlayerId = restoredDealer,
                 reserveTeams = restoredReserveTeams,
                 version = current.version + 1,
                 moveHistory = updatedHistory
@@ -925,7 +973,9 @@ class HostGameUseCase(
                 )
             }
         }
-        restartHand()
+        if (_gameState.value.status != GameStatus.FINISHED) {
+            restartHand()
+        }
     }
 
     suspend fun restartHand() {
@@ -991,9 +1041,9 @@ class HostGameUseCase(
 
         return when (max) {
             8 -> when {
-                countA < maxPerTeam -> Team.TEAM_A
-                countB < maxPerTeam -> Team.TEAM_B
-                countC < maxPerTeam -> Team.TEAM_C
+                countA < maxPerTeam && countA <= countB && countA <= countC && countA <= countD -> Team.TEAM_A
+                countB < maxPerTeam && countB <= countC && countB <= countD -> Team.TEAM_B
+                countC < maxPerTeam && countC <= countD -> Team.TEAM_C
                 countD < maxPerTeam -> Team.TEAM_D
                 else -> Team.RESERVE
             }

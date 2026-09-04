@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.5-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-1.0.6-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.5)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.6)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -39,12 +39,26 @@ Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
   * **2 Jugadores** (1 vs 1).
   * **3 Jugadores** (Trío con 3 equipos independientes: A, B y C).
   * **4 Jugadores** (2 vs 2 por parejas).
+  * **6 Jugadores** (3 equipos de 2 con rotación de reservas).
+  * **8 Jugadores** (4 equipos de 2 con rotación de reservas).
+* 🎛️ **Distribución de Botones Personalizable:** Permite reorganizar el orden de la botonera de cantos a gusto del usuario y guardarla de forma persistente.
+* 🃏 **Gestión Inteligente de Reparto:** Indicador visible del jugador que reparte y sugerencia del siguiente repartidor al completar cada ciclo de manos.
 * 🛡️ **Seguridad Criptográfica y Red Local:**
   * **Cifrado AES-256-GCM Extremo a Extremo:** Toda la comunicación por Sockets TCP en la Wi-Fi local viaja cifrada con clave simétrica aleatoria de 256 bits generada por el Host y compartida únicamente a través del código QR físico.
   * **Autenticación con Token de Sala:** Solo los jugadores que hayan escaneado presencialmente el código QR del anfitrión poseen el token de autorización para unirse.
   * **Firma de Producción Oficial:** Compilado en modo Release y firmado con certificado propio de DevNaranjo (sin certificados genéricos de depuración ni flag `testOnly`).
   * **Protocolo con Protección DoS:** Límite estricto de 32 KB por trama contra desbordamientos de memoria.
   * **Búfer Reutilizable en CameraX:** Elimina pausas del Garbage Collector a 60 FPS al escanear el QR.
+
+---
+
+## 🚀 Novedades de la Versión 1.0.6 (Patch 2)
+
+* 🪨 **Multijugador Robusto (2, 3, 4, 6 y 8 Jugadores):** Corrección integral del sistema de permisos y sincronización de equipos en tiempo real. Ahora cada jugador cliente puede modificar sus piedras y cantar jugadas de manera independiente para su equipo sin bloqueos.
+* 🎛️ **Personalización de Distribución de Botones:** Nueva pantalla de reordenación de la botonera de jugadas y cánticos accesible desde los ajustes del marcador ("Cambiar Distribución"), con almacenamiento persistente de preferencias.
+* 🃏 **Indicador Dinámico de Repartidor:** Detección y anuncio del siguiente jugador a repartir tras finalizar cada mano o juego.
+* 🔊 **Optimización de Audio y Smart TV:** Solución a la interrupción de música de fondo tras los cánticos y avisos sonoros de Buenas y Victoria.
+* 🧪 **Suite de Pruebas de Integración Multijugador:** Cobertura automatizada integral con 28 pruebas unitarias y de integración verificando la conectividad, reconexión con persistencia de asiento, deshacer jugadas y modificación de tanteos en todas las configuraciones de mesa.
 
 ---
 
@@ -75,6 +89,17 @@ La partida se disputa a un total de **21 Piedras**:
 
 ## 🚀 Registro de Cambios
  
+### 🃏 El Piedrero — v1.0.6 (04/09/2026 - Patch 2) — 🪨
+
+* 🪨 **Multijugador en Salas de 2, 3, 4, 6 y 8 Jugadores:** Corrección del algoritmo de asignación de equipos y permisos de modificación remota de piedras (`getEffectiveLocalTeam()`), eliminando el bloqueo que marcaba las tarjetas como "Equipo Rival" a jugadores remotos.
+* 🎛️ **Personalización Completa de Botonera de Cantos:** Pantalla de configuración que permite redistribuir los botones a gusto del usuario con persistencia offline de ajustes.
+* 🃏 **Gestión y Anuncio de Reparto:** Detección dinámica y aviso visible de quién reparte las cartas y el siguiente en el orden de juego.
+* 🔄 **Reconexión Resiliente con Asiento Persistente:** Mantenimiento garantizado del equipo asignado tras microcortes de red Wi-Fi.
+* ↩️ **Deshacer Jugadas Sincronizado (`UNDO_LAST_MOVE`):** Soporte seguro para revertir jugadas en multijugador con bloqueo a equipos en reserva.
+* 📊 **Recuento de Cartas Oficial (`applyCardCount`):** Validación estricta de baraja completa (40 cartas / umbral de 20) y rotación automática de repartidor.
+* 🔊 **Mejoras de Audio en Transmisión TV:** Eliminación del corte permanente de música de fondo tras cánticos al proyectar pantalla.
+* 🧪 **Suite Automatizada de 28 Tests:** Cobertura de pruebas unitarias y de integración al 100% pasando en verde.
+
 ### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
 
 * 📺 **Transmisión en Directo a Pantallas (TV Cast):** Nuevo diálogo interactivo (`TvCastDialog.kt`) para proyectar el tanteador en Smart TVs o monitores externos mediante Google Cast / Pantalla Inalámbrica de Android, con optimización automática permanente de audio en TV.
@@ -153,13 +178,14 @@ El proyecto sigue los principios de **Clean Architecture** y **MVVM/MVI reactivo
 app/src/main/java/com/app/rondacanaria/
 ├── data/
 │   ├── audio/        # RondaAudioPlayer (reproducción con fallback sintético y hápticos)
-│   ├── history/      # GameHistoryRepository (persistencia JSON offline de 30 partidas)
+│   ├── history/      # GameHistoryRepository y ButtonLayoutPersistence (persistencia JSON offline)
 │   ├── model/        # Modelos de red, paquetes NDJSON, CantoType, TeamScore
 │   └── network/      # SocketServer, SocketClient y utilidades de red local
 ├── domain/
 │   ├── model/        # ConnectionInfo (datos de sala en código QR)
 │   └── usecase/      # HostGameUseCase y ClientGameUseCase (lógica de red y partida)
 └── ui/
+    ├── components/   # Diálogos: AudioSettingsDialog, CustomizeButtonsDialog, TvCastDialog, etc.
     ├── qr/           # QrCodeGenerator (optimizado con JNI) y QrCameraScanner (CameraX)
     ├── screens/      # ModeSelection, Lobby, HostLobby, Scanner, Scoreboard, History
     ├── MainActivity.kt

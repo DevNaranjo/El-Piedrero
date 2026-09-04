@@ -121,7 +121,8 @@ data class GameMove(
     val authorName: String? = null,
     val previousReserveTeams: List<Team> = emptyList(),
     val dealNumber: Int = 1,
-    val handNumber: Int = 1
+    val handNumber: Int = 1,
+    val previousDealerId: String? = null
 )
 
 @Serializable

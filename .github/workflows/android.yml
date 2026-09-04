@@ -37,11 +37,15 @@ jobs:
       - name: Run Lint Analysis
         run: ./gradlew lintVitalRelease --stacktrace
 
+      - name: Decode Release Keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' || vars.KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.KEYSTORE_BASE64 || vars.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+
       - name: Build Release APK and App Bundle
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || vars.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || vars.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || vars.KEY_PASSWORD }}
         run: ./gradlew assembleRelease bundleRelease --stacktrace
 
       - name: Generate Checksums

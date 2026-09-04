@@ -217,7 +217,6 @@ class RondaAudioPlayer(private val context: Context) {
 
     fun getEffectiveBgmVolume(): Float {
         if (!isMusicEnabled) return 0f
-        if (isTvAudioOptimizationEnabled && isTvCastingActive && isExternalDisplayConnected()) return 0f
         val duck = if (isPlayingVoice) 0.33f else 1.0f
         return (masterVolume * musicVolume * MAX_BGM_GAIN * duck).coerceIn(0f, 1f)
     }
@@ -1226,9 +1225,15 @@ class RondaAudioPlayer(private val context: Context) {
     private fun updateBgmVolume() {
         synchronized(bgmLock) {
             try {
+                val player = bgmMediaPlayer ?: return
                 if (bgmFadeAnimator?.isRunning != true) {
                     val targetVol = getEffectiveBgmVolume()
-                    bgmMediaPlayer?.setVolume(targetVol, targetVol)
+                    player.setVolume(targetVol, targetVol)
+                    if (targetVol > 0f && isMusicEnabled && !player.isPlaying) {
+                        try {
+                            player.start()
+                        } catch (_: Exception) {}
+                    }
                 }
             } catch (_: Exception) {}
         }

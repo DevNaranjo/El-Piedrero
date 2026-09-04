@@ -3,6 +3,7 @@ package com.app.rondacanaria.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
@@ -35,6 +36,7 @@ fun AudioSettingsDialog(
     onToggleMusic: (Boolean) -> Unit,
     onToggleSfx: (Boolean) -> Unit,
     onToggleVibration: (Boolean) -> Unit = {},
+    onOpenCustomizeButtons: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -302,6 +304,55 @@ fun AudioSettingsDialog(
                                 onCheckedChange = onToggleVibration,
                                 modifier = Modifier.height(28.dp)
                             )
+                        }
+                    }
+                }
+
+                if (onOpenCustomizeButtons != null) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DashboardCustomize,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Distribución de Botones",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Personaliza el orden de los cantos",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            FilledTonalButton(
+                                onClick = onOpenCustomizeButtons,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Cambiar", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
                 }

@@ -36,6 +36,7 @@ import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
+import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
 import com.app.rondacanaria.ui.components.TvCastDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,13 +48,12 @@ fun ScoreBoardScreen(
     val context = LocalContext.current
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
-    val isThreePlayers = (gameState.maxPlayers == 3 || uiState.maxPlayers == 3) && gameState.connectedPlayers.size != 2
-    val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2 || (gameState.connectedPlayers.size == 2 && !uiState.isLocalGame)) && !isThreePlayers
+    val effectiveMaxPlayers = if (gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) gameState.maxPlayers else uiState.maxPlayers
+    val isTwoPlayers = effectiveMaxPlayers == 2
+    val isThreePlayers = effectiveMaxPlayers == 3
 
-    val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers, isTwoPlayers) {
+    val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers, effectiveMaxPlayers, uiState.isHost, uiState.isLocalGame) {
         when {
-            isMultiplayerClient && isTwoPlayers -> Team.TEAM_B
-            uiState.isHost && isTwoPlayers -> Team.TEAM_A
             uiState.isHost -> Team.TEAM_A
             isMultiplayerClient -> {
                 val playerInState = gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }
@@ -61,7 +61,8 @@ fun ScoreBoardScreen(
                 when {
                     playerInState != null && playerInState.team != Team.SPECTATOR -> playerInState.team
                     uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
-                    else -> Team.TEAM_B
+                    isTwoPlayers -> Team.TEAM_B
+                    else -> uiState.myTeam
                 }
             }
             uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
@@ -70,7 +71,13 @@ fun ScoreBoardScreen(
     }
 
     var selectedTeamForCanto by remember(effectiveMyTeam, isMultiplayerClient) {
-        mutableStateOf(if (isMultiplayerClient) effectiveMyTeam else Team.TEAM_A)
+        mutableStateOf(if (isMultiplayerClient && effectiveMyTeam != Team.SPECTATOR && effectiveMyTeam != Team.RESERVE) effectiveMyTeam else Team.TEAM_A)
+    }
+
+    LaunchedEffect(effectiveMyTeam) {
+        if (isMultiplayerClient && effectiveMyTeam != Team.SPECTATOR && effectiveMyTeam != Team.RESERVE) {
+            selectedTeamForCanto = effectiveMyTeam
+        }
     }
     var showExitConfirmationDialog by remember { mutableStateOf(false) }
     var showEndGameConfirmation by remember { mutableStateOf(false) }
@@ -78,12 +85,16 @@ fun ScoreBoardScreen(
     var showSwitchTeamDialog by remember { mutableStateOf(false) }
     var showMoveHistoryDialog by remember { mutableStateOf(false) }
     var showAudioSettingsDialog by remember { mutableStateOf(false) }
+    var showCustomizeButtonsDialog by remember { mutableStateOf(false) }
+    var showSettingsMenu by remember { mutableStateOf(false) }
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
 
     // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
     BackHandler {
-        if (showTvCastDialog) {
+        if (showCustomizeButtonsDialog) {
+            showCustomizeButtonsDialog = false
+        } else if (showTvCastDialog) {
             showTvCastDialog = false
         } else if (showAudioSettingsDialog) {
             showAudioSettingsDialog = false
@@ -289,11 +300,35 @@ fun ScoreBoardScreen(
                     ) {
                         Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV", modifier = Modifier.size(20.dp))
                     }
-                    IconButton(
-                        onClick = { showAudioSettingsDialog = true },
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido", modifier = Modifier.size(20.dp))
+                    Box {
+                        IconButton(
+                            onClick = { showSettingsMenu = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Ajustes", modifier = Modifier.size(20.dp))
+                        }
+
+                        DropdownMenu(
+                            expanded = showSettingsMenu,
+                            onDismissRequest = { showSettingsMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ajustes de Sonido", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.VolumeUp, contentDescription = null) },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    showAudioSettingsDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Cambiar Distribución", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.DashboardCustomize, contentDescription = null) },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    showCustomizeButtonsDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -806,236 +841,29 @@ fun ScoreBoardScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Botonera de Jugadas y Cantos en Cuadrícula Simétrica de 2 Columnas (Material 3)
+            // Botonera de Jugadas y Cantos con Distribución Personalizable de 2 Columnas
             val cantoTargetTeam = if (isMultiplayer) effectiveMyTeam else selectedTeamForCanto
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Fila 1: Cantos básicos de mano
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.RONDA) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                val buttonPairs = uiState.cantoButtonOrder.chunked(2)
+                buttonPairs.forEach { pair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = CantoType.RONDA.displayName,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.PARRANDA) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = CantoType.PARRANDA.displayName,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Fila 2: Cantos mayores de mano
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.CARACOL) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = CantoType.CARACOL.displayName,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.CARACOLILLO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = CantoType.CARACOLILLO.displayName,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Fila 3: Jugadas de mesa (Majo y Limpiar)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.MAJO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = CantoType.MAJO.displayName,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.LIMPIAR) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = CantoType.LIMPIAR.displayName,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Fila 4: Jugadas de mesa dobles (Majo y Limpio, Contramajo)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.MAJO_Y_LIMPIO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = CantoType.MAJO_Y_LIMPIO.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.CONTRAMAJO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = CantoType.CONTRAMAJO.displayName,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Fila 5: Cadena de majos de alto valor (Requetemajo, Requetecontramajo)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.REQUETEMAJO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = CantoType.REQUETEMAJO.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = { viewModel.callCanto(cantoTargetTeam, CantoType.SOBREMAJO) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = CantoType.SOBREMAJO.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
+                        pair.forEach { cantoType ->
+                            CantoActionButton(
+                                cantoType = cantoType,
+                                onClick = { viewModel.callCanto(cantoTargetTeam, cantoType) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (pair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -1113,7 +941,23 @@ fun ScoreBoardScreen(
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
+            onOpenCustomizeButtons = {
+                showAudioSettingsDialog = false
+                showCustomizeButtonsDialog = true
+            },
             onDismiss = { showAudioSettingsDialog = false }
+        )
+    }
+
+    // Diálogo para personalizar la distribución de botones de cantos y jugadas
+    if (showCustomizeButtonsDialog) {
+        CustomizeButtonsDialog(
+            currentOrder = uiState.cantoButtonOrder,
+            onSaveOrder = { newOrder ->
+                viewModel.setCantoButtonOrder(newOrder)
+                Toast.makeText(context, "Distribución de botones guardada", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { showCustomizeButtonsDialog = false }
         )
     }
 
@@ -1487,6 +1331,33 @@ fun ScoreBoardScreen(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                 )
                             }
+                        }
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Style,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "🃏 En la siguiente partida le toca repartir a $dealerName",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
@@ -3132,3 +3003,52 @@ fun CardCountDialog(
         )
     }
 }
+
+@Composable
+private fun CantoActionButton(
+    cantoType: CantoType,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = when (cantoType) {
+        CantoType.CARACOLILLO, CantoType.SOBREMAJO, CantoType.REQUETECONTRAMAJO -> ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+        CantoType.MAJO, CantoType.CONTRAMAJO, CantoType.MAJO_Y_LIMPIO -> ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        else -> ButtonDefaults.filledTonalButtonColors()
+    }
+
+    val fontSize = when (cantoType) {
+        CantoType.RONDA, CantoType.PARRANDA, CantoType.CARACOL, CantoType.CARACOLILLO -> 13.5.sp
+        CantoType.LIMPIAR, CantoType.MAJO -> 13.sp
+        CantoType.CONTRAMAJO -> 12.5.sp
+        else -> 12.sp
+    }
+
+    val contentPadding = when (cantoType) {
+        CantoType.SOBREMAJO, CantoType.REQUETECONTRAMAJO -> PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+        else -> PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+    }
+
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = contentPadding,
+        colors = colors
+    ) {
+        Text(
+            text = cantoType.displayName,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+

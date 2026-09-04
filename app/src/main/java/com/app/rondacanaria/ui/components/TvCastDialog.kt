@@ -134,6 +134,21 @@ fun TvCastDialog(
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "💡 Consejo: Para evitar que el audio se trabe por saturación Wi-Fi, usa preferentemente Wi-Fi 5 GHz o instala la app en tu Android TV / Fire TV y únete como Espectador.",
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
                     }
                 }
             }

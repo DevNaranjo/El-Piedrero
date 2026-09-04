@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.rondacanaria.data.audio.RondaAudioPlayer
+import com.app.rondacanaria.data.history.ButtonLayoutPersistence
+import com.app.rondacanaria.data.history.DEFAULT_CANTO_BUTTON_ORDER
 import com.app.rondacanaria.data.history.GameHistoryRepository
 import com.app.rondacanaria.data.history.LocalGamePersistence
 import com.app.rondacanaria.data.history.LocalSavedGame
@@ -50,7 +52,8 @@ data class ScoreUiState(
     val musicVolume: Float = 0.5f,
     val sfxVolume: Float = 0.9f,
     val isTvAudioOptimizationEnabled: Boolean = true,
-    val isTvCastingActive: Boolean = false
+    val isTvCastingActive: Boolean = false,
+    val cantoButtonOrder: List<CantoType> = DEFAULT_CANTO_BUTTON_ORDER
 )
 
 class ScoreViewModel(
@@ -62,6 +65,7 @@ class ScoreViewModel(
     private val clientUseCase: ClientGameUseCase = ClientGameUseCase()
     private val historyRepository = GameHistoryRepository(application.applicationContext)
     private val localPersistence = LocalGamePersistence(application.applicationContext)
+    private val buttonLayoutPersistence = ButtonLayoutPersistence(application.applicationContext)
     val gameHistory: StateFlow<List<GameHistoryRecord>> = historyRepository.history
     private var lastRecordedGameId: String? = null
 
@@ -74,7 +78,8 @@ class ScoreViewModel(
             musicVolume = audioPlayer.musicVolume,
             sfxVolume = audioPlayer.sfxVolume,
             isTvAudioOptimizationEnabled = audioPlayer.isTvAudioOptimizationEnabled,
-            isTvCastingActive = audioPlayer.isTvCastingActive
+            isTvCastingActive = audioPlayer.isTvCastingActive,
+            cantoButtonOrder = buttonLayoutPersistence.loadButtonOrder()
         )
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
@@ -115,15 +120,14 @@ class ScoreViewModel(
         viewModelScope.launch {
             clientUseCase.gameState.collect { state ->
                 if (!_uiState.value.isHost && state != null) {
-                    val isTwoPlayers = (state.maxPlayers == 2 || state.connectedPlayers.size == 2) && state.maxPlayers != 3
                     val myPlayer = state.connectedPlayers.find { 
                         it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == _uiState.value.playerName && !it.isHost)
                     }
                     val resolvedTeam = when {
-                        isTwoPlayers -> Team.TEAM_B
                         myPlayer != null && myPlayer.team != Team.SPECTATOR -> myPlayer.team
                         clientUseCase.myTeam.value != Team.SPECTATOR -> clientUseCase.myTeam.value
-                        else -> Team.TEAM_B
+                        state.maxPlayers == 2 -> Team.TEAM_B
+                        else -> _uiState.value.myTeam
                     }
 
                     _uiState.update { current ->
@@ -499,23 +503,30 @@ class ScoreViewModel(
         _uiState.update { it.copy(currentScreen = AppScreen.SCOREBOARD) }
     }
 
+    private fun getEffectiveLocalTeam(): Team {
+        val state = _uiState.value
+        if (state.isHost) return Team.TEAM_A
+        val myPlayer = state.gameState.connectedPlayers.find {
+            it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == state.playerName && !it.isHost)
+        }
+        if (myPlayer != null && myPlayer.team != Team.SPECTATOR) {
+            return myPlayer.team
+        }
+        if (state.myTeam != Team.SPECTATOR) {
+            return state.myTeam
+        }
+        val effectiveMax = if (state.gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) state.gameState.maxPlayers else state.maxPlayers
+        if (effectiveMax == 2) {
+            return Team.TEAM_B
+        }
+        return Team.SPECTATOR
+    }
+
     fun callCanto(teamId: Team, canto: CantoType) {
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
-            var effectiveMyTeam = when {
-                isTwoPlayers && !state.isHost -> Team.TEAM_B
-                isTwoPlayers && state.isHost -> Team.TEAM_A
-                state.isHost -> Team.TEAM_A
-                state.myTeam != Team.SPECTATOR -> state.myTeam
-                else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
-                    ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
-                    ?: if (!state.isHost) Team.TEAM_B else state.myTeam
-            }
-            if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
-                effectiveMyTeam = Team.TEAM_B
-            }
+            val effectiveMyTeam = getEffectiveLocalTeam()
             if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
             if (effectiveMyTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
         }
@@ -534,19 +545,7 @@ class ScoreViewModel(
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
-            var effectiveMyTeam = when {
-                isTwoPlayers && !state.isHost -> Team.TEAM_B
-                isTwoPlayers && state.isHost -> Team.TEAM_A
-                state.isHost -> Team.TEAM_A
-                state.myTeam != Team.SPECTATOR -> state.myTeam
-                else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
-                    ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
-                    ?: if (!state.isHost) Team.TEAM_B else state.myTeam
-            }
-            if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
-                effectiveMyTeam = Team.TEAM_B
-            }
+            val effectiveMyTeam = getEffectiveLocalTeam()
             if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
             if (effectiveMyTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
         }
@@ -563,20 +562,10 @@ class ScoreViewModel(
 
     fun undoLastMove() {
         val state = _uiState.value
-        val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
-        var effectiveMyTeam = when {
-            isTwoPlayers && !state.isHost -> Team.TEAM_B
-            isTwoPlayers && state.isHost -> Team.TEAM_A
-            state.isHost -> Team.TEAM_A
-            state.myTeam != Team.SPECTATOR -> state.myTeam
-            else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
-                ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
-                ?: if (!state.isHost) Team.TEAM_B else state.myTeam
+        if (!state.isLocalGame) {
+            val effectiveMyTeam = getEffectiveLocalTeam()
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
         }
-        if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
-            effectiveMyTeam = Team.TEAM_B
-        }
-        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE)) return
 
         viewModelScope.launch {
             if (state.isHost) {
@@ -840,13 +829,19 @@ class ScoreViewModel(
         _uiState.update { it.copy(sfxVolume = volume) }
     }
 
-    fun setTvAudioOptimizationEnabled(enabled: Boolean) {
-        _uiState.update { it.copy(isTvAudioOptimizationEnabled = true) }
-    }
-
     fun setTvCastingActive(active: Boolean) {
         audioPlayer.isTvCastingActive = active
         _uiState.update { it.copy(isTvCastingActive = active) }
+    }
+
+    fun setCantoButtonOrder(newOrder: List<CantoType>) {
+        buttonLayoutPersistence.saveButtonOrder(newOrder)
+        _uiState.update { it.copy(cantoButtonOrder = newOrder) }
+    }
+
+    fun resetCantoButtonOrder() {
+        buttonLayoutPersistence.resetButtonOrder()
+        _uiState.update { it.copy(cantoButtonOrder = DEFAULT_CANTO_BUTTON_ORDER) }
     }
 
     override fun onCleared() {
