@@ -134,10 +134,8 @@ class SocketServer(
                             _serverEvents.emit(ServerEvent.MessageReceived(clientId, envelope))
                         } catch (parseError: Exception) {
                             _serverEvents.emit(ServerEvent.Error(parseError))
-                            // Si el descifrado falla (trama corrupta o ataque de inyección), cerrar la sesión
-                            if (secretKey != null) {
-                                break
-                            }
+                            android.util.Log.e("SocketServer", "Error al procesar trama de $clientId: ${parseError.message}")
+                            // Mantener la sesión activa; no romper el bucle ante anomalías aisladas
                         }
                     }
                 }
@@ -151,7 +149,7 @@ class SocketServer(
         }
     }
 
-    suspend fun broadcast(message: NetworkEnvelope) {
+    suspend fun broadcast(message: NetworkEnvelope) = withContext(Dispatchers.IO) {
         val rawJson = json.encodeToString(message)
         val currentKey = secretKey
         val payloadToSend = if (currentKey != null) {
@@ -160,15 +158,14 @@ class SocketServer(
             rawJson + "\n"
         }
         activeClients.values.forEach { session ->
-            serverScope?.launch {
-                try {
-                    session.writeMutex.withLock {
-                        session.writer.write(payloadToSend)
-                        session.writer.flush()
-                    }
-                } catch (e: Exception) {
-                    disconnectClient(session.id)
+            try {
+                session.writeMutex.withLock {
+                    session.writer.write(payloadToSend)
+                    session.writer.flush()
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("SocketServer", "Error enviando broadcast a ${session.id}: ${e.message}")
+                disconnectClient(session.id)
             }
         }
     }

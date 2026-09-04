@@ -102,11 +102,8 @@ class SocketClient(
                                     val envelope = json.decodeFromString<NetworkEnvelope>(plainJson)
                                     _incomingMessages.emit(envelope)
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
-                                    if (secretKey != null) {
-                                        // Error de descifrado o clave incorrecta
-                                        break
-                                    }
+                                    android.util.Log.e("SocketClient", "Error al procesar trama recibida: ${e.message}")
+                                    // Mantener la conexión abierta ante tramas atípicas para permitir que las siguientes lleguen
                                 }
                             }
                         }

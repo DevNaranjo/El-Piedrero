@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.03.092026.4-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.4)
+[![Versión](https://img.shields.io/badge/Versión-1.0.5-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -75,7 +75,29 @@ La partida se disputa a un total de **21 Piedras**:
 
 ## 🚀 Registro de Cambios
  
-### 🆕 Persistencia de Registro por Manos, Interfaz Compacta y Frases Tradicionales (v1.0.03.092026.4)
+### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
+
+* 📺 **Transmisión en Directo a Pantallas (TV Cast):** Nuevo diálogo interactivo (`TvCastDialog.kt`) para proyectar el tanteador en Smart TVs o monitores externos mediante Google Cast / Pantalla Inalámbrica de Android, con optimización automática permanente de audio en TV.
+* 💾 **Gestión Inteligente del Ciclo de Vida y Persistencia:**
+  * **Al minimizar la app:** La partida en curso se mantiene al 100% en memoria (`launchMode="singleTask"`).
+  * **Al cerrar la app (deslizar en recientes):** Detección nativa con `AppCleanupService.kt` y `onTaskRemoved()` que limpia la partida y retorna limpiamente al menú de inicio.
+  * **Silenciado inmediato:** Corte instantáneo de música al abrir la vista de aplicaciones recientes o cambiar de ventana (`onPause` y `onStop`).
+* 🎼 **Música Ambiental Folclórica Generada por IA (Aleatoria):**
+  * Incorporación de 6 piezas instrumentales originales inspiradas en el folclore canario (`bgm_01.mp3` a `bgm_06.mp3`), 100% libres de derechos fonográficos y de gestión colectiva (SGAE).
+  * Reproducción aleatoria (`pickNextRandomIndex()`) sin repeticiones consecutivas y documentación legal bilingüe en `MUSIC_LICENSES.md` y en el diálogo de privacidad de la app.
+* 🌐 **Multijugador Sincronizado y Reconexión de 5 Minutos:**
+  * Sincronización instantánea de piedras en tiempo real entre anfitrión y clientes.
+  * Margen de gracia de 5 minutos con cuenta atrás regresiva visible antes de abandonar la sala si se minimiza la app o hay microcortes Wi-Fi.
+* 🃏 **Recuento de Cartas Automatizado y Seguro:**
+  * Cálculo de diferencia automático en partidas locales para completar la baraja de 40 cartas.
+  * Bloqueo estricto del botón de confirmación si la suma de cartas es insuficiente, informando exactamente cuántas cartas faltan.
+* 🏆 **Suma Rápida Superior a 21 Piedras:** Posibilidad de sumar tanteos libres tras el recuento con aviso dinámico de victoria (*"¡Ganarás por X piedras de más!"*).
+* 👁️ **Accesibilidad y Encabezado Compacto:**
+  * Bloqueo de `fontScale = 1.0f` para evitar desbordamientos de interfaz ante configuraciones de fuentes gigantes de Android, manteniendo un formato responsive.
+  * Ajuste de la barra superior `TopAppBar` en el marcador con botones de acción compactos (38 dp) y protección de texto en una sola línea para que "El Piedrero 🃏" luzca perfecto y centrado.
+* 🛡️ **DevSecOps y Seguridad de Publicación:** Eliminación de contraseñas y keystores del árbol del proyecto, ofuscación R8 activada en release y protección reforzada en `.gitignore`.
+
+### 🏷️ Persistencia de Registro por Manos, Interfaz Compacta y Frases Tradicionales (v1.0.03.092026.4)
 
 * 📜 **Historial Permanente de la Partida ("Registro X"):** Las jugadas y puntos ya no se borran al finalizar las manos o realizar el recuento. Cada mano concluida se preserva de forma permanente catalogada como `Registro X (Guardado)`, mientras que la mano en juego se muestra como `Registro X (En curso)`. Se incluye selector de filtros rápidos (`Todos`, `Registro 1`, `Registro 2`...) y etiquetas por jugada (`Reg. X · R Y`).
 * 👥 **Personalización Compacta de Equipos y Jugadores:** Rediseño completo del diálogo de partida local para 4, 6 y 8 jugadores. Se agrupan los participantes directamente en tarjetas compactas por equipo con los dos jugadores en dos columnas paralelas, eliminando espacios muertos, scrolls excesivos y recortes de botones.

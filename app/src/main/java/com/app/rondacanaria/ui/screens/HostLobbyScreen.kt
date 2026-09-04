@@ -24,8 +24,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.rondacanaria.data.model.Team
+import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.TvCastDialog
 import com.app.rondacanaria.ui.qr.QrCodeGenerator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,9 +42,12 @@ fun HostLobbyScreen(
     }
     var showIncompletePlayersDialog by remember { mutableStateOf(false) }
     var showExitHostRoomConfirmation by remember { mutableStateOf(false) }
+    var showTvCastDialog by remember { mutableStateOf(false) }
 
     BackHandler {
-        if (showIncompletePlayersDialog) {
+        if (showTvCastDialog) {
+            showTvCastDialog = false
+        } else if (showIncompletePlayersDialog) {
             showIncompletePlayersDialog = false
         } else if (showExitHostRoomConfirmation) {
             showExitHostRoomConfirmation = false
@@ -74,6 +79,11 @@ fun HostLobbyScreen(
                 navigationIcon = {
                     IconButton(onClick = { showExitHostRoomConfirmation = true }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showTvCastDialog = true }) {
+                        Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -151,6 +161,39 @@ fun HostLobbyScreen(
                 uiState.maxPlayers
             } else {
                 4
+            }
+
+            if (!uiState.isHost && uiState.sessionStatus != SessionStatus.CONNECTED) {
+                val countdownText = if (uiState.reconnectCountdown != null && uiState.reconnectCountdown > 0) {
+                    val mm = uiState.reconnectCountdown / 60
+                    val ss = uiState.reconnectCountdown % 60
+                    " (${mm}:${if (ss < 10) "0$ss" else "$ss"} restantes)"
+                } else ""
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Reconectando a la sala...$countdownText",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             Text(
@@ -750,6 +793,13 @@ fun HostLobbyScreen(
                     Text("Rechazar", textAlign = TextAlign.Center)
                 }
             }
+        )
+    }
+
+    if (showTvCastDialog) {
+        TvCastDialog(
+            onCastStarted = { viewModel.setTvCastingActive(true) },
+            onDismiss = { showTvCastDialog = false }
         )
     }
 }

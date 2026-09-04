@@ -28,6 +28,7 @@ class ClientGameUseCase(
     private var useCaseScope: CoroutineScope? = null
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
+    private var reconnectCountdownJob: Job? = null
 
     private var targetHost: String = ""
     private var targetPort: Int = NetworkUtils.DEFAULT_PORT
@@ -39,6 +40,9 @@ class ClientGameUseCase(
 
     private val _sessionStatus = MutableStateFlow(SessionStatus.IDLE)
     val sessionStatus: StateFlow<SessionStatus> = _sessionStatus.asStateFlow()
+
+    private val _reconnectCountdown = MutableStateFlow<Int?>(null)
+    val reconnectCountdown: StateFlow<Int?> = _reconnectCountdown.asStateFlow()
 
     private val _myTeam = MutableStateFlow(Team.SPECTATOR)
     val myTeam: StateFlow<Team> = _myTeam.asStateFlow()
@@ -87,6 +91,9 @@ class ClientGameUseCase(
             socketClient.connectionState.collect { state ->
                 when (state) {
                     is ClientConnectionState.Connected -> {
+                        reconnectCountdownJob?.cancel()
+                        reconnectCountdownJob = null
+                        _reconnectCountdown.value = null
                         if (_sessionStatus.value != SessionStatus.RECONNECTING) {
                             _sessionStatus.value = SessionStatus.CONNECTING
                         }
@@ -283,24 +290,34 @@ class ClientGameUseCase(
         if (reconnectJob?.isActive == true) return
         _sessionStatus.value = SessionStatus.RECONNECTING
 
-        reconnectJob = useCaseScope?.launch {
-            var attempt = 1
-            var backoffMs = 1500L
+        // Cuenta atrás regresiva de 5 minutos (300 segundos) para reconexión
+        _reconnectCountdown.value = 300
+        reconnectCountdownJob?.cancel()
+        reconnectCountdownJob = useCaseScope?.launch {
+            var seconds = 300
+            while (isActive && seconds > 0) {
+                delay(1000L)
+                seconds--
+                _reconnectCountdown.value = seconds
+            }
+            if (isActive && _sessionStatus.value == SessionStatus.RECONNECTING) {
+                _sessionStatus.value = SessionStatus.DISCONNECTED
+                _reconnectCountdown.value = null
+                val hostLabel = if (targetHostName.isNotBlank()) "la mesa de $targetHostName" else "la mesa del anfitrión"
+                _errorMessage.value = "Tiempo de espera agotado (5 minutos). Se cerró la conexión con $hostLabel."
+                leaveGame()
+            }
+        }
 
-            while (isActive && attempt <= 8) {
+        reconnectJob = useCaseScope?.launch {
+            var backoffMs = 2000L
+            while (isActive && _sessionStatus.value == SessionStatus.RECONNECTING) {
                 delay(backoffMs)
                 if (socketClient.connectionState.value is ClientConnectionState.Connected) {
                     break
                 }
                 socketClient.connect(targetHost, targetPort)
-                backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(8000L)
-                attempt++
-            }
-
-            if (socketClient.connectionState.value !is ClientConnectionState.Connected) {
-                _sessionStatus.value = SessionStatus.DISCONNECTED
-                val hostLabel = if (targetHostName.isNotBlank()) "la mesa de $targetHostName" else "la mesa del anfitrión"
-                _errorMessage.value = "Se perdió la conexión con $hostLabel."
+                backoffMs = (backoffMs * 1.3).toLong().coerceIn(2000L, 8000L)
             }
         }
     }
@@ -308,6 +325,10 @@ class ClientGameUseCase(
     fun leaveGame() {
         stopHeartbeat()
         reconnectJob?.cancel()
+        reconnectJob = null
+        reconnectCountdownJob?.cancel()
+        reconnectCountdownJob = null
+        _reconnectCountdown.value = null
         socketClient.setEncryptionKey(null)
         socketClient.disconnect()
         useCaseScope?.cancel()

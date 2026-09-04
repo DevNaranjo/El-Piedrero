@@ -103,6 +103,11 @@ fun PrivacyPolicyDialog(
                 )
 
                 PrivacySectionItem(
+                    title = "🎵 Música Ambiental (Generada por IA)",
+                    description = "Las pistas de música instrumental que acompañan el juego (bgm_01 a bgm_06) han sido generadas mediante Inteligencia Artificial (IA) inspiradas en melodías y ritmos tradicionales del folclore canario, totalmente libres de derechos de autor y entidades de gestión colectiva (SGAE)."
+                )
+
+                PrivacySectionItem(
                     title = "🌱 Tradición Cultural y Menores",
                     description = "Las locuciones tradicionales de Ronda Canaria se incluyen con fines culturales y folclóricos sin ánimo de lucro. Aplicación apta para todos los públicos (PEGI 3 / COPPA)."
                 )

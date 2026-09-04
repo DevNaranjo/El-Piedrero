@@ -36,6 +36,7 @@ import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
+import com.app.rondacanaria.ui.components.TvCastDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,14 +47,20 @@ fun ScoreBoardScreen(
     val context = LocalContext.current
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
+    val isThreePlayers = gameState.maxPlayers == 3 || uiState.maxPlayers == 3
+    val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
 
-    val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers) {
-        if (uiState.myTeam != Team.SPECTATOR) {
+    val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers, isTwoPlayers) {
+        if (isMultiplayerClient && isTwoPlayers) {
+            Team.TEAM_B
+        } else if (uiState.isHost && isTwoPlayers) {
+            Team.TEAM_A
+        } else if (uiState.myTeam != Team.SPECTATOR) {
             uiState.myTeam
         } else {
             gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }?.team
                 ?: gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost }?.team
-                ?: uiState.myTeam
+                ?: if (isMultiplayerClient) Team.TEAM_B else uiState.myTeam
         }
     }
 
@@ -66,11 +73,14 @@ fun ScoreBoardScreen(
     var showSwitchTeamDialog by remember { mutableStateOf(false) }
     var showMoveHistoryDialog by remember { mutableStateOf(false) }
     var showAudioSettingsDialog by remember { mutableStateOf(false) }
+    var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
 
     // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
     BackHandler {
-        if (showAudioSettingsDialog) {
+        if (showTvCastDialog) {
+            showTvCastDialog = false
+        } else if (showAudioSettingsDialog) {
             showAudioSettingsDialog = false
         } else if (showCardCountDialog) {
             showCardCountDialog = false
@@ -98,10 +108,6 @@ fun ScoreBoardScreen(
         (gameState.maxPlayers == 8 || uiState.maxPlayers == 8) -> listOf(Team.TEAM_C, Team.TEAM_D)
         else -> emptyList()
     }
-
-    val isThreePlayers = gameState.maxPlayers == 3 || uiState.maxPlayers == 3
-    val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
-
     val maxDeals = when {
         isTwoPlayers -> 6
         isThreePlayers -> 4
@@ -182,8 +188,16 @@ fun ScoreBoardScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("El Piedrero 🃏", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Column(
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "El Piedrero 🃏",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Text(
                             text = if (uiState.isLocalGame) {
                                 "Partida Local"
@@ -200,55 +214,81 @@ fun ScoreBoardScreen(
                                 }
                                 "Jugador en $teamName"
                             },
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { showExitConfirmationDialog = true }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Salir")
+                    IconButton(
+                        onClick = { showExitConfirmationDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Salir", modifier = Modifier.size(20.dp))
                     }
                 },
                 actions = {
                     IconButton(
                         onClick = { viewModel.undoLastMove() },
-                        enabled = gameState.moveHistory.isNotEmpty()
+                        enabled = gameState.moveHistory.isNotEmpty(),
+                        modifier = Modifier.size(38.dp)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Undo,
                             contentDescription = "Deshacer última jugada",
-                            tint = if (gameState.moveHistory.isNotEmpty()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.38f)
+                            tint = if (gameState.moveHistory.isNotEmpty()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.38f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = { showMoveHistoryDialog = true }) {
+                    IconButton(
+                        onClick = { showMoveHistoryDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
                         BadgedBox(
                             badge = {
                                 if (gameState.moveHistory.isNotEmpty()) {
                                     Badge {
-                                        Text("${gameState.moveHistory.size}")
+                                        Text("${gameState.moveHistory.size}", fontSize = 9.sp)
                                     }
                                 }
                             }
                         ) {
-                            Icon(Icons.Default.History, contentDescription = "Registro de movimientos")
+                            Icon(Icons.Default.History, contentDescription = "Registro de movimientos", modifier = Modifier.size(20.dp))
                         }
                     }
                     if (canOpenReserveOrTeamDialog) {
-                        IconButton(onClick = { showSwitchTeamDialog = true }) {
+                        IconButton(
+                            onClick = { showSwitchTeamDialog = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
                             Icon(
                                 imageVector = if (isThreePlayers) Icons.Default.PauseCircle else Icons.Default.SwapHoriz,
-                                contentDescription = if (isThreePlayers) "Poner en Reserva / Descanso" else "Cambiar Equipo"
+                                contentDescription = if (isThreePlayers) "Poner en Reserva / Descanso" else "Cambiar Equipo",
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                     if (uiState.isHost) {
-                        IconButton(onClick = { viewModel.resetGame() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Reiniciar Puntos")
+                        IconButton(
+                            onClick = { viewModel.resetGame() },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Reiniciar Puntos", modifier = Modifier.size(20.dp))
                         }
                     }
-                    IconButton(onClick = { showAudioSettingsDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido")
+                    IconButton(
+                        onClick = { showTvCastDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV", modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(
+                        onClick = { showAudioSettingsDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido", modifier = Modifier.size(20.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -267,7 +307,11 @@ fun ScoreBoardScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (!uiState.isLocalGame && uiState.sessionStatus != SessionStatus.CONNECTED) {
-                ConnectionStatusBanner(status = uiState.sessionStatus, isHost = uiState.isHost)
+                ConnectionStatusBanner(
+                    status = uiState.sessionStatus,
+                    isHost = uiState.isHost,
+                    reconnectCountdown = uiState.reconnectCountdown
+                )
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
@@ -1068,6 +1112,14 @@ fun ScoreBoardScreen(
         )
     }
 
+    // Diálogo de Transmitir a Smart TV / Dispositivo cercano
+    if (showTvCastDialog) {
+        TvCastDialog(
+            onCastStarted = { viewModel.setTvCastingActive(true) },
+            onDismiss = { showTvCastDialog = false }
+        )
+    }
+
     // Diálogo con el registro de movimientos de la partida actual
     if (showMoveHistoryDialog) {
         MoveHistoryDialog(
@@ -1152,6 +1204,7 @@ fun ScoreBoardScreen(
         CardCountDialog(
             activeTeams = activeTeamsList,
             maxPlayers = if (isThreePlayers) 3 else (if (isTwoPlayers) 2 else gameState.maxPlayers),
+            isLocal = uiState.isLocalGame,
             currentDeal = gameState.currentDeal,
             maxDeals = maxDeals,
             nextDealerName = nextDealerName,
@@ -1739,8 +1792,15 @@ fun RondaScoreCard(
 @Composable
 fun ConnectionStatusBanner(
     status: SessionStatus,
-    isHost: Boolean
+    isHost: Boolean,
+    reconnectCountdown: Int? = null
 ) {
+    val countdownText = if (reconnectCountdown != null && reconnectCountdown > 0) {
+        val mm = reconnectCountdown / 60
+        val ss = reconnectCountdown % 60
+        " (${mm}:${if (ss < 10) "0$ss" else "$ss"} restantes)"
+    } else ""
+
     val (bgColor, text, icon) = when (status) {
         SessionStatus.CONNECTED -> Triple(
             MaterialTheme.colorScheme.primaryContainer,
@@ -1754,17 +1814,17 @@ fun ConnectionStatusBanner(
         )
         SessionStatus.RECONNECTING -> Triple(
             MaterialTheme.colorScheme.tertiaryContainer,
-            "🟠 Reconectando a la mesa...",
+            "🟠 Reconectando a la mesa...$countdownText",
             Icons.Default.Sync
         )
         SessionStatus.DISCONNECTED -> Triple(
             MaterialTheme.colorScheme.errorContainer,
-            "🔴 Desconectado de la mesa",
+            "🔴 Desconectado de la mesa$countdownText",
             Icons.Default.WifiOff
         )
         SessionStatus.ERROR -> Triple(
             MaterialTheme.colorScheme.errorContainer,
-            "⚠️ Error de red",
+            "⚠️ Error de red$countdownText",
             Icons.Default.ErrorOutline
         )
         SessionStatus.IDLE -> Triple(
@@ -1810,9 +1870,9 @@ fun AddCustomPiedrasDialog(
     onConfirm: (Int) -> Unit
 ) {
     var textValue by remember { mutableStateOf("") }
-    val remaining = (maxPiedras - currentScore).coerceAtLeast(0)
     val parsedInt = textValue.toIntOrNull() ?: 0
-    val isValid = parsedInt in 1..remaining
+    val isValid = parsedInt > 0
+    val totalProjected = currentScore + parsedInt
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1895,13 +1955,61 @@ fun AddCustomPiedrasDialog(
                     }
                 }
 
-                if (textValue.isNotBlank() && !isValid) {
-                    Text(
-                        text = if (parsedInt <= 0) "Indica un número mayor a 0" else "Máximo posible: +$remaining piedras",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
+                if (textValue.isNotBlank()) {
+                    if (parsedInt <= 0) {
+                        Text(
+                            text = "Indica un número mayor a 0",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    } else if (totalProjected > maxPiedras) {
+                        val extra = totalProjected - maxPiedras
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🏆 ¡Ganarás por $extra ${if (extra == 1) "piedra" else "piedras"} de más!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            )
+                        }
+                    } else if (totalProjected == maxPiedras) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🏆 ¡Alcanzarás las 21 piedras y ganarás la partida!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            )
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Nuevo total: $totalProjected/$maxPiedras piedras",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -2561,6 +2669,7 @@ fun MoveHistoryDialog(
 fun CardCountDialog(
     activeTeams: List<Pair<Team, String>>,
     maxPlayers: Int,
+    isLocal: Boolean = true,
     currentDeal: Int,
     maxDeals: Int,
     nextDealerName: String,
@@ -2577,9 +2686,32 @@ fun CardCountDialog(
             activeTeams.forEach { put(it.first, "") }
         }
     }
+
+    fun updateTeamCount(changedTeam: Team, newCountStr: String) {
+        textInputs[changedTeam] = newCountStr
+        if (isLocal && maxPlayers != 3 && activeTeams.size == 2) {
+            val otherTeam = activeTeams.firstOrNull { it.first != changedTeam }?.first
+            if (otherTeam != null) {
+                if (newCountStr.isBlank()) {
+                    textInputs[otherTeam] = ""
+                } else {
+                    val count = newCountStr.toIntOrNull()
+                    if (count != null && count in 0..totalDeckCards) {
+                        val remaining = (totalDeckCards - count).coerceIn(0, totalDeckCards)
+                        textInputs[otherTeam] = remaining.toString()
+                    }
+                }
+            }
+        }
+    }
+
     var showExcessCardsDialog by remember { mutableStateOf(false) }
+    var showInsufficientCardsDialog by remember { mutableStateOf(false) }
 
     val totalSum = activeTeams.sumOf { (team, _) -> textInputs[team]?.toIntOrNull() ?: 0 }
+    val isExcess = totalSum > totalDeckCards
+    val isInsufficient = totalSum < totalDeckCards
+    val isExact = totalSum == totalDeckCards
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2699,7 +2831,7 @@ fun CardCountDialog(
                                 FilledTonalIconButton(
                                     onClick = {
                                         val newC = ((currentText.toIntOrNull() ?: threshold) - 1).coerceAtLeast(0)
-                                        textInputs[team] = newC.toString()
+                                        updateTeamCount(team, newC.toString())
                                     },
                                     modifier = Modifier.size(44.dp)
                                 ) {
@@ -2710,7 +2842,7 @@ fun CardCountDialog(
                                     value = currentText,
                                     onValueChange = { input ->
                                         if (input.all { it.isDigit() } && input.length <= 2) {
-                                            textInputs[team] = input
+                                            updateTeamCount(team, input)
                                         }
                                     },
                                     label = { Text("Cartas contadas") },
@@ -2730,7 +2862,7 @@ fun CardCountDialog(
                                 FilledTonalIconButton(
                                     onClick = {
                                         val newC = ((currentText.toIntOrNull() ?: (threshold - 1)) + 1).coerceAtMost(totalDeckCards)
-                                        textInputs[team] = newC.toString()
+                                        updateTeamCount(team, newC.toString())
                                     },
                                     modifier = Modifier.size(44.dp)
                                 ) {
@@ -2752,7 +2884,7 @@ fun CardCountDialog(
                                         shape = RoundedCornerShape(6.dp),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clickable { textInputs[team] = preset.toString() }
+                                            .clickable { updateTeamCount(team, preset.toString()) }
                                     ) {
                                         Text(
                                             text = "$preset",
@@ -2770,35 +2902,51 @@ fun CardCountDialog(
                 }
 
                 // Resumen del total de cartas indicadas
-                if (totalSum > 0) {
-                    val isExcess = totalSum > totalDeckCards
-                    Surface(
-                        color = if (isExcess) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                Surface(
+                    color = when {
+                        isExcess -> MaterialTheme.colorScheme.errorContainer
+                        isInsufficient && totalSum > 0 -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                        isExact -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isExcess) Icons.Default.Warning else Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = if (isExcess) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isExcess) {
-                                    "Total sumado: $totalSum / $totalDeckCards cartas. ¡Supera las $totalDeckCards cartas!"
-                                } else {
-                                    "Total sumado: $totalSum / $totalDeckCards cartas"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isExcess) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Icon(
+                            imageVector = when {
+                                isExcess -> Icons.Default.Warning
+                                isInsufficient && totalSum > 0 -> Icons.Default.ErrorOutline
+                                isExact -> Icons.Default.CheckCircle
+                                else -> Icons.Default.Info
+                            },
+                            contentDescription = null,
+                            tint = when {
+                                isExcess || (isInsufficient && totalSum > 0) -> MaterialTheme.colorScheme.error
+                                isExact -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = when {
+                                isExcess -> "Total sumado: $totalSum / $totalDeckCards cartas. ¡Supera las $totalDeckCards cartas!"
+                                isInsufficient && totalSum > 0 -> "Total sumado: $totalSum / $totalDeckCards cartas. Faltan ${totalDeckCards - totalSum} cartas para poder sumar las piedras."
+                                isExact -> "Total sumado: $totalDeckCards / $totalDeckCards cartas. ¡Recuento completo!"
+                                else -> "Deben contarse exactamente $totalDeckCards cartas en total."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = when {
+                                isExcess || (isInsufficient && totalSum > 0) -> MaterialTheme.colorScheme.onErrorContainer
+                                isExact -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
                     }
                 }
 
@@ -2820,6 +2968,8 @@ fun CardCountDialog(
                 onClick = {
                     if (totalSum > totalDeckCards) {
                         showExcessCardsDialog = true
+                    } else if (totalSum < totalDeckCards) {
+                        showInsufficientCardsDialog = true
                     } else {
                         val finalCounts = activeTeams.associate { (team, _) ->
                             team to (textInputs[team]?.toIntOrNull() ?: 0)
@@ -2827,9 +2977,16 @@ fun CardCountDialog(
                         onApplyCount(finalCounts)
                     }
                 },
-                enabled = totalSum > 0
+                enabled = isExact
             ) {
-                Text("Aplicar Piedras y Siguiente Mano", textAlign = TextAlign.Center)
+                Text(
+                    text = if (isInsufficient && totalSum > 0) {
+                        "Faltan ${totalDeckCards - totalSum} cartas"
+                    } else {
+                        "Aplicar Piedras y Siguiente Mano"
+                    },
+                    textAlign = TextAlign.Center
+                )
             }
         },
         dismissButton = {
@@ -2900,6 +3057,71 @@ fun CardCountDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Recuento", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    if (showInsufficientCardsDialog) {
+        AlertDialog(
+            onDismissRequest = { showInsufficientCardsDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Cartas Insuficientes",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "El recuento no suma las cartas suficientes para una mano completa.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "Contadas: $totalSum / $totalDeckCards cartas (Faltan ${totalDeckCards - totalSum})",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "No se pueden sumar piedras si no se alcanzan las $totalDeckCards cartas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showInsufficientCardsDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Revisar Recuento", fontWeight = FontWeight.Bold)
                 }
             }
         )

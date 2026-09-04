@@ -1,6 +1,11 @@
 package com.app.rondacanaria.ui
 
+import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import com.app.rondacanaria.data.history.LocalGamePersistence
+import com.app.rondacanaria.service.AppCleanupService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -9,9 +14,12 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import com.app.rondacanaria.ui.screens.HostLobbyScreen
 import com.app.rondacanaria.ui.screens.LobbyScreen
 import com.app.rondacanaria.ui.screens.ModeSelectionScreen
@@ -22,14 +30,41 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: ScoreViewModel by viewModels()
 
+    override fun attachBaseContext(newBase: Context) {
+        val config = Configuration(newBase.resources.configuration).apply {
+            fontScale = 1.0f
+        }
+        val context = newBase.createConfigurationContext(config)
+        super.attachBaseContext(context)
+    }
+
+    override fun applyOverrideConfiguration(overrideConfiguration: Configuration?) {
+        if (overrideConfiguration != null) {
+            overrideConfiguration.fontScale = 1.0f
+        }
+        super.applyOverrideConfiguration(overrideConfiguration)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            startService(Intent(this, AppCleanupService::class.java))
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error iniciando AppCleanupService: ${e.message}")
+        }
         setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+            val currentDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(
+                    density = currentDensity.density,
+                    fontScale = 1.0f
+                )
+            ) {
+                MaterialTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
                     val uiState by viewModel.uiState.collectAsState()
 
                     // Interceptar el botón físico o gesto de "Atrás" de Android para no cerrar la app
@@ -56,6 +91,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
 
     override fun onResume() {
         super.onResume()
@@ -65,5 +101,21 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         viewModel.pauseBackgroundMusic()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        viewModel.pauseBackgroundMusic()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            try {
+                LocalGamePersistence(applicationContext).clearLocalGame()
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error limpiando partida en onDestroy: ${e.message}")
+            }
+        }
     }
 }

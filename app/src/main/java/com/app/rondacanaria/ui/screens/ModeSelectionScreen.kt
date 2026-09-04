@@ -13,11 +13,13 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.PrivacyPolicyDialog
+import com.app.rondacanaria.ui.components.TvCastDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +44,7 @@ fun ModeSelectionScreen(
 ) {
     var showLocalSetupDialog by remember { mutableStateOf(false) }
     var showAudioSettingsDialog by remember { mutableStateOf(false) }
+    var showTvCastDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
     var localMaxPlayers by remember { mutableStateOf(4) }
@@ -58,8 +61,10 @@ fun ModeSelectionScreen(
     }
 
     // Al pulsar atrás en el menú principal: cerrar diálogos abiertos en vez de salir de la app
-    BackHandler(enabled = showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
-        if (showLicensesDialog) {
+    BackHandler(enabled = showTvCastDialog || showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
+        if (showTvCastDialog) {
+            showTvCastDialog = false
+        } else if (showLicensesDialog) {
             showLicensesDialog = false
         } else if (showPrivacyDialog) {
             showPrivacyDialog = false
@@ -77,6 +82,9 @@ fun ModeSelectionScreen(
                 actions = {
                     IconButton(onClick = { showPrivacyDialog = true }) {
                         Icon(Icons.Default.Shield, contentDescription = "Privacidad y Uso de Datos")
+                    }
+                    IconButton(onClick = { showTvCastDialog = true }) {
+                        Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV")
                     }
                     IconButton(onClick = { showAudioSettingsDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido")
@@ -740,6 +748,13 @@ fun ModeSelectionScreen(
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
             onDismiss = { showAudioSettingsDialog = false }
+        )
+    }
+
+    if (showTvCastDialog) {
+        TvCastDialog(
+            onCastStarted = { viewModel.setTvCastingActive(true) },
+            onDismiss = { showTvCastDialog = false }
         )
     }
 

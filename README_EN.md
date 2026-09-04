@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-1.0.03.092026.2-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)
+[![Version](https://img.shields.io/badge/Version-1.0.5-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -75,7 +75,21 @@ The game is played to a total of **21 Stones ("Piedras")**:
 
 ## 🚀 Changelog
  
-### 🆕 Connection Experience, Dynamic Audio & Visual Polish (v1.0.03.092026.2)
+### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
+
+* 📺 **Live Score Casting (TV Cast):** New interactive dialog (`TvCastDialog.kt`) to mirror the scoreboard to Smart TVs and external monitors via Google Cast / Android Wireless Display, with automatic permanent TV audio optimization.
+* 💾 **Smart Lifecycle & Persistence:**
+  * **On app minimize:** Matches stay 100% alive in memory (`launchMode="singleTask"`).
+  * **On swipe-away (kill task):** Handled via `AppCleanupService.kt` and `onTaskRemoved()` to clean up active games and return to the main menu.
+  * **Instant silence on recents:** Immediately cuts background music when opening the recent apps switcher or switching windows (`onPause` and `onStop`).
+* 🎼 **AI-Generated Canarian Folk Music (Shuffled):** Added 6 original instrumental tracks inspired by Canarian folklore (`bgm_01.mp3` through `bgm_06.mp3`), 100% royalty-free, played in random shuffle order (`pickNextRandomIndex()`), with bilingual licensing in `MUSIC_LICENSES.md`.
+* 🌐 **Multiplayer Sync & 5-Minute Grace Countdown:** Real-time bidirectional stone synchronization with a 5-minute reconnect timer before leaving the room on backgrounding or Wi-Fi hiccups.
+* 🃏 **Automated & Safe Card Counting:** Automatic card difference calculation up to 40 cards, and strict validation preventing stone application if cards are missing.
+* 🏆 **Quick Add Beyond 21 Stones:** Unrestricted quick stone additions after counting with victory notifications (*"You will win by X extra stones!"*).
+* 👁️ **Accessibility & Visual Polish:** Fixed `fontScale = 1.0f` to prevent layout breaking on devices with large system fonts, and compacted TopAppBar action buttons to ensure title centering.
+* 🛡️ **DevSecOps & Release Hardening:** Keystores and plaintext passwords removed from source tree, R8 minification enabled in release builds, and strengthened `.gitignore`.
+
+### 🏷️ Connection Experience, Dynamic Audio & Visual Polish (v1.0.03.092026.2)
 
 * 🔄 **QR Scan Lifecycle & Instant Camera Release:** Immediately unbinds and releases camera hardware (`unbindAll`) upon scanning a valid QR code, preventing unnecessary battery and CPU drain. Displays a dedicated loading screen (`ConnectionLoadingView`) informing the user that the phone is synchronizing with the host table.
 * 🛡️ **Network Privacy & Host-Based Error Diagnostics (No IPs):** Completely stripped IP addresses and port numbers from all user-visible error dialogs. Connection failures trigger `ConnectionErrorView` showing the host's name (*"Could not connect to [Host]'s table"*) with actionable local Wi-Fi guidance and instant retry / back actions.
