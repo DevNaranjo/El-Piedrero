@@ -147,7 +147,7 @@ class ClientGameUseCase(
         socketClient.sendMessage(envelope)
     }
 
-    private fun handleIncomingEnvelope(envelope: NetworkEnvelope) {
+    internal fun handleIncomingEnvelope(envelope: NetworkEnvelope) {
         when (envelope.type) {
             MessageType.JOIN_RESPONSE -> {
                 val response = envelope.joinResponse ?: return
@@ -168,9 +168,15 @@ class ClientGameUseCase(
                 val current = _gameState.value
                 if (current == null || newState.version >= current.version) {
                     _gameState.value = newState
-                    val myPlayer = newState.connectedPlayers.find { it.id == localPlayerId }
+                    val myPlayer = newState.connectedPlayers.find { 
+                        it.id == localPlayerId || (it.name.isNotBlank() && it.name == localPlayerName && !it.isHost)
+                    }
                     if (myPlayer != null && _myTeam.value != myPlayer.team) {
                         _myTeam.value = myPlayer.team
+                    } else if (_myTeam.value == Team.SPECTATOR) {
+                        if (newState.maxPlayers == 2 || newState.connectedPlayers.size == 2) {
+                            _myTeam.value = Team.TEAM_B
+                        }
                     }
                 }
             }

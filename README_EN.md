@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-1.0.6-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.7-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Play with a single phone in the center of the table or synchronize scores across
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.6)** page.
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.7)** page.
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.
@@ -79,16 +79,18 @@ The game is played to a total of **21 Stones ("Piedras")**:
 
 ## 🚀 Changelog
  
-### 🃏 El Piedrero — v1.0.6 (04/09/2026 - Patch 2) — 🪨
+### 🃏 El Piedrero — v1.0.7 (04/09/2026 - Patch 2) — 🪨
 
-* 🪨 **Multiplayer for 2, 3, 4, 6 & 8 Players:** Fixed team assignment and remote stone modification permissions (`getEffectiveLocalTeam()`), eliminating the issue where opponent scorecards were incorrectly locked on client devices.
+* 🪨 **Bidirectional Multiplayer Scoring for 2, 3, 4, 6 & 8 Players:** Comprehensive fix for scoring and stone modification for joining clients. Both host and all invited players can now add/subtract stones and declare calls in real time for their assigned teams without locks.
+* 📶 **Elimination of Redundant TCP Socket Filters:** Removed clock skew frame drop and TCP sequence conflict drops in `HostGameUseCase.kt`, ensuring smooth packet processing across local Wi-Fi and mobile hotspots.
+* 🎯 **Clean Client State Initialization:** Guaranteed reset of `isHost = false` and `isLocalGame = false` in `ScoreViewModel.kt` when connecting to avoid conflicts with previous local matches.
 * 🎛️ **Full Call Button Customization:** Settings dialog allowing players to reorder call buttons in a 2-column layout with offline persistence.
 * 🃏 **Dynamic Dealer Tracking & Notification:** Clear visual dealer badge and next dealer guidance upon hand completion.
 * 🔄 **Resilient Reconnection with Seat Preservation:** Guaranteed player seat retention across temporary Wi-Fi drops.
 * ↩️ **Synchronized Undo (`UNDO_LAST_MOVE`):** Safe move reversal in multiplayer with strict security blocking bench/reserve players.
 * 📊 **Official Card Count Enforcement (`applyCardCount`):** Strict deck validation (40 cards / 20-card threshold) and automatic dealer rotation.
 * 🔊 **TV Casting Audio Improvements:** Resolved background music dropping permanently after scoring calls during screen projection.
-* 🧪 **Automated 28-Test Suite:** 100% test coverage across all player capacities and multiplayer scenarios passing in green.
+* 🧪 **Automated Unit Test Suite:** 18 comprehensive unit tests in `MultiplayerStoneModificationTest.kt` verifying all player capacities, real-time sync, and consecutive stone operations passing in green.
 
 ### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
 

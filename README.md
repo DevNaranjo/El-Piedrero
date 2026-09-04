@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.6-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-1.0.7-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.6)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.7)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -52,13 +52,15 @@ Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
 
 ---
 
-## 🚀 Novedades de la Versión 1.0.6 (Patch 2)
+## 🚀 Novedades de la Versión 1.0.7 (Patch 2)
 
-* 🪨 **Multijugador Robusto (2, 3, 4, 6 y 8 Jugadores):** Corrección integral del sistema de permisos y sincronización de equipos en tiempo real. Ahora cada jugador cliente puede modificar sus piedras y cantar jugadas de manera independiente para su equipo sin bloqueos.
+* 🪨 **Sincronización y Modificación de Piedras Multijugador (2, 3, 4, 6 y 8 Jugadores):** Corrección integral del sistema de puntuación para clientes que se unen a la sala. Ahora tanto el anfitrión como todos los jugadores invitados pueden sumar y restar piedras y declarar cantos en tiempo real para sus respectivos equipos sin bloqueos.
+* 🌐 **Resiliencia en Red Local y Hotspot Wi-Fi:** Eliminado el descarte de tramas por desfase horario entre dispositivos y por conflicto de secuencia con los pings de heartbeat sobre TCP, garantizando que cada toque de piedra se procese de inmediato.
+* 📱 **Aislamiento de Rol y Enrutamiento en Cliente (`ScoreViewModel`):** Al escanear el QR o unirse a una partida, se asegura el estado `isHost = false` y `isLocalGame = false`, canalizando los eventos de tanteo directamente hacia el servidor socket del anfitrión en lugar de retenerlos localmente.
 * 🎛️ **Personalización de Distribución de Botones:** Nueva pantalla de reordenación de la botonera de jugadas y cánticos accesible desde los ajustes del marcador ("Cambiar Distribución"), con almacenamiento persistente de preferencias.
 * 🃏 **Indicador Dinámico de Repartidor:** Detección y anuncio del siguiente jugador a repartir tras finalizar cada mano o juego.
 * 🔊 **Optimización de Audio y Smart TV:** Solución a la interrupción de música de fondo tras los cánticos y avisos sonoros de Buenas y Victoria.
-* 🧪 **Suite de Pruebas de Integración Multijugador:** Cobertura automatizada integral con 28 pruebas unitarias y de integración verificando la conectividad, reconexión con persistencia de asiento, deshacer jugadas y modificación de tanteos en todas las configuraciones de mesa.
+* 🧪 **Suite de Pruebas Automatizadas (100% Pasando):** Cobertura exhaustiva en `MultiplayerStoneModificationTest.kt` validando todas las permutaciones de anfitrión/invitado en 2, 3, 4, 6 y 8 jugadores, sincronización bidireccional de `GameState`, reconexión y operaciones consecutivas de suma/resta.
 
 ---
 
@@ -89,16 +91,18 @@ La partida se disputa a un total de **21 Piedras**:
 
 ## 🚀 Registro de Cambios
  
-### 🃏 El Piedrero — v1.0.6 (04/09/2026 - Patch 2) — 🪨
+### 🃏 El Piedrero — v1.0.7 (04/09/2026 - Patch 2) — 🪨
 
-* 🪨 **Multijugador en Salas de 2, 3, 4, 6 y 8 Jugadores:** Corrección del algoritmo de asignación de equipos y permisos de modificación remota de piedras (`getEffectiveLocalTeam()`), eliminando el bloqueo que marcaba las tarjetas como "Equipo Rival" a jugadores remotos.
+* 🪨 **Puntuación Multijugador Bidireccional en Salas de 2, 3, 4, 6 y 8 Jugadores:** Corrección del algoritmo de asignación de equipos y permisos de modificación remota de piedras (`getEffectiveLocalTeam()`), eliminando el bloqueo que impedía a los clientes sumar piedras a su propio equipo o que las marcaba como rivales.
+* 📶 **Eliminación de Filtros Redundantes en Sockets TCP:** Supresión del descarte por número de secuencia y por desfase horario en `HostGameUseCase.kt`, permitiendo una comunicación fluida en redes Wi-Fi locales y zonas Wi-Fi portátiles.
+* 🎯 **Inicialización de Estado Limpio en Cliente:** Reinicio garantizado de banderas `isHost = false` y `isLocalGame = false` en `ScoreViewModel.kt` al conectarse a una sala para evitar conflictos con partidas locales previas.
 * 🎛️ **Personalización Completa de Botonera de Cantos:** Pantalla de configuración que permite redistribuir los botones a gusto del usuario con persistencia offline de ajustes.
 * 🃏 **Gestión y Anuncio de Reparto:** Detección dinámica y aviso visible de quién reparte las cartas y el siguiente en el orden de juego.
 * 🔄 **Reconexión Resiliente con Asiento Persistente:** Mantenimiento garantizado del equipo asignado tras microcortes de red Wi-Fi.
 * ↩️ **Deshacer Jugadas Sincronizado (`UNDO_LAST_MOVE`):** Soporte seguro para revertir jugadas en multijugador con bloqueo a equipos en reserva.
 * 📊 **Recuento de Cartas Oficial (`applyCardCount`):** Validación estricta de baraja completa (40 cartas / umbral de 20) y rotación automática de repartidor.
 * 🔊 **Mejoras de Audio en Transmisión TV:** Eliminación del corte permanente de música de fondo tras cánticos al proyectar pantalla.
-* 🧪 **Suite Automatizada de 28 Tests:** Cobertura de pruebas unitarias y de integración al 100% pasando en verde.
+* 🧪 **Suite Automatizada de Pruebas Unitarias:** 18 pruebas unitarias exhaustivas en `MultiplayerStoneModificationTest.kt` verificando todas las combinaciones de juego en verde.
 
 ### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
 

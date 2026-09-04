@@ -169,23 +169,11 @@ class HostGameUseCase(
     }
 
     internal suspend fun handleClientMessage(clientId: String, envelope: NetworkEnvelope) {
-        // Validación anti-replay y obsolescencia temporal tolerante para partidas en red local/Zona Wi-Fi (15 min)
-        val now = System.currentTimeMillis()
-        if (Math.abs(now - envelope.timestamp) > 900_000L) {
-            android.util.Log.w("HostGameUseCase", "Trama descartada por antigüedad excesiva (>15m): ${envelope.timestamp} vs $now")
-            return
-        }
         if (envelope.type == MessageType.JOIN_REQUEST) {
             clientDisconnectGraceJobs.remove(envelope.senderId)?.cancel()
             clientLastSequence.remove(envelope.senderId)
         }
         if (envelope.sequenceNumber > 0) {
-            val lastSeq = clientLastSequence[envelope.senderId] ?: 0L
-            // Permitir reseteo de secuencia si el cliente reconectó (número significativamente menor)
-            if (envelope.sequenceNumber <= lastSeq && (lastSeq - envelope.sequenceNumber) <= 10) {
-                android.util.Log.w("HostGameUseCase", "Trama descartada por secuencia duplicada: seq=${envelope.sequenceNumber} <= lastSeq=$lastSeq")
-                return
-            }
             clientLastSequence[envelope.senderId] = envelope.sequenceNumber
         }
 
@@ -330,24 +318,27 @@ class HostGameUseCase(
 
             MessageType.SCORE_UPDATE -> {
                 val scoreUpdate = envelope.scoreUpdate ?: return
-                val isTwoPlayers = _gameState.value.maxPlayers == 2
+                val isTwoPlayers = _gameState.value.maxPlayers == 2 || _gameState.value.connectedPlayers.size == 2
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
+                    ?: _gameState.value.connectedPlayers.find { !it.isHost && isTwoPlayers }
 
                 val effectiveSenderTeam = when {
-                    isTwoPlayers -> Team.TEAM_B // En 1v1 el cliente remoto es inequívocamente el Equipo B
+                    isTwoPlayers -> (senderPlayer?.team?.takeIf { it != Team.SPECTATOR } ?: Team.TEAM_B)
                     senderPlayer != null && senderPlayer.team != Team.SPECTATOR -> senderPlayer.team
                     else -> scoreUpdate.teamId
                 }
 
-                // Regla de seguridad multijugador: Los clientes no pueden modificar el tanteo de equipos contrarios ni los reservas
-                if (!isTwoPlayers && senderPlayer != null && (effectiveSenderTeam != scoreUpdate.teamId || _gameState.value.reserveTeams.contains(effectiveSenderTeam) || effectiveSenderTeam == Team.RESERVE)) {
+                // Regla de seguridad multijugador: Los clientes no pueden modificar el tanteo de equipos contrarios ni los reservas ni espectadores
+                if (senderPlayer != null && (effectiveSenderTeam != scoreUpdate.teamId || _gameState.value.reserveTeams.contains(effectiveSenderTeam) || effectiveSenderTeam == Team.RESERVE || effectiveSenderTeam == Team.SPECTATOR)) {
                     android.util.Log.w("HostGameUseCase", "Petición de tanteo descartada: el jugador ${senderPlayer.name} pertenece a $effectiveSenderTeam pero intentó puntuar a ${scoreUpdate.teamId}")
                     return
                 }
 
-                // En 2 jugadores, el rival solo puede puntuar a su propio equipo (Equipo B)
-                if (isTwoPlayers && scoreUpdate.teamId != Team.TEAM_B) {
+                // En 2 jugadores, el rival remoto solo puede puntuar a su propio equipo y nunca al equipo del anfitrión
+                val hostPlayer = _gameState.value.connectedPlayers.find { it.isHost }
+                val hostTeam = hostPlayer?.team ?: Team.TEAM_A
+                if (isTwoPlayers && effectiveSenderTeam != hostTeam && scoreUpdate.teamId == hostTeam) {
                     android.util.Log.w("HostGameUseCase", "Petición de tanteo descartada: el rival intentó puntuar al equipo del anfitrión (${scoreUpdate.teamId})")
                     return
                 }
@@ -365,7 +356,7 @@ class HostGameUseCase(
                     else -> canto.defaultPiedras
                 }
 
-                val authorName = senderPlayer?.name ?: if (isTwoPlayers) _gameState.value.nameTeamB else "Rival"
+                val authorName = senderPlayer?.name?.ifBlank { null } ?: if (effectiveSenderTeam == Team.TEAM_B) _gameState.value.nameTeamB else "Rival"
                 applyScoreUpdate(scoreUpdate.teamId, scoreUpdate.cantoType, validPiedras, scoreUpdate.reason, authorName)
             }
 

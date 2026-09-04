@@ -81,7 +81,9 @@ $RECYCLE.BIN/
 # AI / Dev Tools scratch files
 # ==========================================
 .gemini/
+.antigravity/
 .aider*
 .cursor/
 .vscode/
 *.orig
+

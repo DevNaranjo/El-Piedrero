@@ -610,4 +610,572 @@ class MultiplayerStoneModificationTest {
 
         hostUseCase.stopHost()
     }
+
+    @Test
+    fun `partida creada con 4 jugadores pero jugada 1v1 (2 conectados) - cliente Paco modifica piedras del Equipo B correctamente`() = runBlocking {
+        // Host crea sala con maxPlayers = 4 (default)
+        hostUseCase.startHost("Iriome", maxPlayers = 4)
+        val token = hostUseCase.roomToken
+
+        // Solo se conecta Paco
+        val pacoId = "player-paco-dynamic-2p"
+        val joinReq = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            joinRequest = JoinRequestPayload(playerName = "Paco", roomToken = token)
+        )
+        hostUseCase.handleClientMessage("client-paco-socket", joinReq)
+
+        // El anfitrión inicia la partida con 2 jugadores
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Paco envía ajuste de piedra +1 en Equipo B
+        val pacoScore = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1 manual Paco"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-socket", pacoScore)
+
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Paco canta Ronda (+1)
+        val pacoRonda = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.RONDA,
+                piedras = 1,
+                reason = "Ronda"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-socket", pacoRonda)
+
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Intento de modificar Equipo A es bloqueado
+        val pacoTamper = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_A,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 3,
+                reason = "Trampa"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-socket", pacoTamper)
+
+        assertEquals(0, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `tolerancia a desfase horario de relojes entre telefonos en zona wifi local`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+        val pacoId = "player-paco-skew"
+
+        val joinReq = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            timestamp = System.currentTimeMillis() - 7_200_000L, // 2 horas en el pasado
+            joinRequest = JoinRequestPayload(playerName = "Paco", roomToken = token)
+        )
+        hostUseCase.handleClientMessage("client-paco-skew", joinReq)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Trama con reloj del cliente desfasado varias horas
+        val pacoScore = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            timestamp = System.currentTimeMillis() + 3_600_000L, // 1 hora en el futuro
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 2,
+                reason = "Ajuste con reloj desfasado"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-skew", pacoScore)
+
+        // La trama es procesada y las piedras se aplican con éxito
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `concurrencia de heartbeat y sumas de piedras sucesivas no descarta paquetes por secuencia`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+        val pacoId = "player-paco-seq"
+
+        val joinReq = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            sequenceNumber = 10L,
+            joinRequest = JoinRequestPayload(playerName = "Paco", roomToken = token)
+        )
+        hostUseCase.handleClientMessage("client-paco-seq", joinReq)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Heartbeat ping llega con seq 15
+        val ping = NetworkEnvelope(
+            type = MessageType.HEARTBEAT_PING,
+            senderId = pacoId,
+            sequenceNumber = 15L
+        )
+        hostUseCase.handleClientMessage("client-paco-seq", ping)
+
+        // Jugador pulsa +1 piedra con secuencia menor o igual (ej. reconexión o corrutina previa con seq 12)
+        val score1 = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 12L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-seq", score1)
+
+        // Jugador pulsa +1 piedra de nuevo
+        val score2 = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 13L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1"
+            )
+        )
+        hostUseCase.handleClientMessage("client-paco-seq", score2)
+
+        // Ambas modificaciones se contabilizan (1 + 1 = 2 piedras)
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `partida multijugador 2 jugadores (1v1) - Paco es host e Iriome se une como cliente - Iriome modifica piedras de su equipo`() = runBlocking {
+        // En este escenario Paco es el anfitrión e Iriome es el cliente que se une
+        hostUseCase.startHost("Paco", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+        val iriomeId = "player-iriome-client-2p"
+
+        val joinReq = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = iriomeId,
+            joinRequest = JoinRequestPayload(playerName = "Iriome", roomToken = token)
+        )
+        hostUseCase.handleClientMessage("sock-iriome", joinReq)
+
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(2, players.size)
+        val iriome = players.find { it.id == iriomeId }
+        assertNotNull(iriome)
+        assertEquals(Team.TEAM_B, iriome?.team)
+
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // 1. Iriome (cliente que se une) suma piedras a su equipo (Equipo B)
+        val iriomeScore1 = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = iriomeId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1 manual Iriome"
+            )
+        )
+        hostUseCase.handleClientMessage("sock-iriome", iriomeScore1)
+
+        val iriomeMajo = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = iriomeId,
+            sequenceNumber = 2L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MAJO,
+                piedras = 1,
+                reason = "Majo"
+            )
+        )
+        hostUseCase.handleClientMessage("sock-iriome", iriomeMajo)
+
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // 2. Paco (anfitrión) suma a su equipo (Equipo A)
+        hostUseCase.applyScoreUpdate(Team.TEAM_A, CantoType.RONDA, 1, "Ronda", "Paco")
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+
+        // 3. Seguridad: Iriome no puede sumar al Equipo A de Paco
+        val iriomeTamper = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = iriomeId,
+            sequenceNumber = 3L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_A,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 5,
+                reason = "Fraude"
+            )
+        )
+        hostUseCase.handleClientMessage("sock-iriome", iriomeTamper)
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `partida multijugador 3 jugadores - Paco es host - todos los jugadores puntuan en sus respectivos equipos`() = runBlocking {
+        hostUseCase.startHost("Paco", maxPlayers = 3)
+        val token = hostUseCase.roomToken
+
+        val iriomeId = "iriome-3p-client"
+        val mariaId = "maria-3p-client"
+
+        hostUseCase.handleClientMessage("sock-iriome", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = iriomeId,
+            joinRequest = JoinRequestPayload(playerName = "Iriome", roomToken = token)
+        ))
+        hostUseCase.handleClientMessage("sock-maria", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = mariaId,
+            joinRequest = JoinRequestPayload(playerName = "Maria", roomToken = token)
+        ))
+
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Paco (Host, Team A) suma +1
+        hostUseCase.applyScoreUpdate(Team.TEAM_A, CantoType.MANUAL_ADJUST, 1, "+1", "Paco")
+
+        // Iriome (Cliente 1, Team B) suma +2
+        hostUseCase.handleClientMessage("sock-iriome", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = iriomeId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 2)
+        ))
+
+        // Maria (Cliente 2, Team C) suma +3
+        hostUseCase.handleClientMessage("sock-maria", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = mariaId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_C, cantoType = CantoType.MANUAL_ADJUST, piedras = 3)
+        ))
+
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamC.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `partida multijugador 4 jugadores - Paco es host - todos los jugadores de ambos equipos puntuan`() = runBlocking {
+        hostUseCase.startHost("Paco", maxPlayers = 4)
+        val token = hostUseCase.roomToken
+
+        val iriomeId = "iriome-4p"
+        val mariaId = "maria-4p"
+        val pepeId = "pepe-4p"
+
+        hostUseCase.handleClientMessage("s-iriome", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = iriomeId,
+            joinRequest = JoinRequestPayload(playerName = "Iriome", roomToken = token)
+        ))
+        hostUseCase.handleClientMessage("s-maria", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = mariaId,
+            joinRequest = JoinRequestPayload(playerName = "Maria", roomToken = token)
+        ))
+        hostUseCase.handleClientMessage("s-pepe", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pepeId,
+            joinRequest = JoinRequestPayload(playerName = "Pepe", roomToken = token)
+        ))
+
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(4, players.size)
+
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Paco (Host, Team A) suma +1
+        hostUseCase.applyScoreUpdate(Team.TEAM_A, CantoType.MANUAL_ADJUST, 1, "+1", "Paco")
+
+        // Maria (Compañera en Team A) suma +2
+        hostUseCase.handleClientMessage("s-maria", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = mariaId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_A, cantoType = CantoType.MANUAL_ADJUST, piedras = 2)
+        ))
+
+        // Iriome (Team B) suma +2
+        hostUseCase.handleClientMessage("s-iriome", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = iriomeId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 2)
+        ))
+
+        // Pepe (Compañero en Team B) suma +1
+        hostUseCase.handleClientMessage("s-pepe", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pepeId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 1)
+        ))
+
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `partida multijugador 6 jugadores - Paco es host - equipos activos modifican sus piedras`() = runBlocking {
+        hostUseCase.startHost("Paco", maxPlayers = 6)
+        val token = hostUseCase.roomToken
+
+        val clientIds = (1..5).map { "paco-6p-$it" }
+        clientIds.forEachIndexed { idx, id ->
+            hostUseCase.handleClientMessage("sock-$id", NetworkEnvelope(
+                type = MessageType.JOIN_REQUEST,
+                senderId = id,
+                joinRequest = JoinRequestPayload(playerName = "Invitado $idx", roomToken = token)
+            ))
+        }
+
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(6, players.size)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Jugador activo de Team B suma piedras
+        val playerB = players.first { it.team == Team.TEAM_B }
+        hostUseCase.handleClientMessage("sock-${playerB.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerB.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 4)
+        ))
+        assertEquals(4, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Rotar reserva para activar Team C
+        hostUseCase.setReserveTeams(listOf(Team.TEAM_A))
+        val playerC = players.first { it.team == Team.TEAM_C }
+        hostUseCase.handleClientMessage("sock-${playerC.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerC.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_C, cantoType = CantoType.MANUAL_ADJUST, piedras = 3)
+        ))
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamC.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `partida multijugador 8 jugadores - Paco es host - todos los equipos activos modifican piedras`() = runBlocking {
+        hostUseCase.startHost("Paco", maxPlayers = 8)
+        val token = hostUseCase.roomToken
+
+        val clientIds = (1..7).map { "paco-8p-$it" }
+        clientIds.forEachIndexed { idx, id ->
+            hostUseCase.handleClientMessage("sock-$id", NetworkEnvelope(
+                type = MessageType.JOIN_REQUEST,
+                senderId = id,
+                joinRequest = JoinRequestPayload(playerName = "Jugador $idx", roomToken = token)
+            ))
+        }
+
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(8, players.size)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        val playerA = players.first { it.team == Team.TEAM_A && !it.isHost }
+        val playerB = players.first { it.team == Team.TEAM_B }
+        val playerC = players.first { it.team == Team.TEAM_C }
+        val playerD = players.first { it.team == Team.TEAM_D }
+
+        // A y B activos suman
+        hostUseCase.handleClientMessage("sock-${playerA.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerA.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_A, cantoType = CantoType.MANUAL_ADJUST, piedras = 2)
+        ))
+        hostUseCase.handleClientMessage("sock-${playerB.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerB.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 3)
+        ))
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Rotar: C y D a la mesa
+        hostUseCase.setReserveTeams(listOf(Team.TEAM_A, Team.TEAM_B))
+        hostUseCase.handleClientMessage("sock-${playerC.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerC.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_C, cantoType = CantoType.MANUAL_ADJUST, piedras = 1)
+        ))
+        hostUseCase.handleClientMessage("sock-${playerD.id}", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = playerD.id,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_D, cantoType = CantoType.MANUAL_ADJUST, piedras = 4)
+        ))
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamC.totalPiedras)
+        assertEquals(4, hostUseCase.gameState.value.scoreTeamD.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `sincronizacion de puntuacion en tiempo real - difusion de GameState a todos los clientes`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+        val pacoId = "player-paco-sync"
+
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            joinRequest = JoinRequestPayload(playerName = "Paco", roomToken = token)
+        ))
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Paco realiza modificación de +1 piedra
+        val pacoUpdate = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1 manual Paco"
+            )
+        )
+        hostUseCase.handleClientMessage("sock-paco", pacoUpdate)
+
+        // El GameState del host se actualiza inmediatamente
+        val hostState = hostUseCase.gameState.value
+        assertEquals(1, hostState.scoreTeamB.totalPiedras)
+        assertEquals(1, hostState.moveHistory.size)
+
+        // Simulamos la recepción del GameState en el cliente
+        val clientUseCase = ClientGameUseCase()
+        clientUseCase.handleIncomingEnvelope(NetworkEnvelope(
+            type = MessageType.GAME_STATE_BROADCAST,
+            senderId = "HOST",
+            gameStateBroadcast = hostState
+        ))
+
+        // El cliente tiene exactamente el mismo GameState sincronizado en tiempo real
+        val clientState = clientUseCase.gameState.value
+        assertNotNull(clientState)
+        assertEquals(hostState.scoreTeamA.totalPiedras, clientState?.scoreTeamA?.totalPiedras)
+        assertEquals(hostState.scoreTeamB.totalPiedras, clientState?.scoreTeamB?.totalPiedras)
+        assertEquals(hostState.moveHistory.size, clientState?.moveHistory?.size)
+        assertEquals(hostState.connectedPlayers.size, clientState?.connectedPlayers?.size)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `operaciones consecutivas de suma y resta de piedras por parte de jugadores clientes tienen exito`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+        val pacoId = "player-paco-consecutive"
+
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            joinRequest = JoinRequestPayload(playerName = "Paco", roomToken = token)
+        ))
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Secuencia de operaciones consecutivas enviadas por Paco:
+        // +1
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 1)
+        ))
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // +2
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 2L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = 2)
+        ))
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // +1 Majo
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 3L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MAJO, piedras = 1)
+        ))
+        assertEquals(4, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // -1 (resta manual)
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 4L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = -1)
+        ))
+        assertEquals(3, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // +1 Ronda
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 5L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.RONDA, piedras = 1)
+        ))
+        assertEquals(4, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // -2 (resta manual)
+        hostUseCase.handleClientMessage("sock-paco", NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 6L,
+            scoreUpdate = ScoreUpdatePayload(teamId = Team.TEAM_B, cantoType = CantoType.MANUAL_ADJUST, piedras = -2)
+        ))
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Todas las 6 operaciones consecutivas fueron procesadas correctamente
+        assertEquals(6, hostUseCase.gameState.value.moveHistory.size)
+
+        hostUseCase.stopHost()
+    }
 }
+

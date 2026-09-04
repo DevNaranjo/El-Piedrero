@@ -119,14 +119,16 @@ class ScoreViewModel(
         // Observar estado del Cliente
         viewModelScope.launch {
             clientUseCase.gameState.collect { state ->
-                if (!_uiState.value.isHost && state != null) {
+                val isConnectedClient = clientUseCase.sessionStatus.value == SessionStatus.CONNECTED || !_uiState.value.isHost
+                if (isConnectedClient && state != null) {
                     val myPlayer = state.connectedPlayers.find { 
                         it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == _uiState.value.playerName && !it.isHost)
                     }
+                    val isTwoPlayersMatch = state.maxPlayers == 2 || state.connectedPlayers.size == 2
                     val resolvedTeam = when {
                         myPlayer != null && myPlayer.team != Team.SPECTATOR -> myPlayer.team
                         clientUseCase.myTeam.value != Team.SPECTATOR -> clientUseCase.myTeam.value
-                        state.maxPlayers == 2 -> Team.TEAM_B
+                        isTwoPlayersMatch -> Team.TEAM_B
                         else -> _uiState.value.myTeam
                     }
 
@@ -139,6 +141,8 @@ class ScoreViewModel(
                             current.currentScreen
                         }
                         current.copy(
+                            isHost = false,
+                            isLocalGame = false,
                             gameState = state,
                             maxPlayers = state.maxPlayers,
                             currentScreen = targetScreen,
@@ -160,7 +164,7 @@ class ScoreViewModel(
         // Observar sesión del Cliente
         viewModelScope.launch {
             clientUseCase.sessionStatus.collect { status ->
-                if (!_uiState.value.isHost) {
+                if (status == SessionStatus.CONNECTED || status == SessionStatus.CONNECTING || status == SessionStatus.RECONNECTING || !_uiState.value.isHost) {
                     val resolvedTeam = clientUseCase.myTeam.value
                     _uiState.update { current ->
                         val targetScreen = if (status == SessionStatus.CONNECTED && current.currentScreen == AppScreen.CLIENT_SCANNER) {
@@ -169,6 +173,8 @@ class ScoreViewModel(
                             current.currentScreen
                         }
                         current.copy(
+                            isHost = false,
+                            isLocalGame = false,
                             sessionStatus = status,
                             currentScreen = targetScreen,
                             myTeam = if (resolvedTeam != Team.SPECTATOR) resolvedTeam else current.myTeam
@@ -238,6 +244,8 @@ class ScoreViewModel(
         }
         _uiState.update {
             it.copy(
+                isHost = false,
+                isLocalGame = false,
                 currentScreen = AppScreen.LOBBY,
                 hostConnectionInfo = null,
                 connectingHostName = null,
@@ -477,6 +485,8 @@ class ScoreViewModel(
         val name = _uiState.value.playerName
         _uiState.update {
             it.copy(
+                isHost = false,
+                isLocalGame = false,
                 hostConnectionInfo = info,
                 connectingHostName = info.hostName,
                 errorMessage = null,
@@ -516,19 +526,38 @@ class ScoreViewModel(
             return state.myTeam
         }
         val effectiveMax = if (state.gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) state.gameState.maxPlayers else state.maxPlayers
-        if (effectiveMax == 2) {
+        if (effectiveMax == 2 || state.gameState.connectedPlayers.size == 2) {
             return Team.TEAM_B
         }
-        return Team.SPECTATOR
+        if (effectiveMax == 3 || state.gameState.connectedPlayers.size == 3) {
+            val playerIndex = state.gameState.connectedPlayers.indexOfFirst {
+                it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == state.playerName && !it.isHost)
+            }
+            return when (playerIndex) {
+                1 -> Team.TEAM_B
+                2 -> Team.TEAM_C
+                else -> Team.TEAM_B
+            }
+        }
+        return Team.TEAM_B
     }
 
     fun callCanto(teamId: Team, canto: CantoType) {
         val state = _uiState.value
-        if (state.gameState.reserveTeams.contains(teamId)) return
+        if (state.gameState.reserveTeams.contains(teamId)) {
+            android.util.Log.w("ScoreViewModel", "Canto ignorado: equipo $teamId está en reserva")
+            return
+        }
         if (!state.isLocalGame) {
             val effectiveMyTeam = getEffectiveLocalTeam()
-            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
-            if (effectiveMyTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) {
+                android.util.Log.w("ScoreViewModel", "Canto ignorado: jugador local $effectiveMyTeam está en reserva")
+                return
+            }
+            if (effectiveMyTeam != teamId) {
+                android.util.Log.w("ScoreViewModel", "Canto ignorado: jugador local $effectiveMyTeam intentó cantar para $teamId")
+                return // En multijugador no se puede cantar para el equipo rival
+            }
         }
 
         val author = state.playerName
@@ -543,11 +572,20 @@ class ScoreViewModel(
 
     fun manualScoreChange(teamId: Team, delta: Int, reason: String = "Ajuste manual") {
         val state = _uiState.value
-        if (state.gameState.reserveTeams.contains(teamId)) return
+        if (state.gameState.reserveTeams.contains(teamId)) {
+            android.util.Log.w("ScoreViewModel", "Ajuste ignorado: equipo $teamId está en reserva")
+            return
+        }
         if (!state.isLocalGame) {
             val effectiveMyTeam = getEffectiveLocalTeam()
-            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
-            if (effectiveMyTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) {
+                android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam está en reserva")
+                return
+            }
+            if (effectiveMyTeam != teamId) {
+                android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam intentó modificar tanteo de $teamId")
+                return // En multijugador no se puede modificar el tanteo del equipo rival
+            }
         }
 
         val author = state.playerName
@@ -597,22 +635,16 @@ class ScoreViewModel(
 
     fun applyCardCount(cardCounts: Map<Team, Int>) {
         val state = _uiState.value
-        val totalDeckCards = if (state.gameState.maxPlayers == 3) 39 else 40
-        val totalSum = cardCounts.values.sum()
-        if (totalSum < totalDeckCards) {
-            // No permitir sumar piedras si el recuento de cartas es insuficiente
-            return
-        }
         val threshold = if (state.gameState.maxPlayers == 3) 13 else 20
         viewModelScope.launch {
             if (state.isHost || state.isLocalGame) {
-                hostUseCase.applyCardCount(cardCounts, state.playerName)
-            } else {
-                val effectiveMyTeam = if (state.myTeam != Team.SPECTATOR) {
-                    state.myTeam
-                } else {
-                    state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team ?: state.myTeam
+                val totalDeckCards = if (state.gameState.maxPlayers == 3) 39 else 40
+                val totalSum = cardCounts.values.sum()
+                if (totalSum >= totalDeckCards || cardCounts.any { it.value > threshold }) {
+                    hostUseCase.applyCardCount(cardCounts, state.playerName)
                 }
+            } else {
+                val effectiveMyTeam = getEffectiveLocalTeam()
                 val myCount = cardCounts[effectiveMyTeam] ?: 0
                 val extra = (myCount - threshold).coerceAtLeast(0)
                 if (extra > 0) {

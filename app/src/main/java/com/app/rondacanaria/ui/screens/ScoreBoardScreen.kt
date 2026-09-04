@@ -49,8 +49,8 @@ fun ScoreBoardScreen(
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
     val effectiveMaxPlayers = if (gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) gameState.maxPlayers else uiState.maxPlayers
-    val isTwoPlayers = effectiveMaxPlayers == 2
-    val isThreePlayers = effectiveMaxPlayers == 3
+    val isTwoPlayers = effectiveMaxPlayers == 2 || gameState.connectedPlayers.size == 2
+    val isThreePlayers = (effectiveMaxPlayers == 3 || gameState.connectedPlayers.size == 3) && !isTwoPlayers
 
     val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers, effectiveMaxPlayers, uiState.isHost, uiState.isLocalGame) {
         when {
@@ -62,7 +62,17 @@ fun ScoreBoardScreen(
                     playerInState != null && playerInState.team != Team.SPECTATOR -> playerInState.team
                     uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
                     isTwoPlayers -> Team.TEAM_B
-                    else -> uiState.myTeam
+                    isThreePlayers -> {
+                        val pIdx = gameState.connectedPlayers.indexOfFirst {
+                            it.id == viewModel.localPlayerId || (it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost)
+                        }
+                        when (pIdx) {
+                            1 -> Team.TEAM_B
+                            2 -> Team.TEAM_C
+                            else -> Team.TEAM_B
+                        }
+                    }
+                    else -> Team.TEAM_B
                 }
             }
             uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
