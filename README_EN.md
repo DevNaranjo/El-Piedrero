@@ -52,6 +52,18 @@ If you want to install and play Ronda Canaria with friends and family:
 
 ---
 
+## 🚀 What's New in Version 1.0.7 (Patch 2)
+
+* 🪨 **Bidirectional Multiplayer Scoring (2, 3, 4, 6 & 8 Players):** Comprehensive fix for scoring and stone modification for joining clients. Both host and all invited players can now add/subtract stones and declare calls in real time for their assigned teams without locks.
+* 🌐 **Local Wi-Fi & Hotspot Resilience:** Removed clock skew packet drop and TCP sequence conflict drops in `HostGameUseCase.kt`, ensuring smooth and immediate packet processing across local Wi-Fi and mobile hotspots.
+* 📱 **Client Role Isolation (`ScoreViewModel`):** Guaranteed reset of `isHost = false` and `isLocalGame = false` when scanning QR codes or joining a match, routing score events directly to the host socket server.
+* 🎛️ **Full Call Button Customization:** Settings dialog allowing players to reorder call buttons in a personalized 2-column layout with offline persistence.
+* 🃏 **Dynamic Dealer Tracking & Notification:** Clear visual dealer badge and next dealer guidance upon hand completion.
+* 🔊 **Audio & TV Casting Polish:** Resolved background music dropping permanently after scoring calls during screen projection.
+* 🧪 **Automated Unit Test Suite (100% Passing):** 18 comprehensive unit tests in `MultiplayerStoneModificationTest.kt` verifying all player capacities, real-time sync, and consecutive stone operations.
+
+---
+
 ## 🃏 Canary Ronda Scoring System
 
 The game is played to a total of **21 Stones ("Piedras")**:
@@ -74,85 +86,6 @@ The game is played to a total of **21 Stones ("Piedras")**:
 | **Requetemajo** | **+3** | Third consecutive majo in hand. | 🔊 `Requetemajo.mp3` |
 | **Sobremajo** | **+4** | Fourth consecutive majo on the table. | 🔊 `Sobremajo.mp3` |
 | **Manual Adjust (+ / -)** | **+1 / -1** | Manual score adjustment at any time. | 📳 Click / Haptic |
-
----
-
-## 🚀 Changelog
- 
-### 🃏 El Piedrero — v1.0.7 (04/09/2026 - Patch 2) — 🪨
-
-* 🪨 **Bidirectional Multiplayer Scoring for 2, 3, 4, 6 & 8 Players:** Comprehensive fix for scoring and stone modification for joining clients. Both host and all invited players can now add/subtract stones and declare calls in real time for their assigned teams without locks.
-* 📶 **Elimination of Redundant TCP Socket Filters:** Removed clock skew frame drop and TCP sequence conflict drops in `HostGameUseCase.kt`, ensuring smooth packet processing across local Wi-Fi and mobile hotspots.
-* 🎯 **Clean Client State Initialization:** Guaranteed reset of `isHost = false` and `isLocalGame = false` in `ScoreViewModel.kt` when connecting to avoid conflicts with previous local matches.
-* 🎛️ **Full Call Button Customization:** Settings dialog allowing players to reorder call buttons in a 2-column layout with offline persistence.
-* 🃏 **Dynamic Dealer Tracking & Notification:** Clear visual dealer badge and next dealer guidance upon hand completion.
-* 🔄 **Resilient Reconnection with Seat Preservation:** Guaranteed player seat retention across temporary Wi-Fi drops.
-* ↩️ **Synchronized Undo (`UNDO_LAST_MOVE`):** Safe move reversal in multiplayer with strict security blocking bench/reserve players.
-* 📊 **Official Card Count Enforcement (`applyCardCount`):** Strict deck validation (40 cards / 20-card threshold) and automatic dealer rotation.
-* 🔊 **TV Casting Audio Improvements:** Resolved background music dropping permanently after scoring calls during screen projection.
-* 🧪 **Automated Unit Test Suite:** 18 comprehensive unit tests in `MultiplayerStoneModificationTest.kt` verifying all player capacities, real-time sync, and consecutive stone operations passing in green.
-
-### 🃏 El Piedrero — v1.0.5 (04/09/2026 - Patch 1) — 🪨
-
-* 📺 **Live Score Casting (TV Cast):** New interactive dialog (`TvCastDialog.kt`) to mirror the scoreboard to Smart TVs and external monitors via Google Cast / Android Wireless Display, with automatic permanent TV audio optimization.
-* 💾 **Smart Lifecycle & Persistence:**
-  * **On app minimize:** Matches stay 100% alive in memory (`launchMode="singleTask"`).
-  * **On swipe-away (kill task):** Handled via `AppCleanupService.kt` and `onTaskRemoved()` to clean up active games and return to the main menu.
-  * **Instant silence on recents:** Immediately cuts background music when opening the recent apps switcher or switching windows (`onPause` and `onStop`).
-* 🎼 **AI-Generated Canarian Folk Music (Shuffled):** Added 6 original instrumental tracks inspired by Canarian folklore (`bgm_01.mp3` through `bgm_06.mp3`), 100% royalty-free, played in random shuffle order (`pickNextRandomIndex()`), with bilingual licensing in `MUSIC_LICENSES.md`.
-* 🌐 **Multiplayer Sync & 5-Minute Grace Countdown:** Real-time bidirectional stone synchronization with a 5-minute reconnect timer before leaving the room on backgrounding or Wi-Fi hiccups.
-* 🃏 **Automated & Safe Card Counting:** Automatic card difference calculation up to 40 cards, and strict validation preventing stone application if cards are missing.
-* 🏆 **Quick Add Beyond 21 Stones:** Unrestricted quick stone additions after counting with victory notifications (*"You will win by X extra stones!"*).
-* 👁️ **Accessibility & Visual Polish:** Fixed `fontScale = 1.0f` to prevent layout breaking on devices with large system fonts, and compacted TopAppBar action buttons to ensure title centering.
-* 🛡️ **DevSecOps & Release Hardening:** Keystores and plaintext passwords removed from source tree, R8 minification enabled in release builds, and strengthened `.gitignore`.
-
-### 🏷️ Connection Experience, Dynamic Audio & Visual Polish (v1.0.03.092026.2)
-
-* 🔄 **QR Scan Lifecycle & Instant Camera Release:** Immediately unbinds and releases camera hardware (`unbindAll`) upon scanning a valid QR code, preventing unnecessary battery and CPU drain. Displays a dedicated loading screen (`ConnectionLoadingView`) informing the user that the phone is synchronizing with the host table.
-* 🛡️ **Network Privacy & Host-Based Error Diagnostics (No IPs):** Completely stripped IP addresses and port numbers from all user-visible error dialogs. Connection failures trigger `ConnectionErrorView` showing the host's name (*"Could not connect to [Host]'s table"*) with actionable local Wi-Fi guidance and instant retry / back actions.
-* 🔘 **Stable Buenas Badge & Scorecard Buttons:** Compacted the "En Buenas" badge to a protected single line (`maxLines = 1`), adjusted stone counter typography, and established guaranteed minimum 44 dp touch targets on scorecard adjustment buttons (`+`, `−`, `+N`), preventing squeezing or clipping on devices with large system fonts.
-* 🔊 **Proportional Stone Volume Synchronization:** Acoustic stone scoring feedback (`ToneGenerator`) is now dynamically modulated by master and SFX volume sliders in real-time.
-* 🔉 **Tempered Default Volume Levels:** Lowered default volumes (Master to 80%, SFX to 70%, BGM to 35%) and reduced maximum acoustic tone gain to eliminate harsh beeps.
-* 📳 **Haptic Feedback Toggle:** Added a **Vibration** switch to the audio settings dialog, allowing players to mute or enable tactile feedback for button presses, calls, and victories.
-* ⚠️ **Multiplayer Safety Dialogs:** Added warnings when starting a match with incomplete players (*"No, esperar"* / *"Sí, empezar"*) and when exiting an active multiplayer room.
-
-### 🏷️ Quality Audit & Production Readiness (v1.0.03092026)
-
-* 🛡️ **DevSecOps & Secure Credential Management:** Removed plaintext keystore secrets and passwords from source files (`app/build.gradle.kts`). Signing credentials are now dynamically read from environment variables during CI/CD.
-* 📦 **R8 Minification & Size Reduction:** Enabled `isMinifyEnabled = true` and `isShrinkResources = true` with tailored ProGuard keep rules for Compose, ZXing, and Kotlinx Serialization. Release APK footprint reduced to **8.2 MB** (>40% reduction).
-* 🔒 **Local Network Anti-Replay Protection:** Added monotonic packet sequence numbers (`sequenceNumber`) and 60-second time-window expiration checks to `NetworkEnvelope` to prevent network packet reinjection.
-* 🔄 **P2P Reconnection Resilience:** Active match disconnection grace period (`assignedPlayerSeats`) preserves player seats, team assignments, and scores upon reconnection without unexpected restarts.
-* 🎧 **System Audio Focus Integration:** Android system `AudioFocusRequest` with `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` in `RondaAudioPlayer` plus automatic cleanup of temporary audio cache files.
-* 🎼 **Legal & Royalty-Free Folk Music:** Replaced copyrighted audio tracks with original CC0/Public Domain Canarian acoustic folk music loops (`bgm_FolkCanario_Isas.wav` & `bgm_FolkCanario_Folias.wav`) documented in `MUSIC_LICENSES.md`.
-* 📜 **Open Source License Attribution:** Interactive in-app dialog (`LicensesDialog.kt`) providing required Apache 2.0 attribution notices (ZXing, AndroidX, Jetpack Compose).
-* ♿ **Universal Accessibility (WCAG 2.1 AA / AAA):**
-  * **Universal 48 dp Touch Targets:** All interactive UI elements (scoring buttons, call tiles, deal stepper, lobby controls, and dialog actions) adhere to the **48×48 dp** minimum (`defaultMinSize(48.dp, 48.dp)`).
-  * **High Visual Contrast:** Wins and "En Buenas" badges reach contrast ratios exceeding **10:1** (surpassing WCAG AAA) with high-legibility typography (≥ 12–14 sp).
-  * **Full TalkBack Semantics:** Added descriptive Spanish `contentDescription` attributes to all action buttons and status icons.
-* 📱 **Locked Portrait Orientation:** Explicitly locked to portrait in `AndroidManifest.xml` for physical table gameplay stability.
-* 🧪 **Expanded Automated Test Suite:** Added `HostGameUseCaseTest.kt` verifying 21-stone victory boundary, malas-to-buenas transitions, victory reversal on undo, and deal limits.
-* ⚙️ **Robust CI/CD Pipeline:** Updated GitHub Actions workflow with `lintVitalRelease`, release APK and AAB bundle builds (`bundleRelease`), and SHA-256 checksum generation (`checksums.txt`).
-
-### 🏷️ Previous History (v1.0.02092026.2)
-
-* 🛡️ **Network Hardening & Socket Security:** Automatic discard on Host of unauthorized remote control commands (`ROOM_CONFIG_UPDATE` and `END_GAME`) from clients.
-* 🔒 **Strict Network Policy:** Removed `android:usesCleartextTraffic` and added `network_security_config.xml` with `cleartextTrafficPermitted="false"`.
-* ⚡ **Direct Audio Streaming (Zero Disk I/O):** `RondaAudioPlayer` streams audio directly from the APK asset descriptor (`AssetFileDescriptor`).
-* 🚀 **Compose Memoization:** Memoized deal history grouping and sorting in `ScoreBoardScreen.kt` with `remember(history)`.
-* 🧹 **ViewModel Lifecycle Cleanup:** Explicit socket server and client cleanup in `ScoreViewModel.onCleared()`.
-* 📐 **Refactored 2-Column Call Buttons:** Symmetric 5x2 grid with `Modifier.weight(1f)`, 48 dp height, and 12 dp rounded corners.
-* 🃏 **Deal Stepper Normalization:** Card dealing stepper controls normalized with generous spacing around the central ordinal indicator.
-* 🔊 **Independent Parallel Audio Channels:** Stone adjust sounds no longer interrupt or cut off the "¡Buenas!" audio.
-
-### 🏷️ Previous History (v1.0.02092026)
-
-* 🏷️ **New Identity "El Piedrero":** Complete update of brand, titles, and system manifest.
-* 📜 **Persistent Game History:** Rotating history of the last 30 games with detailed scorecards (`HistoryScreen.kt` & `GameHistoryRepository.kt`).
-* 🃏 **New Traditional Plays:** Added *Limpiar (+1)*, *Majo (+1)*, *Majo y Limpio (+2)*, and *Caracolillo (+5)* with associated audio and haptics.
-* 🛡️ **Network Hardening & Anti-Cheating:** Strict 32 KB frame limit on TCP sockets against DoS attacks and nominal score validation on the Host server.
-* ⚡ **Performance Optimization:** Reusable byte buffer in CameraX to eliminate GC stutter at 60 FPS and batch JNI pixel rendering for QR code generation.
-* 🧪 **Automated Testing & CI/CD:** Unit test suite for scoring rules (`TeamScoreTest.kt`) and GitHub Actions integration workflow.
-* 🌍 **Open Source Release:** Structured repository under the MIT License with `CONTRIBUTING.md` and portable Gradle Toolchains compilation.
 
 ---
 
