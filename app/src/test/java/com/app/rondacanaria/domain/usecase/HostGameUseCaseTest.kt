@@ -111,4 +111,129 @@ class HostGameUseCaseTest {
         assertEquals(1, hostUseCase.gameState.value.currentDeal)
         hostUseCase.stopHost()
     }
+
+    @Test
+    fun `paco se une a la sala de Iriome y suma piedras y cantos para el Equipo B en sala 1v1`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 2)
+        val token = hostUseCase.roomToken
+
+        // Paco envía JOIN_REQUEST
+        val pacoId = "paco-uuid-123"
+        val joinEnvelope = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            joinRequest = JoinRequestPayload(
+                playerName = "Paco",
+                roomToken = token
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", joinEnvelope)
+
+        // Verificar que Paco fue aceptado en TEAM_B
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(2, players.size)
+        val pacoPlayer = players.find { it.id == pacoId }
+        assertNotNull(pacoPlayer)
+        assertEquals(Team.TEAM_B, pacoPlayer?.team)
+
+        // Iniciar partida
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Paco envía SCORE_UPDATE manual (+1 piedra para Equipo B)
+        val scoreEnvelope = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1 piedra manual"
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", scoreEnvelope)
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Paco envía SCORE_UPDATE de canto (RONDA para Equipo B)
+        val cantoEnvelope = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 2L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.RONDA,
+                piedras = 1,
+                reason = "Ronda"
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", cantoEnvelope)
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `paco se une a la sala de Iriome y suma piedras y cantos en sala de 4 jugadores con 2 conectados`() = runBlocking {
+        hostUseCase.startHost("Iriome", maxPlayers = 4)
+        val token = hostUseCase.roomToken
+
+        // Paco envía JOIN_REQUEST
+        val pacoId = "paco-uuid-456"
+        val joinEnvelope = NetworkEnvelope(
+            type = MessageType.JOIN_REQUEST,
+            senderId = pacoId,
+            joinRequest = JoinRequestPayload(
+                playerName = "Paco",
+                roomToken = token
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", joinEnvelope)
+
+        // Verificar asignación a TEAM_B
+        val players = hostUseCase.gameState.value.connectedPlayers
+        assertEquals(2, players.size)
+        val pacoPlayer = players.find { it.id == pacoId }
+        assertNotNull(pacoPlayer)
+        assertEquals(Team.TEAM_B, pacoPlayer?.team)
+
+        // Iniciar partida
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Verificar que maxPlayers se adaptó a 2 y los nombres de equipo son los de los jugadores
+        assertEquals(2, hostUseCase.gameState.value.maxPlayers)
+        assertEquals("Iriome", hostUseCase.gameState.value.nameTeamA)
+        assertEquals("Paco", hostUseCase.gameState.value.nameTeamB)
+
+        // Paco envía SCORE_UPDATE manual (+1 piedra para Equipo B)
+        val scoreEnvelope = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 1L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.MANUAL_ADJUST,
+                piedras = 1,
+                reason = "+1 piedra manual"
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", scoreEnvelope)
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Paco envía SCORE_UPDATE de Canto (RONDA)
+        val cantoEnvelope = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            senderId = pacoId,
+            sequenceNumber = 2L,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = Team.TEAM_B,
+                cantoType = CantoType.RONDA,
+                piedras = 1,
+                reason = "Ronda"
+            )
+        )
+        hostUseCase.handleClientMessage("192.168.1.100:1234", cantoEnvelope)
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
 }

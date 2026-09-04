@@ -19,7 +19,7 @@ Play with a single phone in the center of the table or synchronize scores across
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.03.092026.2)** page.
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.5)** page.
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.

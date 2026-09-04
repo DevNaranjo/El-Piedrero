@@ -47,25 +47,30 @@ fun ScoreBoardScreen(
     val context = LocalContext.current
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
-    val isThreePlayers = gameState.maxPlayers == 3 || uiState.maxPlayers == 3
-    val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2) && !isThreePlayers
+    val isThreePlayers = (gameState.maxPlayers == 3 || uiState.maxPlayers == 3) && gameState.connectedPlayers.size != 2
+    val isTwoPlayers = (gameState.maxPlayers == 2 || uiState.maxPlayers == 2 || (gameState.connectedPlayers.size == 2 && !uiState.isLocalGame)) && !isThreePlayers
 
     val effectiveMyTeam = remember(uiState.myTeam, gameState.connectedPlayers, isTwoPlayers) {
-        if (isMultiplayerClient && isTwoPlayers) {
-            Team.TEAM_B
-        } else if (uiState.isHost && isTwoPlayers) {
-            Team.TEAM_A
-        } else if (uiState.myTeam != Team.SPECTATOR) {
-            uiState.myTeam
-        } else {
-            gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }?.team
-                ?: gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost }?.team
-                ?: if (isMultiplayerClient) Team.TEAM_B else uiState.myTeam
+        when {
+            isMultiplayerClient && isTwoPlayers -> Team.TEAM_B
+            uiState.isHost && isTwoPlayers -> Team.TEAM_A
+            uiState.isHost -> Team.TEAM_A
+            isMultiplayerClient -> {
+                val playerInState = gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }
+                    ?: gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost }
+                when {
+                    playerInState != null && playerInState.team != Team.SPECTATOR -> playerInState.team
+                    uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
+                    else -> Team.TEAM_B
+                }
+            }
+            uiState.myTeam != Team.SPECTATOR -> uiState.myTeam
+            else -> Team.TEAM_A
         }
     }
 
     var selectedTeamForCanto by remember(effectiveMyTeam, isMultiplayerClient) {
-        mutableStateOf(if (isMultiplayerClient && effectiveMyTeam != Team.SPECTATOR && effectiveMyTeam != Team.RESERVE) effectiveMyTeam else Team.TEAM_A)
+        mutableStateOf(if (isMultiplayerClient) effectiveMyTeam else Team.TEAM_A)
     }
     var showExitConfirmationDialog by remember { mutableStateOf(false) }
     var showEndGameConfirmation by remember { mutableStateOf(false) }
@@ -160,7 +165,7 @@ fun ScoreBoardScreen(
     val showTeamD = hasTeamD && !isTeamDReserve
 
     val isMultiplayer = !uiState.isLocalGame
-    val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.SPECTATOR)
+    val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam))
 
     // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
     // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO.

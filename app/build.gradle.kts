@@ -75,6 +75,9 @@ android {
     androidResources {
         noCompress += listOf("mp3", "wav", "ogg", "m4a")
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

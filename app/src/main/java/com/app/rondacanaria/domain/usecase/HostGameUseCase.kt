@@ -168,7 +168,7 @@ class HostGameUseCase(
         }
     }
 
-    private suspend fun handleClientMessage(clientId: String, envelope: NetworkEnvelope) {
+    internal suspend fun handleClientMessage(clientId: String, envelope: NetworkEnvelope) {
         // Validación anti-replay y obsolescencia temporal tolerante para partidas en red local/Zona Wi-Fi (15 min)
         val now = System.currentTimeMillis()
         if (Math.abs(now - envelope.timestamp) > 900_000L) {
@@ -237,17 +237,18 @@ class HostGameUseCase(
                             currentPlayers + player
                         }
 
-                        val updatedTeamAName = if (maxCapacity in listOf(2, 3)) {
+                        val isTwoOrThree = maxCapacity in listOf(2, 3) || updatedPlayers.size in listOf(2, 3)
+                        val updatedTeamAName = if (isTwoOrThree) {
                             updatedPlayers.firstOrNull { it.team == Team.TEAM_A || (it.team == Team.RESERVE && updatedPlayers.indexOf(it) == 0) }?.name ?: _gameState.value.nameTeamA
                         } else {
                             _gameState.value.nameTeamA
                         }
-                        val updatedTeamBName = if (maxCapacity in listOf(2, 3)) {
+                        val updatedTeamBName = if (isTwoOrThree) {
                             updatedPlayers.firstOrNull { it.team == Team.TEAM_B || (it.team == Team.RESERVE && updatedPlayers.indexOf(it) == 1) }?.name ?: _gameState.value.nameTeamB
                         } else {
                             _gameState.value.nameTeamB
                         }
-                        val updatedTeamCName = if (maxCapacity == 3) {
+                        val updatedTeamCName = if (maxCapacity == 3 || updatedPlayers.size == 3) {
                             updatedPlayers.firstOrNull { it.team == Team.TEAM_C || (it.team == Team.RESERVE && updatedPlayers.indexOf(it) == 2) }?.name ?: _gameState.value.nameTeamC
                         } else {
                             _gameState.value.nameTeamC
@@ -329,7 +330,7 @@ class HostGameUseCase(
 
             MessageType.SCORE_UPDATE -> {
                 val scoreUpdate = envelope.scoreUpdate ?: return
-                val isTwoPlayers = _gameState.value.maxPlayers == 2
+                val isTwoPlayers = _gameState.value.maxPlayers == 2 || _gameState.value.connectedPlayers.size == 2
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
 
@@ -694,9 +695,26 @@ class HostGameUseCase(
     suspend fun setGameStatus(newStatus: GameStatus) {
         stateMutex.withLock {
             val current = _gameState.value
-            if (current.status != newStatus) {
+            val actualCount = current.connectedPlayers.size
+            val effectiveMax = if (newStatus == GameStatus.PLAYING && actualCount in listOf(2, 3) && actualCount < current.maxPlayers) {
+                actualCount
+            } else {
+                current.maxPlayers
+            }
+            val updatedTeamAName = if (effectiveMax in listOf(2, 3)) {
+                current.connectedPlayers.getOrNull(0)?.name?.ifBlank { null } ?: current.nameTeamA
+            } else current.nameTeamA
+
+            val updatedTeamBName = if (effectiveMax in listOf(2, 3)) {
+                current.connectedPlayers.getOrNull(1)?.name?.ifBlank { null } ?: current.nameTeamB
+            } else current.nameTeamB
+
+            if (current.status != newStatus || current.maxPlayers != effectiveMax) {
                 _gameState.value = current.copy(
                     status = newStatus,
+                    maxPlayers = effectiveMax,
+                    nameTeamA = updatedTeamAName,
+                    nameTeamB = updatedTeamBName,
                     version = current.version + 1
                 )
             }

@@ -115,7 +115,7 @@ class ScoreViewModel(
         viewModelScope.launch {
             clientUseCase.gameState.collect { state ->
                 if (!_uiState.value.isHost && state != null) {
-                    val isTwoPlayers = state.maxPlayers == 2
+                    val isTwoPlayers = (state.maxPlayers == 2 || state.connectedPlayers.size == 2) && state.maxPlayers != 3
                     val myPlayer = state.connectedPlayers.find { 
                         it.id == clientUseCase.localPlayerId || (it.name.isNotBlank() && it.name == _uiState.value.playerName && !it.isHost)
                     }
@@ -449,6 +449,7 @@ class ScoreViewModel(
             it.copy(
                 isHost = false,
                 isLocalGame = false,
+                myTeam = Team.TEAM_B,
                 currentScreen = AppScreen.CLIENT_SCANNER,
                 connectingHostName = null,
                 errorMessage = null,
@@ -476,7 +477,7 @@ class ScoreViewModel(
                 connectingHostName = info.hostName,
                 errorMessage = null,
                 maxPlayers = info.maxPlayers,
-                myTeam = if (info.maxPlayers in listOf(2, 3)) Team.TEAM_B else it.myTeam
+                myTeam = Team.TEAM_B
             )
         }
         clientUseCase.joinGame(
@@ -502,16 +503,20 @@ class ScoreViewModel(
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            val isTwoPlayers = state.gameState.maxPlayers == 2 || state.maxPlayers == 2
-            val effectiveMyTeam = when {
+            val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
+            var effectiveMyTeam = when {
                 isTwoPlayers && !state.isHost -> Team.TEAM_B
                 isTwoPlayers && state.isHost -> Team.TEAM_A
+                state.isHost -> Team.TEAM_A
                 state.myTeam != Team.SPECTATOR -> state.myTeam
                 else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
                     ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
                     ?: if (!state.isHost) Team.TEAM_B else state.myTeam
             }
-            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR) return
+            if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
+                effectiveMyTeam = Team.TEAM_B
+            }
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
             if (effectiveMyTeam != teamId) return // En multijugador no se puede cantar para el equipo rival
         }
 
@@ -529,16 +534,20 @@ class ScoreViewModel(
         val state = _uiState.value
         if (state.gameState.reserveTeams.contains(teamId)) return
         if (!state.isLocalGame) {
-            val isTwoPlayers = state.gameState.maxPlayers == 2 || state.maxPlayers == 2
-            val effectiveMyTeam = when {
+            val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
+            var effectiveMyTeam = when {
                 isTwoPlayers && !state.isHost -> Team.TEAM_B
                 isTwoPlayers && state.isHost -> Team.TEAM_A
+                state.isHost -> Team.TEAM_A
                 state.myTeam != Team.SPECTATOR -> state.myTeam
                 else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
                     ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
                     ?: if (!state.isHost) Team.TEAM_B else state.myTeam
             }
-            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR) return
+            if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
+                effectiveMyTeam = Team.TEAM_B
+            }
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
             if (effectiveMyTeam != teamId) return // En multijugador no se puede modificar el tanteo del equipo rival
         }
 
@@ -554,16 +563,20 @@ class ScoreViewModel(
 
     fun undoLastMove() {
         val state = _uiState.value
-        val isTwoPlayers = state.gameState.maxPlayers == 2 || state.maxPlayers == 2
-        val effectiveMyTeam = when {
+        val isTwoPlayers = (state.gameState.maxPlayers == 2 || state.maxPlayers == 2 || state.gameState.connectedPlayers.size == 2) && state.gameState.maxPlayers != 3
+        var effectiveMyTeam = when {
             isTwoPlayers && !state.isHost -> Team.TEAM_B
             isTwoPlayers && state.isHost -> Team.TEAM_A
+            state.isHost -> Team.TEAM_A
             state.myTeam != Team.SPECTATOR -> state.myTeam
             else -> state.gameState.connectedPlayers.find { it.id == clientUseCase.localPlayerId }?.team
                 ?: state.gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == state.playerName && !it.isHost }?.team
                 ?: if (!state.isHost) Team.TEAM_B else state.myTeam
         }
-        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE || effectiveMyTeam == Team.SPECTATOR)) return
+        if (!state.isHost && (effectiveMyTeam == Team.SPECTATOR || (effectiveMyTeam == Team.RESERVE && !state.gameState.reserveTeams.contains(Team.TEAM_B)))) {
+            effectiveMyTeam = Team.TEAM_B
+        }
+        if (!state.isLocalGame && (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE)) return
 
         viewModelScope.launch {
             if (state.isHost) {
