@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.7-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-1.0.8-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.7)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.8)**.
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -52,12 +52,12 @@ Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
 
 ---
 
-## 🚀 Novedades de la Versión 1.0.7 (Patch 2)
+## 🚀 Novedades de la Versión 1.0.8
 
-* 🪨 **Sincronización y Modificación de Piedras Multijugador (2, 3, 4, 6 y 8 Jugadores):** Corrección integral del sistema de puntuación para clientes que se unen a la sala. Ahora tanto el anfitrión como todos los jugadores invitados pueden sumar y restar piedras y declarar cantos en tiempo real para sus respectivos equipos sin bloqueos.
-* 🌐 **Resiliencia en Red Local y Hotspot Wi-Fi:** Eliminado el descarte de tramas por desfase horario entre dispositivos y por conflicto de secuencia con los pings de heartbeat sobre TCP, garantizando que cada toque de piedra se procese de inmediato.
+* 🪨 **Corrección Crítica de Sincronización en Dispositivos Físicos (Invitado / Jugador B):** Resolución del error donde los clientes invitados no podían sumar o restar piedras en dispositivos Android reales. La llamada de escritura y vaciado de red (`currentWriter.flush()`) ahora se ejecuta de forma estricta y garantizada bajo `Dispatchers.IO`, evitando excepciones de red (`NetworkOnMainThreadException`) originadas por el hilo de UI.
+* ⚡ **Desbloqueo Inmediato de Sockets TCP:** Corrección del orden de cierre en la desconexión del cliente (`disconnectInternal`), cerrando el `socket` antes que el `reader` para evitar bloqueos por deadlocks en hilos concurrentes que esperan lecturas entrantes.
 * 📱 **Aislamiento de Rol y Enrutamiento en Cliente (`ScoreViewModel`):** Al escanear el QR o unirse a una partida, se asegura el estado `isHost = false` y `isLocalGame = false`, canalizando los eventos de tanteo directamente hacia el servidor socket del anfitrión en lugar de retenerlos localmente.
-* 🎛️ **Personalización de Distribución de Botones:** Nueva pantalla de reordenación de la botonera de jugadas y cánticos accesible desde los ajustes del marcador ("Cambiar Distribución"), con almacenamiento persistente de preferencias.
+* 🎛️ **Personalización de Distribución de Botones:** Pantalla de reordenación de la botonera de jugadas y cánticos accesible desde los ajustes del marcador ("Cambiar Distribución"), con almacenamiento persistente de preferencias.
 * 🃏 **Indicador Dinámico de Repartidor:** Detección y anuncio del siguiente jugador a repartir tras finalizar cada mano o juego.
 * 🔊 **Optimización de Audio y Smart TV:** Solución a la interrupción de música de fondo tras los cánticos y avisos sonoros de Buenas y Victoria.
 * 🧪 **Suite de Pruebas Automatizadas (100% Pasando):** Cobertura exhaustiva en `MultiplayerStoneModificationTest.kt` validando todas las permutaciones de anfitrión/invitado en 2, 3, 4, 6 y 8 jugadores, sincronización bidireccional de `GameState`, reconexión y operaciones consecutivas de suma/resta.

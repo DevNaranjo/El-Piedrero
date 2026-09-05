@@ -195,7 +195,7 @@ class ClientGameUseCase(
         }
     }
 
-    suspend fun requestCanto(teamId: Team, canto: CantoType) {
+    suspend fun requestCanto(teamId: Team, canto: CantoType): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.SCORE_UPDATE,
             sequenceNumber = outgoingSequence.incrementAndGet(),
@@ -207,10 +207,12 @@ class ClientGameUseCase(
                 reason = canto.displayName
             )
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestCanto (${canto.displayName} para $teamId) enviado=$sent (seq=${envelope.sequenceNumber})")
+        sent
     }
 
-    suspend fun requestManualScoreChange(teamId: Team, deltaPiedras: Int, reason: String = "Ajuste manual") {
+    suspend fun requestManualScoreChange(teamId: Team, deltaPiedras: Int, reason: String = "Ajuste manual"): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.SCORE_UPDATE,
             sequenceNumber = outgoingSequence.incrementAndGet(),
@@ -222,23 +224,27 @@ class ClientGameUseCase(
                 reason = reason
             )
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestManualScoreChange (delta=$deltaPiedras para $teamId) enviado=$sent (seq=${envelope.sequenceNumber})")
+        sent
     }
 
-    suspend fun requestEndGame(reason: String = "Fin de partida solicitado") {
+    suspend fun requestEndGame(reason: String = "Fin de partida solicitado"): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.END_GAME,
             sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             endGame = EndGamePayload(reason = reason)
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestEndGame enviado=$sent")
+        sent
     }
 
-    suspend fun requestSwitchTeam(targetTeam: Team) {
-        if (_gameState.value?.maxPlayers == 2) return
+    suspend fun requestSwitchTeam(targetTeam: Team): Boolean = withContext(Dispatchers.IO) {
+        if (_gameState.value?.maxPlayers == 2) return@withContext false
         // En tríos, solo se puede usar suplente antes de contar cualquier piedra
-        if (_gameState.value?.maxPlayers == 3 && _gameState.value?.moveHistory?.isNotEmpty() == true) return
+        if (_gameState.value?.maxPlayers == 3 && _gameState.value?.moveHistory?.isNotEmpty() == true) return@withContext false
         val envelope = NetworkEnvelope(
             type = MessageType.SWITCH_TEAM,
             sequenceNumber = outgoingSequence.incrementAndGet(),
@@ -249,27 +255,33 @@ class ClientGameUseCase(
                 playerName = localPlayerName
             )
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestSwitchTeam ($targetTeam) enviado=$sent")
+        sent
     }
 
-    suspend fun requestUndoLastMove() {
+    suspend fun requestUndoLastMove(): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.UNDO_LAST_MOVE,
             sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestUndoLastMove enviado=$sent")
+        sent
     }
 
-    suspend fun requestUpdateDeal(newDeal: Int) {
-        if (newDeal < 1) return
+    suspend fun requestUpdateDeal(newDeal: Int): Boolean = withContext(Dispatchers.IO) {
+        if (newDeal < 1) return@withContext false
         val envelope = NetworkEnvelope(
             type = MessageType.UPDATE_DEAL,
             sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             updateDeal = UpdateDealPayload(dealNumber = newDeal)
         )
-        socketClient.sendMessage(envelope)
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestUpdateDeal ($newDeal) enviado=$sent")
+        sent
     }
 
     private fun startHeartbeat() {

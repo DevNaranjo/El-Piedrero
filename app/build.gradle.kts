@@ -16,8 +16,8 @@ android {
         applicationId = "com.app.rondacanaria"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.7"
+        versionCode = 4
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

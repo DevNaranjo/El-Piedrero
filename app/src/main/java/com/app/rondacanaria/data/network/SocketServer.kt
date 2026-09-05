@@ -63,6 +63,8 @@ class SocketServer(
     private val _connectedClientsCount = MutableStateFlow(0)
     val connectedClientsCount: StateFlow<Int> = _connectedClientsCount.asStateFlow()
 
+    val boundPort: Int get() = serverSocket?.localPort ?: -1
+
     private val activeClients = ConcurrentHashMap<String, ClientSession>()
 
     private class ClientSession(
@@ -170,8 +172,8 @@ class SocketServer(
         }
     }
 
-    suspend fun sendToClient(clientId: String, message: NetworkEnvelope): Boolean {
-        val session = activeClients[clientId] ?: return false
+    suspend fun sendToClient(clientId: String, message: NetworkEnvelope): Boolean = withContext(Dispatchers.IO) {
+        val session = activeClients[clientId] ?: return@withContext false
         val rawJson = json.encodeToString(message)
         val currentKey = secretKey
         val payloadToSend = if (currentKey != null) {
@@ -179,13 +181,14 @@ class SocketServer(
         } else {
             rawJson + "\n"
         }
-        return try {
+        try {
             session.writeMutex.withLock {
                 session.writer.write(payloadToSend)
                 session.writer.flush()
             }
             true
         } catch (e: Exception) {
+            android.util.Log.e("SocketServer", "Error enviando a $clientId: ${e.message}", e)
             disconnectClient(clientId)
             false
         }
@@ -195,9 +198,9 @@ class SocketServer(
         val session = activeClients.remove(clientId)
         if (session != null) {
             try {
+                session.socket.close()
                 session.reader.close()
                 session.writer.close()
-                session.socket.close()
             } catch (_: Exception) {}
 
             _connectedClientsCount.value = activeClients.size

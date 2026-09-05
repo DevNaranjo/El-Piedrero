@@ -1177,5 +1177,65 @@ class MultiplayerStoneModificationTest {
 
         hostUseCase.stopHost()
     }
+
+    @Test(timeout = 10000)
+    fun `test end-to-end socket real con cifrado AES-256-GCM - Cliente B suma piedras y recibe broadcast de estado`() = runBlocking {
+        val server = com.app.rondacanaria.data.network.SocketServer()
+        val realHostUseCase = HostGameUseCase(server)
+        realHostUseCase.startHost("AnfitrionA", maxPlayers = 2, port = 0)
+        val port = realHostUseCase.boundPort
+        assertTrue("El puerto asignado debe ser válido", port > 0)
+
+        val clientSocket = com.app.rondacanaria.data.network.SocketClient()
+        val realClientUseCase = ClientGameUseCase(clientSocket)
+
+        try {
+            realClientUseCase.joinGame(
+                host = "127.0.0.1",
+                port = port,
+                playerName = "InvitadoB",
+                roomToken = realHostUseCase.roomToken,
+                encryptionKey = realHostUseCase.encryptionKey,
+                hostName = "AnfitrionA"
+            )
+
+            var attempts = 0
+            while (realClientUseCase.sessionStatus.value != SessionStatus.CONNECTED && attempts < 60) {
+                kotlinx.coroutines.delay(100)
+                attempts++
+            }
+            assertEquals(SessionStatus.CONNECTED, realClientUseCase.sessionStatus.value)
+            assertEquals(Team.TEAM_B, realClientUseCase.myTeam.value)
+
+            // Cliente B solicita suma de +1 piedra manual en su equipo
+            val sentManual = realClientUseCase.requestManualScoreChange(Team.TEAM_B, 1, "+1 piedra manual")
+            assertTrue("La trama de ajuste manual debió enviarse por socket", sentManual)
+
+            attempts = 0
+            while ((realClientUseCase.gameState.value?.scoreTeamB?.totalPiedras ?: 0) < 1 && attempts < 60) {
+                kotlinx.coroutines.delay(100)
+                attempts++
+            }
+
+            assertEquals(1, realHostUseCase.gameState.value.scoreTeamB.totalPiedras)
+            assertEquals(1, realClientUseCase.gameState.value?.scoreTeamB?.totalPiedras)
+
+            // Cliente B canta RONDA (+1 piedra)
+            val sentCanto = realClientUseCase.requestCanto(Team.TEAM_B, CantoType.RONDA)
+            assertTrue("La trama de canto debió enviarse por socket", sentCanto)
+
+            attempts = 0
+            while ((realClientUseCase.gameState.value?.scoreTeamB?.totalPiedras ?: 0) < 2 && attempts < 60) {
+                kotlinx.coroutines.delay(100)
+                attempts++
+            }
+
+            assertEquals(2, realHostUseCase.gameState.value.scoreTeamB.totalPiedras)
+            assertEquals(2, realClientUseCase.gameState.value?.scoreTeamB?.totalPiedras)
+        } finally {
+            realClientUseCase.leaveGame()
+            realHostUseCase.stopHost()
+        }
+    }
 }
 

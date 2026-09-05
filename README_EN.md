@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-1.0.7-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.8-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -19,7 +19,7 @@ Play with a single phone in the center of the table or synchronize scores across
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.7)** page.
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.8)** page.
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.
@@ -52,10 +52,10 @@ If you want to install and play Ronda Canaria with friends and family:
 
 ---
 
-## 🚀 What's New in Version 1.0.7 (Patch 2)
+## 🚀 What's New in Version 1.0.8
 
-* 🪨 **Bidirectional Multiplayer Scoring (2, 3, 4, 6 & 8 Players):** Comprehensive fix for scoring and stone modification for joining clients. Both host and all invited players can now add/subtract stones and declare calls in real time for their assigned teams without locks.
-* 🌐 **Local Wi-Fi & Hotspot Resilience:** Removed clock skew packet drop and TCP sequence conflict drops in `HostGameUseCase.kt`, ensuring smooth and immediate packet processing across local Wi-Fi and mobile hotspots.
+* 🪨 **Critical Physical Device Multiplayer Scoring Fix (Guest / Player B):** Fixed an issue on physical Android devices where guest players were unable to add or subtract stones. Network writes and flushes (`currentWriter.flush()`) are now strictly dispatched on `Dispatchers.IO`, preventing `NetworkOnMainThreadException` on Android's main UI thread.
+* ⚡ **Immediate TCP Socket Unblocking:** Resolved potential socket disconnect deadlocks by closing the raw `socket` before the `reader`, cleanly releasing concurrent threads blocked on pending I/O read operations.
 * 📱 **Client Role Isolation (`ScoreViewModel`):** Guaranteed reset of `isHost = false` and `isLocalGame = false` when scanning QR codes or joining a match, routing score events directly to the host socket server.
 * 🎛️ **Full Call Button Customization:** Settings dialog allowing players to reorder call buttons in a personalized 2-column layout with offline persistence.
 * 🃏 **Dynamic Dealer Tracking & Notification:** Clear visual dealer badge and next dealer guidance upon hand completion.

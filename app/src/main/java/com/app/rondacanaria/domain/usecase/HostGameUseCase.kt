@@ -51,6 +51,7 @@ class HostGameUseCase(
 
     val roomToken: String get() = currentRoomToken
     val encryptionKey: String get() = currentEncryptionKey
+    val boundPort: Int get() = socketServer.boundPort
 
     suspend fun restoreGameState(restored: GameState) {
         stateMutex.withLock {
@@ -318,6 +319,7 @@ class HostGameUseCase(
 
             MessageType.SCORE_UPDATE -> {
                 val scoreUpdate = envelope.scoreUpdate ?: return
+                android.util.Log.d("HostGameUseCase", "SCORE_UPDATE recibido: sender=${envelope.senderId}, team=${scoreUpdate.teamId}, piedras=${scoreUpdate.piedras}, reason=${scoreUpdate.reason}")
                 val isTwoPlayers = _gameState.value.maxPlayers == 2 || _gameState.value.connectedPlayers.size == 2
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
@@ -345,6 +347,7 @@ class HostGameUseCase(
 
                 // Los equipos en reserva no pueden recibir puntuación mientras estén en reserva
                 if (_gameState.value.reserveTeams.contains(scoreUpdate.teamId)) {
+                    android.util.Log.w("HostGameUseCase", "Petición de tanteo descartada: el equipo ${scoreUpdate.teamId} está en reserva")
                     return
                 }
 
@@ -357,6 +360,7 @@ class HostGameUseCase(
                 }
 
                 val authorName = senderPlayer?.name?.ifBlank { null } ?: if (effectiveSenderTeam == Team.TEAM_B) _gameState.value.nameTeamB else "Rival"
+                android.util.Log.d("HostGameUseCase", "Aplicando tanteo validado: equipo=${scoreUpdate.teamId}, piedras=$validPiedras, author=$authorName")
                 applyScoreUpdate(scoreUpdate.teamId, scoreUpdate.cantoType, validPiedras, scoreUpdate.reason, authorName)
             }
 

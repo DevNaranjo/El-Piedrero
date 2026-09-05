@@ -16,6 +16,7 @@ import com.app.rondacanaria.domain.usecase.ClientGameUseCase
 import com.app.rondacanaria.domain.usecase.HostGameUseCase
 import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.domain.usecase.TeamChangeRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -544,6 +545,7 @@ class ScoreViewModel(
 
     fun callCanto(teamId: Team, canto: CantoType) {
         val state = _uiState.value
+        android.util.Log.d("ScoreViewModel", "callCanto: ${canto.displayName} para $teamId (isLocal=${state.isLocalGame}, isHost=${state.isHost})")
         if (state.gameState.reserveTeams.contains(teamId)) {
             android.util.Log.w("ScoreViewModel", "Canto ignorado: equipo $teamId está en reserva")
             return
@@ -561,7 +563,7 @@ class ScoreViewModel(
         }
 
         val author = state.playerName
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (state.isHost) {
                 hostUseCase.applyScoreUpdate(teamId, canto, canto.defaultPiedras, canto.displayName, author)
             } else {
@@ -572,6 +574,7 @@ class ScoreViewModel(
 
     fun manualScoreChange(teamId: Team, delta: Int, reason: String = "Ajuste manual") {
         val state = _uiState.value
+        android.util.Log.d("ScoreViewModel", "manualScoreChange: team=$teamId, delta=$delta, isLocal=${state.isLocalGame}, isHost=${state.isHost}")
         if (state.gameState.reserveTeams.contains(teamId)) {
             android.util.Log.w("ScoreViewModel", "Ajuste ignorado: equipo $teamId está en reserva")
             return
@@ -589,7 +592,7 @@ class ScoreViewModel(
         }
 
         val author = state.playerName
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (state.isHost) {
                 hostUseCase.applyScoreUpdate(teamId, CantoType.MANUAL_ADJUST, delta, reason, author)
             } else {
@@ -605,7 +608,7 @@ class ScoreViewModel(
             if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) return
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (state.isHost) {
                 hostUseCase.undoLastMove()
             } else {
@@ -624,7 +627,7 @@ class ScoreViewModel(
         }
         val maxDeals = getMaxDeals(maxP)
         val targetDeal = if (newDeal > maxDeals || newDeal < 1) 1 else newDeal
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (state.isHost || state.isLocalGame) {
                 hostUseCase.setCurrentDeal(targetDeal)
             } else {
@@ -636,7 +639,7 @@ class ScoreViewModel(
     fun applyCardCount(cardCounts: Map<Team, Int>) {
         val state = _uiState.value
         val threshold = if (state.gameState.maxPlayers == 3) 13 else 20
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (state.isHost || state.isLocalGame) {
                 val totalDeckCards = if (state.gameState.maxPlayers == 3) 39 else 40
                 val totalSum = cardCounts.values.sum()

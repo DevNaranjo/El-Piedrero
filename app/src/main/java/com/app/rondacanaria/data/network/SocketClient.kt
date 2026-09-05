@@ -122,10 +122,13 @@ class SocketClient(
         }
     }
 
-    suspend fun sendMessage(message: NetworkEnvelope): Boolean {
-        if (_connectionState.value !is ClientConnectionState.Connected) return false
+    suspend fun sendMessage(message: NetworkEnvelope): Boolean = withContext(Dispatchers.IO) {
+        if (_connectionState.value !is ClientConnectionState.Connected) {
+            android.util.Log.w("SocketClient", "No se puede enviar mensaje: socket no conectado (estado: ${_connectionState.value})")
+            return@withContext false
+        }
 
-        return try {
+        try {
             val rawJson = json.encodeToString(message)
             val currentKey = secretKey
             val payloadToSend = if (currentKey != null) {
@@ -134,12 +137,14 @@ class SocketClient(
                 rawJson + "\n"
             }
             writeMutex.withLock {
-                val currentWriter = writer ?: return false
+                val currentWriter = writer ?: return@withLock
                 currentWriter.write(payloadToSend)
                 currentWriter.flush()
             }
+            android.util.Log.d("SocketClient", "Trama enviada correctamente: ${message.type} (seq=${message.sequenceNumber})")
             true
         } catch (e: Exception) {
+            android.util.Log.e("SocketClient", "Error enviando mensaje: ${e.message}", e)
             _connectionState.value = ClientConnectionState.Error("Error enviando mensaje", e)
             disconnect()
             false
@@ -155,9 +160,9 @@ class SocketClient(
         readJob = null
 
         try {
+            socket?.close()
             reader?.close()
             writer?.close()
-            socket?.close()
         } catch (_: Exception) {}
 
         reader = null
