@@ -77,5 +77,8 @@ class TeamScoreTest {
         assertEquals(1, CantoType.MAJO.defaultPiedras)
         assertEquals(1, CantoType.LIMPIAR.defaultPiedras)
         assertEquals(2, CantoType.MAJO_Y_LIMPIO.defaultPiedras)
+        assertEquals(2, CantoType.CONTRAMAJO.defaultPiedras)
+        assertEquals(3, CantoType.REQUETEMAJO.defaultPiedras)
+        assertEquals(4, CantoType.SOBREMAJO.defaultPiedras)
     }
 }

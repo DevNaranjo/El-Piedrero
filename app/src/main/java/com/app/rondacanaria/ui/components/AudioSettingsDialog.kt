@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeMute
@@ -36,6 +37,7 @@ fun AudioSettingsDialog(
     onToggleMusic: (Boolean) -> Unit,
     onToggleSfx: (Boolean) -> Unit,
     onToggleVibration: (Boolean) -> Unit = {},
+    onSkipSong: () -> Unit = {},
     onOpenCustomizeButtons: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -183,6 +185,28 @@ fun AudioSettingsDialog(
                             valueRange = 0f..1f,
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        FilledTonalButton(
+                            onClick = onSkipSong,
+                            enabled = isMusicEnabled,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Saltar canción",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Saltar de canción ⏭️",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
 

@@ -68,7 +68,8 @@ class HostGameUseCase(
         maxPlayers: Int = 4,
         port: Int = NetworkUtils.DEFAULT_PORT,
         reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList(),
-        initialPlayers: List<Player>? = null
+        initialPlayers: List<Player>? = null,
+        initialStatus: GameStatus = GameStatus.WAITING
     ) {
         if (_isHostRunning.value) {
             stopHost()
@@ -138,7 +139,7 @@ class HostGameUseCase(
             winsTeamC = 0,
             winsTeamD = 0,
             maxPlayers = maxPlayers,
-            status = GameStatus.WAITING,
+            status = initialStatus,
             winnerTeam = null,
             version = 1L,
             connectedPlayers = players,
@@ -331,8 +332,9 @@ class HostGameUseCase(
                     else -> scoreUpdate.teamId
                 }
 
-                // Regla de seguridad multijugador: Los clientes no pueden modificar el tanteo de equipos contrarios ni los reservas ni espectadores
-                if (senderPlayer != null && (effectiveSenderTeam != scoreUpdate.teamId || _gameState.value.reserveTeams.contains(effectiveSenderTeam) || effectiveSenderTeam == Team.RESERVE || effectiveSenderTeam == Team.SPECTATOR)) {
+                // Regla de seguridad multijugador: Los clientes no pueden modificar el tanteo de equipos contrarios salvo si son Líder o Anfitrión
+                val isHostOrLeader = senderPlayer?.isHost == true || senderPlayer?.isLeader == true
+                if (senderPlayer != null && !isHostOrLeader && (effectiveSenderTeam != scoreUpdate.teamId || _gameState.value.reserveTeams.contains(effectiveSenderTeam) || effectiveSenderTeam == Team.RESERVE || effectiveSenderTeam == Team.SPECTATOR)) {
                     android.util.Log.w("HostGameUseCase", "Petición de tanteo descartada: el jugador ${senderPlayer.name} pertenece a $effectiveSenderTeam pero intentó puntuar a ${scoreUpdate.teamId}")
                     return
                 }
@@ -396,6 +398,50 @@ class HostGameUseCase(
                 }
                 val newDeal = envelope.updateDeal?.dealNumber ?: return
                 setCurrentDeal(newDeal)
+            }
+
+            MessageType.SET_DEALER -> {
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
+                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
+                    android.util.Log.w("HostGameUseCase", "Petición SET_DEALER descartada: sender ${envelope.senderId} no es host ni líder")
+                    return
+                }
+                val dealerId = envelope.setDealer?.dealerPlayerId ?: return
+                setDealer(dealerId)
+            }
+
+            MessageType.APPLY_CARD_COUNT -> {
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
+                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
+                    android.util.Log.w("HostGameUseCase", "Petición APPLY_CARD_COUNT descartada: sender ${envelope.senderId} no es host ni líder")
+                    return
+                }
+                val payload = envelope.applyCardCount ?: return
+                val author = payload.authorName.ifBlank { senderPlayer.name }
+                applyCardCount(payload.cardCounts, author)
+            }
+
+            MessageType.RESTART_HAND -> {
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
+                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
+                    android.util.Log.w("HostGameUseCase", "Petición RESTART_HAND descartada: sender ${envelope.senderId} no es host ni líder")
+                    return
+                }
+                restartHand()
+            }
+
+            MessageType.RESET_GAME -> {
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
+                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
+                    android.util.Log.w("HostGameUseCase", "Petición RESET_GAME descartada: sender ${envelope.senderId} no es host ni líder")
+                    return
+                }
+                val resetWins = envelope.resetGame?.resetWins ?: false
+                resetGame(resetWins = resetWins)
             }
 
             else -> {}
@@ -848,8 +894,12 @@ class HostGameUseCase(
             }
             _connectedClients.value = updatedClients
 
+            val hostTeam = currentPlayers.find { it.isHost }?.team ?: Team.TEAM_A
             val updated = currentPlayers.map {
-                if (it.id == playerId) it.copy(team = resolvedTeam) else it
+                if (it.id == playerId) {
+                    val keepLeader = it.isLeader && resolvedTeam != hostTeam && resolvedTeam != Team.SPECTATOR
+                    it.copy(team = resolvedTeam, isLeader = keepLeader)
+                } else it
             }
 
             // En partidas de 3 jugadores, sincronizar reserveTeams cuando alguien pasa a RESERVE o vuelve
@@ -926,6 +976,7 @@ class HostGameUseCase(
     }
 
     suspend fun setCurrentDeal(newDeal: Int) {
+        var reachedLastDeal = false
         stateMutex.withLock {
             val current = _gameState.value
             val maxDeals = getMaxDeals(current.maxPlayers)
@@ -933,6 +984,9 @@ class HostGameUseCase(
             val isRestartingHand = (current.currentDeal >= maxDeals && effectiveDeal == 1)
             val nextDealer = if (isRestartingHand) getNextDealerId(current) else (current.dealerPlayerId ?: current.connectedPlayers.firstOrNull()?.id)
             if (current.currentDeal != effectiveDeal || isRestartingHand) {
+                if (effectiveDeal == maxDeals && current.currentDeal != maxDeals) {
+                    reachedLastDeal = true
+                }
                 val nextHand = if (isRestartingHand) current.currentHand + 1 else current.currentHand
                 _gameState.value = current.copy(
                     currentDeal = effectiveDeal,
@@ -942,6 +996,16 @@ class HostGameUseCase(
                     version = current.version + 1
                 )
             }
+        }
+        if (reachedLastDeal) {
+            val soundPayload = SoundTriggerPayload(SoundType.LAST_DEAL_ULTIMAS)
+            _soundEvents.emit(soundPayload)
+            val soundEnvelope = NetworkEnvelope(
+                type = MessageType.SOUND_TRIGGER,
+                senderId = "HOST",
+                soundTrigger = soundPayload
+            )
+            socketServer.broadcast(soundEnvelope)
         }
         broadcastCurrentState()
     }
@@ -997,6 +1061,34 @@ class HostGameUseCase(
                     version = current.version + 1
                 )
             }
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun setPlayerLeader(playerId: String, isLeader: Boolean) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            val targetPlayer = current.connectedPlayers.find { it.id == playerId } ?: return@withLock
+            val hostTeam = current.connectedPlayers.find { it.isHost }?.team ?: Team.TEAM_A
+            // Solo se permite líder en salas de 4, 6 y 8 jugadores, y solo para miembros de equipos rivales
+            if (current.maxPlayers !in listOf(4, 6, 8)) return@withLock
+            if (targetPlayer.team == hostTeam || targetPlayer.team == Team.SPECTATOR) return@withLock
+
+            val updatedPlayers = current.connectedPlayers.map {
+                if (it.id == playerId) {
+                    it.copy(isLeader = isLeader)
+                } else if (isLeader && it.team == targetPlayer.team) {
+                    // Máximo un líder activo por equipo rival
+                    it.copy(isLeader = false)
+                } else {
+                    it
+                }
+            }
+
+            _gameState.value = current.copy(
+                connectedPlayers = updatedPlayers,
+                version = current.version + 1
+            )
         }
         broadcastCurrentState()
     }

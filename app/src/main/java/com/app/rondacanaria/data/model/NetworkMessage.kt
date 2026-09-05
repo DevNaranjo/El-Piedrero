@@ -16,7 +16,11 @@ enum class MessageType {
     HEARTBEAT_PONG,
     SWITCH_TEAM,
     UNDO_LAST_MOVE,
-    UPDATE_DEAL
+    UPDATE_DEAL,
+    SET_DEALER,
+    APPLY_CARD_COUNT,
+    RESET_GAME,
+    RESTART_HAND
 }
 
 @Serializable
@@ -55,7 +59,8 @@ enum class SoundType {
     JUGADA_SOBREMAJO,
     JUGADA_REQUETECONTRAMAJO,
     PIEDRA_ADD,
-    PIEDRA_SUBTRACT
+    PIEDRA_SUBTRACT,
+    LAST_DEAL_ULTIMAS
 }
 
 @Serializable
@@ -79,7 +84,8 @@ data class Player(
     val id: String,
     val name: String,
     val team: Team,
-    val isHost: Boolean
+    val isHost: Boolean,
+    val isLeader: Boolean = false
 )
 
 @Serializable
@@ -217,6 +223,22 @@ data class UpdateDealPayload(
 )
 
 @Serializable
+data class SetDealerPayload(
+    val dealerPlayerId: String
+)
+
+@Serializable
+data class ApplyCardCountPayload(
+    val cardCounts: Map<Team, Int>,
+    val authorName: String = ""
+)
+
+@Serializable
+data class ResetGamePayload(
+    val resetWins: Boolean = false
+)
+
+@Serializable
 data class NetworkEnvelope(
     val type: MessageType,
     val id: String = UUID.randomUUID().toString(),
@@ -231,5 +253,8 @@ data class NetworkEnvelope(
     val endGame: EndGamePayload? = null,
     val switchTeam: SwitchTeamPayload? = null,
     val updateDeal: UpdateDealPayload? = null,
+    val setDealer: SetDealerPayload? = null,
+    val applyCardCount: ApplyCardCountPayload? = null,
+    val resetGame: ResetGamePayload? = null,
     val gameStateBroadcast: GameState? = null
 )

@@ -143,7 +143,7 @@ fun TvCastDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "💡 Consejo: Para evitar que el audio se trabe por saturación Wi-Fi, usa preferentemente Wi-Fi 5 GHz o instala la app en tu Android TV / Fire TV y únete como Espectador.",
+                                text = "💡 Consejo: Para evitar que el audio se trabe por saturación Wi-Fi, usa preferentemente Wi-Fi 5 GHz.",
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(8.dp)

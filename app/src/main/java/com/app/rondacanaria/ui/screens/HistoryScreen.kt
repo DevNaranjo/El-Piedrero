@@ -32,6 +32,7 @@ fun HistoryScreen(
 ) {
     val history by viewModel.gameHistory.collectAsState()
     var showClearDialog by remember { mutableStateOf(false) }
+    var recordToDelete by remember { mutableStateOf<GameHistoryRecord?>(null) }
 
     Scaffold(
         topBar = {
@@ -80,11 +81,38 @@ fun HistoryScreen(
                     }
 
                     items(history, key = { it.id }) { record ->
-                        HistoryCard(record = record)
+                        HistoryCard(
+                            record = record,
+                            onDelete = { recordToDelete = record }
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (recordToDelete != null) {
+        val record = recordToDelete!!
+        AlertDialog(
+            onDismissRequest = { recordToDelete = null },
+            title = { Text("¿Eliminar partida?") },
+            text = { Text("Se eliminará esta partida ganada por ${record.winnerName} del historial. Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteGameRecord(record.id)
+                        recordToDelete = null
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { recordToDelete = null }) {
+                    Text("Cancelar", textAlign = TextAlign.Center)
+                }
+            }
+        )
     }
 
     if (showClearDialog) {
@@ -112,7 +140,10 @@ fun HistoryScreen(
 }
 
 @Composable
-fun HistoryCard(record: GameHistoryRecord) {
+fun HistoryCard(
+    record: GameHistoryRecord,
+    onDelete: () -> Unit
+) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()) }
     val formattedDate = remember(record.timestamp) { dateFormat.format(Date(record.timestamp)) }
 
@@ -140,17 +171,33 @@ fun HistoryCard(record: GameHistoryRecord) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (record.isLocalGame) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = if (record.isLocalGame) "📱 Local" else "🌐 Red Wi-Fi",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = if (record.isLocalGame) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onTertiaryContainer
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (record.isLocalGame) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Text(
+                            text = if (record.isLocalGame) "📱 Local" else "🌐 Red Wi-Fi",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = if (record.isLocalGame) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar partida",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.75f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 

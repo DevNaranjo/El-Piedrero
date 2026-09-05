@@ -3,14 +3,14 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-1.0.8-orange.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-v1.0--stable%20(Code%201)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-blue.svg?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Android CI](https://github.com/DevNaranjo/El-Piedrero/actions/workflows/android.yml/badge.svg)](https://github.com/DevNaranjo/El-Piedrero/actions)
 
-**El Piedrero** es una aplicación móvil nativa de código abierto para Android diseñada para llevar el tanteo de la tradicional **Ronda Canaria** de forma cómoda, automática y 100% offline (sin conexión a Internet).
+**El Piedrero** es una aplicación móvil nativa de código abierto para Android diseñada para llevar el tanteo de la tradicional **Ronda** de forma cómoda, automática y 100% offline (sin conexión a Internet).
 
 Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las piedras entre varios dispositivos mediante **Wi-Fi Local y código QR**, reproduciendo los audios auténticos de cada canto (*Ronda, Parranda, Caracol, Caracolillo, Majo, Limpiar, Majo y Limpio y ¡Buenas!*), con historial persistente de las **últimas 30 partidas**.
 
@@ -19,7 +19,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases/tag/v1.0.8)**.
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0-stable / versionCode 1**).
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
@@ -42,25 +42,13 @@ Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
   * **6 Jugadores** (3 equipos de 2 con rotación de reservas).
   * **8 Jugadores** (4 equipos de 2 con rotación de reservas).
 * 🎛️ **Distribución de Botones Personalizable:** Permite reorganizar el orden de la botonera de cantos a gusto del usuario y guardarla de forma persistente.
-* 🃏 **Gestión Inteligente de Reparto:** Indicador visible del jugador que reparte y sugerencia del siguiente repartidor al completar cada ciclo de manos.
+* 🃏 **Gestión Inteligente de Reparto y Cartas a la Mesa:** Indicador visible del jugador que reparte, sugerencia del siguiente repartidor al completar cada ciclo y diálogo interactivo oficial para el recuento de las 4 cartas a la mesa en el primer reparto.
 * 🛡️ **Seguridad Criptográfica y Red Local:**
   * **Cifrado AES-256-GCM Extremo a Extremo:** Toda la comunicación por Sockets TCP en la Wi-Fi local viaja cifrada con clave simétrica aleatoria de 256 bits generada por el Host y compartida únicamente a través del código QR físico.
   * **Autenticación con Token de Sala:** Solo los jugadores que hayan escaneado presencialmente el código QR del anfitrión poseen el token de autorización para unirse.
   * **Firma de Producción Oficial:** Compilado en modo Release y firmado con certificado propio de DevNaranjo (sin certificados genéricos de depuración ni flag `testOnly`).
   * **Protocolo con Protección DoS:** Límite estricto de 32 KB por trama contra desbordamientos de memoria.
   * **Búfer Reutilizable en CameraX:** Elimina pausas del Garbage Collector a 60 FPS al escanear el QR.
-
----
-
-## 🚀 Novedades de la Versión 1.0.8
-
-* 🪨 **Corrección Crítica de Sincronización en Dispositivos Físicos (Invitado / Jugador B):** Resolución del error donde los clientes invitados no podían sumar o restar piedras en dispositivos Android reales. La llamada de escritura y vaciado de red (`currentWriter.flush()`) ahora se ejecuta de forma estricta y garantizada bajo `Dispatchers.IO`, evitando excepciones de red (`NetworkOnMainThreadException`) originadas por el hilo de UI.
-* ⚡ **Desbloqueo Inmediato de Sockets TCP:** Corrección del orden de cierre en la desconexión del cliente (`disconnectInternal`), cerrando el `socket` antes que el `reader` para evitar bloqueos por deadlocks en hilos concurrentes que esperan lecturas entrantes.
-* 📱 **Aislamiento de Rol y Enrutamiento en Cliente (`ScoreViewModel`):** Al escanear el QR o unirse a una partida, se asegura el estado `isHost = false` y `isLocalGame = false`, canalizando los eventos de tanteo directamente hacia el servidor socket del anfitrión en lugar de retenerlos localmente.
-* 🎛️ **Personalización de Distribución de Botones:** Pantalla de reordenación de la botonera de jugadas y cánticos accesible desde los ajustes del marcador ("Cambiar Distribución"), con almacenamiento persistente de preferencias.
-* 🃏 **Indicador Dinámico de Repartidor:** Detección y anuncio del siguiente jugador a repartir tras finalizar cada mano o juego.
-* 🔊 **Optimización de Audio y Smart TV:** Solución a la interrupción de música de fondo tras los cánticos y avisos sonoros de Buenas y Victoria.
-* 🧪 **Suite de Pruebas Automatizadas (100% Pasando):** Cobertura exhaustiva en `MultiplayerStoneModificationTest.kt` validando todas las permutaciones de anfitrión/invitado en 2, 3, 4, 6 y 8 jugadores, sincronización bidireccional de `GameState`, reconexión y operaciones consecutivas de suma/resta.
 
 ---
 
@@ -87,8 +75,6 @@ La partida se disputa a un total de **21 Piedras**:
 | **Sobremajo** | **+4** | Cuarto majo consecutivo en mesa. | 🔊 `Sobremajo.mp3` |
 | **Ajuste (+ / -)** | **+1 / -1** | Modificación manual de piedras en cualquier momento. | 📳 Tock / Háptico |
 
----
-
 
 ## 🏗️ Arquitectura y Tecnologías
 
@@ -97,15 +83,15 @@ El proyecto sigue los principios de **Clean Architecture** y **MVVM/MVI reactivo
 ```
 app/src/main/java/com/app/rondacanaria/
 ├── data/
-│   ├── audio/        # RondaAudioPlayer (reproducción con fallback sintético y hápticos)
+│   ├── audio/        # RondaAudioPlayer (búfer de audio prioritario, MediaPlayer y SoundPool)
 │   ├── history/      # GameHistoryRepository y ButtonLayoutPersistence (persistencia JSON offline)
-│   ├── model/        # Modelos de red, paquetes NDJSON, CantoType, TeamScore
-│   └── network/      # SocketServer, SocketClient y utilidades de red local
+│   ├── model/        # Modelos de red, paquetes NDJSON, CantoType, TeamScore, GameState
+│   └── network/      # SocketServer, SocketClient, cifrado AES-256-GCM y utilidades TCP
 ├── domain/
-│   ├── model/        # ConnectionInfo (datos de sala en código QR)
-│   └── usecase/      # HostGameUseCase y ClientGameUseCase (lógica de red y partida)
+│   ├── model/        # ConnectionInfo (datos de sala para código QR)
+│   └── usecase/      # HostGameUseCase y ClientGameUseCase (gestión de sala, roles, turnos y reglas)
 └── ui/
-    ├── components/   # Diálogos: AudioSettingsDialog, CustomizeButtonsDialog, TvCastDialog, etc.
+    ├── components/   # Diálogos: MesaCardsDealDialog, AudioSettingsDialog, CustomizeButtonsDialog, etc.
     ├── qr/           # QrCodeGenerator (optimizado con JNI) y QrCameraScanner (CameraX)
     ├── screens/      # ModeSelection, Lobby, HostLobby, Scanner, Scoreboard, History
     ├── MainActivity.kt
@@ -114,30 +100,43 @@ app/src/main/java/com/app/rondacanaria/
 
 ---
 
-## 🛠️ Compilación y Desarrollo
+## 🛠️ Instrucciones de Ejecución y Mantenimiento
 
-### Requisitos
-* Android Studio Iguana (2023.2.1) o superior.
-* JDK 17 (resuelto automáticamente mediante Gradle Toolchains).
+### Requisitos del Entorno
+* **Android Studio:** Iguana (2023.2.1) o superior (Ladybug / Koala recomendados).
+* **JDK:** Versión 17 (gestionada automáticamente mediante Gradle JVM Toolchains).
+* **Android SDK:** Compile SDK 34, Min SDK 24 (Android 7.0+).
 
-### Comandos de Terminal
+### Comandos de Ejecución y Compilación
 ```bash
-# Clonar el repositorio
+# 1. Clonar el repositorio
 git clone https://github.com/DevNaranjo/El-Piedrero.git
 cd El-Piedrero
 
-# Ejecutar la suite de pruebas unitarias
-# (En Linux, macOS o PowerShell):
-./gradlew test
-# (En Windows CMD / Símbolo del sistema):
-gradlew test
+# 2. Ejecutar la suite completa de pruebas unitarias
+# (Linux / macOS / PowerShell):
+./gradlew testDebugUnitTest
+# (Windows CMD):
+gradlew testDebugUnitTest
 
-# Compilar el APK en modo Debug
-# (En Linux, macOS o PowerShell):
+# 3. Compilar el APK en modo Debug (instalación y pruebas directas)
 ./gradlew assembleDebug
-# (En Windows CMD / Símbolo del sistema):
-gradlew assembleDebug
+
+# Ubicación del APK generado:
+# app/build/outputs/apk/debug/app-debug.apk
+
+# 4. Compilar el APK y Bundle de Producción (Release)
+./gradlew assembleRelease bundleRelease
+
+# Ubicación del APK Release firmado:
+# app/build/outputs/apk/release/app-release.apk
 ```
+
+### Directrices de Mantenimiento
+1. **Reglas de Juego Inmutables:** Los cantos tradicionales y las 21 piedras (11 malas + 10 buenas) son el núcleo de la Ronda Canaria y deben permanecer matemáticamente consistentes en `TeamScore` y `HostGameUseCase`.
+2. **Ciclo de Repartos:** El diálogo `MesaCardsDealDialog` y su botón asociado deben mostrarse únicamente cuando `currentDeal == 1`. En los repartos subsiguientes no deben presentarse opciones de mesa.
+3. **Persistencia Local:** Los estados locales guardados en SharedPreferences mediante `LocalSavedGame` deben migrarse o inicializarse siempre con `status = GameStatus.PLAYING` para evitar bloqueos en la interfaz del marcador.
+4. **Seguridad en Red P2P:** Todo mensaje nuevo en el protocolo NDJSON debe registrarse en `NetworkMessage.kt` y transmitirse con el sobre `NetworkEnvelope` bajo el cifrado AES-256-GCM.
 
 ---
 

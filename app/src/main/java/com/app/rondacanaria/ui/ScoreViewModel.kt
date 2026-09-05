@@ -38,6 +38,7 @@ data class ScoreUiState(
     val teamDName: String = "Equipo D",
     val maxPlayers: Int = 4,
     val isHost: Boolean = false,
+    val isLeader: Boolean = false,
     val isLocalGame: Boolean = false,
     val myTeam: Team = Team.SPECTATOR,
     val gameState: GameState = GameState(gameId = ""),
@@ -133,6 +134,8 @@ class ScoreViewModel(
                         else -> _uiState.value.myTeam
                     }
 
+                    val amILeader = myPlayer?.isLeader == true
+
                     _uiState.update { current ->
                         val targetScreen = if (state.status == GameStatus.PLAYING && current.currentScreen == AppScreen.HOST_LOBBY) {
                             AppScreen.SCOREBOARD
@@ -143,6 +146,7 @@ class ScoreViewModel(
                         }
                         current.copy(
                             isHost = false,
+                            isLeader = amILeader,
                             isLocalGame = false,
                             gameState = state,
                             maxPlayers = state.maxPlayers,
@@ -212,6 +216,11 @@ class ScoreViewModel(
         // Restaurar partida local activa si existe y no se había cerrado formalmente
         val savedLocal = localPersistence.loadLocalGame()
         if (savedLocal != null && savedLocal.gameState.status != GameStatus.FINISHED) {
+            val restoredState = if (savedLocal.gameState.status == GameStatus.WAITING) {
+                savedLocal.gameState.copy(status = GameStatus.PLAYING)
+            } else {
+                savedLocal.gameState
+            }
             _uiState.update { current ->
                 current.copy(
                     isLocalGame = true,
@@ -222,12 +231,12 @@ class ScoreViewModel(
                     teamBName = savedLocal.teamBName,
                     teamCName = savedLocal.teamCName,
                     teamDName = savedLocal.teamDName,
-                    gameState = savedLocal.gameState,
+                    gameState = restoredState,
                     sessionStatus = SessionStatus.CONNECTED
                 )
             }
             viewModelScope.launch {
-                hostUseCase.restoreGameState(savedLocal.gameState)
+                hostUseCase.restoreGameState(restoredState)
             }
         }
     }
@@ -330,7 +339,8 @@ class ScoreViewModel(
             teamDName = teamD,
             maxPlayers = maxPlayers,
             reserveTeams = effectiveReserves,
-            initialPlayers = localPlayers
+            initialPlayers = localPlayers,
+            initialStatus = GameStatus.PLAYING
         )
         _uiState.update {
             it.copy(
@@ -362,6 +372,19 @@ class ScoreViewModel(
         if (_uiState.value.isHost) {
             viewModelScope.launch {
                 hostUseCase.setDealer(dealerPlayerId)
+            }
+        } else if (_uiState.value.isLeader) {
+            viewModelScope.launch {
+                clientUseCase.requestSetDealer(dealerPlayerId)
+            }
+        }
+    }
+
+    fun togglePlayerLeader(playerId: String) {
+        if (_uiState.value.isHost) {
+            val player = _uiState.value.gameState.connectedPlayers.find { it.id == playerId } ?: return
+            viewModelScope.launch {
+                hostUseCase.setPlayerLeader(playerId, !player.isLeader)
             }
         }
     }
@@ -585,9 +608,9 @@ class ScoreViewModel(
                 android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam está en reserva")
                 return
             }
-            if (effectiveMyTeam != teamId) {
+            if (effectiveMyTeam != teamId && !state.isLeader) {
                 android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam intentó modificar tanteo de $teamId")
-                return // En multijugador no se puede modificar el tanteo del equipo rival
+                return // En multijugador los clientes normales no pueden modificar el tanteo del equipo rival
             }
         }
 
@@ -646,6 +669,8 @@ class ScoreViewModel(
                 if (totalSum >= totalDeckCards || cardCounts.any { it.value > threshold }) {
                     hostUseCase.applyCardCount(cardCounts, state.playerName)
                 }
+            } else if (state.isLeader) {
+                clientUseCase.requestApplyCardCount(cardCounts, state.playerName)
             } else {
                 val effectiveMyTeam = getEffectiveLocalTeam()
                 val myCount = cardCounts[effectiveMyTeam] ?: 0
@@ -664,10 +689,12 @@ class ScoreViewModel(
 
     fun restartHand() {
         val state = _uiState.value
-        if (!state.isHost && !state.isLocalGame && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
+        if (!state.isHost && !state.isLocalGame && !state.isLeader && (state.gameState.reserveTeams.contains(state.myTeam) || state.myTeam == Team.RESERVE)) return
         viewModelScope.launch {
             if (state.isHost || state.isLocalGame) {
                 hostUseCase.restartHand()
+            } else if (state.isLeader) {
+                clientUseCase.requestRestartHand()
             } else {
                 clientUseCase.requestUpdateDeal(1)
             }
@@ -704,6 +731,10 @@ class ScoreViewModel(
         if (_uiState.value.isHost || _uiState.value.isLocalGame) {
             viewModelScope.launch {
                 hostUseCase.resetGame(resetWins, newStatus = GameStatus.PLAYING)
+            }
+        } else if (_uiState.value.isLeader) {
+            viewModelScope.launch {
+                clientUseCase.requestResetGame(resetWins)
             }
         }
     }
@@ -761,6 +792,10 @@ class ScoreViewModel(
 
     fun clearGameHistory() {
         historyRepository.clearHistory()
+    }
+
+    fun deleteGameRecord(gameId: String) {
+        historyRepository.deleteGame(gameId)
     }
 
     private fun checkAndRecordVictory(state: GameState) {
@@ -834,9 +869,24 @@ class ScoreViewModel(
         audioPlayer.resumeBackgroundMusic()
     }
 
+    fun pauseAllAudio() {
+        audioPlayer.pauseAllAudio()
+    }
+
+    fun resumeAllAudio() {
+        audioPlayer.resumeAllAudio()
+    }
+
     fun toggleMusic(enabled: Boolean) {
         audioPlayer.isMusicEnabled = enabled
         _uiState.update { it.copy(isMusicEnabled = enabled) }
+    }
+
+    fun skipSong() {
+        if (!audioPlayer.isMusicEnabled) {
+            toggleMusic(true)
+        }
+        audioPlayer.playNextBgmTrack()
     }
 
     fun toggleSfx(enabled: Boolean) {

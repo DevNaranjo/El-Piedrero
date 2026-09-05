@@ -1,6 +1,7 @@
 package com.app.rondacanaria.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -296,6 +297,22 @@ fun HostLobbyScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
+                                } else if (player.isLeader) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        color = Color(0xFFFFD54F).copy(alpha = 0.35f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = BorderStroke(1.dp, Color(0xFFFFA000))
+                                    ) {
+                                        Text(
+                                            text = "👑 Líder",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFE65100),
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
                             }
 
@@ -318,62 +335,84 @@ fun HostLobbyScreen(
                                         FilledTonalButton(
                                             onClick = { viewModel.switchPlayerTeam(player.id, myOriginalTeam) },
                                             modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.filledTonalButtonColors(
-                                                containerColor = Color(0xFFFFE082),
-                                                contentColor = Color(0xFF5D4037)
-                                            )
+                                            shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Icon(Icons.Default.PlayArrow, contentDescription = "Activar jugador", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                            Text("Activar")
                                         }
                                     } else {
                                         OutlinedButton(
                                             onClick = { viewModel.switchPlayerTeam(player.id, Team.RESERVE) },
                                             modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Icon(Icons.Default.PauseCircle, contentDescription = "Poner jugador en reserva", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Reserva", fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                            Text("A la reserva")
                                         }
                                     }
                                 } else {
                                     Surface(
+                                        shape = RoundedCornerShape(8.dp),
                                         color = if (isPlayerReserve) Color(0xFFFFE082) else MaterialTheme.colorScheme.primaryContainer,
-                                        shape = RoundedCornerShape(8.dp)
+                                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                     ) {
-                                        Text(
-                                            text = if (isPlayerReserve) "💤 Reserva" else "En Juego",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isPlayerReserve) Color(0xFF5D4037) else MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                        )
+                                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 8.dp)) {
+                                            Text(
+                                                text = if (isPlayerReserve) "💤 Reserva" else "En Juego",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isPlayerReserve) Color(0xFF5D4037) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 }
                             } else {
+                                val hostTeam = uiState.gameState.connectedPlayers.find { it.isHost }?.team ?: Team.TEAM_A
+                                val canBeLeader = uiState.gameState.maxPlayers in listOf(4, 6, 8) && player.team != hostTeam && player.team != Team.SPECTATOR && !player.isHost
                                 var showTeamMenu by remember { mutableStateOf(false) }
-                                Box {
-                                    Surface(
-                                        color = when (player.team) {
-                                            Team.TEAM_A -> MaterialTheme.colorScheme.primaryContainer
-                                            Team.TEAM_B -> MaterialTheme.colorScheme.secondaryContainer
-                                            Team.TEAM_C -> MaterialTheme.colorScheme.tertiaryContainer
-                                            Team.TEAM_D -> MaterialTheme.colorScheme.surfaceVariant
-                                            Team.RESERVE -> Color(0xFFFFE082)
-                                            Team.SPECTATOR -> MaterialTheme.colorScheme.surfaceVariant
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                            .then(
-                                                if (uiState.isHost) Modifier.clickable { showTeamMenu = true } else Modifier
-                                            )
-                                    ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (uiState.isHost && canBeLeader) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (player.isLeader) Color(0xFFFFD54F) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                            border = BorderStroke(1.dp, if (player.isLeader) Color(0xFFFFA000) else Color.LightGray),
+                                            modifier = Modifier
+                                                .clickable { viewModel.togglePlayerLeader(player.id) }
+                                                .padding(end = 6.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(text = "👑", fontSize = 13.sp)
+                                                if (player.isLeader) {
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    Text(
+                                                        text = "Líder",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFE65100)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Box {
+                                        Surface(
+                                            color = when (player.team) {
+                                                Team.TEAM_A -> MaterialTheme.colorScheme.primaryContainer
+                                                Team.TEAM_B -> MaterialTheme.colorScheme.secondaryContainer
+                                                Team.TEAM_C -> MaterialTheme.colorScheme.tertiaryContainer
+                                                Team.TEAM_D -> MaterialTheme.colorScheme.surfaceVariant
+                                                Team.RESERVE -> Color(0xFFFFE082)
+                                                Team.SPECTATOR -> MaterialTheme.colorScheme.surfaceVariant
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier
+                                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                                .then(
+                                                    if (uiState.isHost) Modifier.clickable { showTeamMenu = true } else Modifier
+                                                )
+                                        ) {
                                         val (teamColor, teamLabel) = when (player.team) {
                                             Team.TEAM_A -> MaterialTheme.colorScheme.onPrimaryContainer to uiState.gameState.nameTeamA
                                             Team.TEAM_B -> MaterialTheme.colorScheme.onSecondaryContainer to uiState.gameState.nameTeamB
@@ -454,6 +493,7 @@ fun HostLobbyScreen(
                     }
                 }
             }
+        }
 
             // Selección de equipos en reserva (solo anfitrión) para 6 y 8 jugadores
             if ((uiState.gameState.maxPlayers == 6 || uiState.gameState.maxPlayers == 8) && uiState.isHost) {

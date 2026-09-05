@@ -284,6 +284,53 @@ class ClientGameUseCase(
         sent
     }
 
+    suspend fun requestSetDealer(dealerPlayerId: String): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.SET_DEALER,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            setDealer = SetDealerPayload(dealerPlayerId = dealerPlayerId)
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestSetDealer ($dealerPlayerId) enviado=$sent")
+        sent
+    }
+
+    suspend fun requestApplyCardCount(cardCounts: Map<Team, Int>, authorName: String): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.APPLY_CARD_COUNT,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            applyCardCount = ApplyCardCountPayload(cardCounts = cardCounts, authorName = authorName)
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestApplyCardCount enviado=$sent")
+        sent
+    }
+
+    suspend fun requestRestartHand(): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.RESTART_HAND,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestRestartHand enviado=$sent")
+        sent
+    }
+
+    suspend fun requestResetGame(resetWins: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.RESET_GAME,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            resetGame = ResetGamePayload(resetWins = resetWins)
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestResetGame (resetWins=$resetWins) enviado=$sent")
+        sent
+    }
+
     private fun startHeartbeat() {
         stopHeartbeat()
         heartbeatJob = useCaseScope?.launch {

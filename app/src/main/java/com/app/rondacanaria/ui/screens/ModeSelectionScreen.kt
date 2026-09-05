@@ -747,6 +747,7 @@ fun ModeSelectionScreen(
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
+            onSkipSong = { viewModel.skipSong() },
             onDismiss = { showAudioSettingsDialog = false }
         )
     }

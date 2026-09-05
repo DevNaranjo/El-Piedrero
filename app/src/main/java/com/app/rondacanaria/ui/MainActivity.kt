@@ -1,7 +1,9 @@
 package com.app.rondacanaria.ui
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Bundle
 import com.app.rondacanaria.data.history.LocalGamePersistence
@@ -45,8 +47,22 @@ class MainActivity : ComponentActivity() {
         super.applyOverrideConfiguration(overrideConfiguration)
     }
 
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                viewModel.pauseAllAudio()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+            registerReceiver(screenOffReceiver, filter)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error registrando screenOffReceiver: ${e.message}")
+        }
         try {
             startService(Intent(this, AppCleanupService::class.java))
         } catch (e: Exception) {
@@ -65,51 +81,54 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                    val uiState by viewModel.uiState.collectAsState()
+                        val uiState by viewModel.uiState.collectAsState()
 
-                    // Interceptar el botón físico o gesto de "Atrás" de Android para no cerrar la app
-                    BackHandler(enabled = uiState.currentScreen != AppScreen.MODE_SELECTION && uiState.currentScreen != AppScreen.SCOREBOARD && uiState.currentScreen != AppScreen.HOST_LOBBY) {
-                        when (uiState.currentScreen) {
-                            AppScreen.HISTORY -> viewModel.goToModeSelection()
-                            AppScreen.LOBBY -> viewModel.goToModeSelection()
-                            AppScreen.CLIENT_SCANNER -> viewModel.goToNetworkLobby()
-                            else -> {}
+                        // Interceptar el botón físico o gesto de "Atrás" de Android para no cerrar la app
+                        BackHandler(enabled = uiState.currentScreen != AppScreen.MODE_SELECTION && uiState.currentScreen != AppScreen.SCOREBOARD && uiState.currentScreen != AppScreen.HOST_LOBBY) {
+                            when (uiState.currentScreen) {
+                                AppScreen.HISTORY -> viewModel.goToModeSelection()
+                                AppScreen.LOBBY -> viewModel.goToModeSelection()
+                                AppScreen.CLIENT_SCANNER -> viewModel.goToNetworkLobby()
+                                else -> {}
+                            }
                         }
-                    }
 
-                    Crossfade(targetState = uiState.currentScreen, label = "ScreenTransition") { screen ->
-                        when (screen) {
-                            AppScreen.MODE_SELECTION -> ModeSelectionScreen(uiState = uiState, viewModel = viewModel)
-                            AppScreen.LOBBY -> LobbyScreen(uiState = uiState, viewModel = viewModel)
-                            AppScreen.HOST_LOBBY -> HostLobbyScreen(uiState = uiState, viewModel = viewModel)
-                            AppScreen.CLIENT_SCANNER -> ScannerScreen(uiState = uiState, viewModel = viewModel)
-                            AppScreen.SCOREBOARD -> ScoreBoardScreen(uiState = uiState, viewModel = viewModel)
-                            AppScreen.HISTORY -> com.app.rondacanaria.ui.screens.HistoryScreen(viewModel = viewModel)
+                        Crossfade(targetState = uiState.currentScreen, label = "ScreenTransition") { screen ->
+                            when (screen) {
+                                AppScreen.MODE_SELECTION -> ModeSelectionScreen(uiState = uiState, viewModel = viewModel)
+                                AppScreen.LOBBY -> LobbyScreen(uiState = uiState, viewModel = viewModel)
+                                AppScreen.HOST_LOBBY -> HostLobbyScreen(uiState = uiState, viewModel = viewModel)
+                                AppScreen.CLIENT_SCANNER -> ScannerScreen(uiState = uiState, viewModel = viewModel)
+                                AppScreen.SCOREBOARD -> ScoreBoardScreen(uiState = uiState, viewModel = viewModel)
+                                AppScreen.HISTORY -> com.app.rondacanaria.ui.screens.HistoryScreen(viewModel = viewModel)
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
 
     override fun onResume() {
         super.onResume()
-        viewModel.resumeBackgroundMusic()
+        viewModel.resumeAllAudio()
     }
 
     override fun onPause() {
         super.onPause()
-        viewModel.pauseBackgroundMusic()
+        viewModel.pauseAllAudio()
     }
 
     override fun onStop() {
         super.onStop()
-        viewModel.pauseBackgroundMusic()
+        viewModel.pauseAllAudio()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            unregisterReceiver(screenOffReceiver)
+        } catch (_: Exception) {}
         if (isFinishing) {
             try {
                 LocalGamePersistence(applicationContext).clearLocalGame()

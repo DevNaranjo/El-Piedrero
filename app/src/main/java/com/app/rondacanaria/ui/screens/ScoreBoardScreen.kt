@@ -35,8 +35,11 @@ import com.app.rondacanaria.data.model.*
 import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.delay
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
+import com.app.rondacanaria.ui.components.MesaCardsDealDialog
 import com.app.rondacanaria.ui.components.TvCastDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +49,15 @@ fun ScoreBoardScreen(
     viewModel: ScoreViewModel
 ) {
     val context = LocalContext.current
+
+    // Mantener la pantalla encendida mientras se disputa la partida
+    DisposableEffect(Unit) {
+        val window = (context as? android.app.Activity)?.window
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     val gameState = uiState.gameState
     val isMultiplayerClient = !uiState.isLocalGame && !uiState.isHost
     val effectiveMaxPlayers = if (gameState.maxPlayers in listOf(2, 3, 4, 6, 8)) gameState.maxPlayers else uiState.maxPlayers
@@ -99,10 +111,28 @@ fun ScoreBoardScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
+    var showMesaCardsDialog by remember { mutableStateOf(false) }
+    var showManageLeadersDialog by remember { mutableStateOf(false) }
+    var lastSeenMesaKey by rememberSaveable(gameState.gameId) { mutableStateOf("") }
+
+    // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa
+    val effectiveGameId = gameState.gameId.ifBlank { "game" }
+    val currentMesaKey = "${effectiveGameId}_H${gameState.currentHand}"
+    LaunchedEffect(effectiveGameId, gameState.currentHand, gameState.currentDeal, gameState.status) {
+        if (gameState.status != GameStatus.FINISHED && gameState.currentDeal == 1 && lastSeenMesaKey != currentMesaKey) {
+            delay(300)
+            lastSeenMesaKey = currentMesaKey
+            showMesaCardsDialog = true
+        }
+    }
 
     // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
     BackHandler {
-        if (showCustomizeButtonsDialog) {
+        if (showManageLeadersDialog) {
+            showManageLeadersDialog = false
+        } else if (showMesaCardsDialog) {
+            showMesaCardsDialog = false
+        } else if (showCustomizeButtonsDialog) {
             showCustomizeButtonsDialog = false
         } else if (showTvCastDialog) {
             showTvCastDialog = false
@@ -190,10 +220,10 @@ fun ScoreBoardScreen(
 
     // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
     // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO.
-    val canModifyA = showTeamA && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_A && !isReserve))
-    val canModifyB = showTeamB && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_B && !isReserve))
-    val canModifyC = showTeamC && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_C && !isReserve))
-    val canModifyD = showTeamD && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_D && !isReserve))
+    val canModifyA = showTeamA && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_A && !isReserve))
+    val canModifyB = showTeamB && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_B && !isReserve))
+    val canModifyC = showTeamC && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_C && !isReserve))
+    val canModifyD = showTeamD && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_D && !isReserve))
 
     val activeTeamsCount = listOf(showTeamA, showTeamB, showTeamC, showTeamD).count { it }
     val isCompactCards = activeTeamsCount > 2
@@ -338,6 +368,16 @@ fun ScoreBoardScreen(
                                     showCustomizeButtonsDialog = true
                                 }
                             )
+                            if (uiState.isHost && !uiState.isLocalGame && gameState.maxPlayers in listOf(4, 6, 8)) {
+                                DropdownMenuItem(
+                                    text = { Text("Gestionar Líderes 👑", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Text("👑", fontSize = 16.sp) },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        showManageLeadersDialog = true
+                                    }
+                                )
+                            }
                         }
                     }
                 },
@@ -462,19 +502,21 @@ fun ScoreBoardScreen(
                             fontSize = 14.sp
                         )
                     }
-                    if (uiState.isHost) {
-                        TextButton(
-                            onClick = {
-                                val activePlayers = gameState.connectedPlayers.filter {
-                                    !gameState.reserveTeams.contains(it.team) && it.team != Team.RESERVE && it.team != Team.SPECTATOR
-                                }.ifEmpty { gameState.connectedPlayers }
-                                val currentIdx = activePlayers.indexOfFirst { it.id == dealerPlayer?.id }
-                                val nextIdx = if (currentIdx != -1) (currentIdx + 1) % activePlayers.size else 0
-                                activePlayers.getOrNull(nextIdx)?.id?.let { viewModel.setDealer(it) }
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text("Cambiar ↺", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (uiState.isHost || uiState.isLeader) {
+                            TextButton(
+                                onClick = {
+                                    val activePlayers = gameState.connectedPlayers.filter {
+                                        !gameState.reserveTeams.contains(it.team) && it.team != Team.RESERVE && it.team != Team.SPECTATOR
+                                    }.ifEmpty { gameState.connectedPlayers }
+                                    val currentIdx = activePlayers.indexOfFirst { it.id == dealerPlayer?.id }
+                                    val nextIdx = if (currentIdx != -1) (currentIdx + 1) % activePlayers.size else 0
+                                    activePlayers.getOrNull(nextIdx)?.id?.let { viewModel.setDealer(it) }
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("Cambiar ↺", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -595,6 +637,22 @@ fun ScoreBoardScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                        }
+                    }
+
+                    if (gameState.currentDeal == 1 && !isReserve) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = { showMesaCardsDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🃏", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Cartas a la Mesa (1.ᵉʳ Reparto)", fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -732,6 +790,7 @@ fun ScoreBoardScreen(
                                 Text(
                                     text = buildString {
                                         append(if (isThreePlayers || isTwoPlayers) "Jugador: $myTeamName" else "Equipo: $myTeamName")
+                                        if (uiState.isLeader) append(" 👑 (Líder)")
                                         if (isMeDealing) append(" 🃏 (Repartes tú)")
                                     },
                                     style = MaterialTheme.typography.bodySmall,
@@ -951,6 +1010,7 @@ fun ScoreBoardScreen(
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
+            onSkipSong = { viewModel.skipSong() },
             onOpenCustomizeButtons = {
                 showAudioSettingsDialog = false
                 showCustomizeButtonsDialog = true
@@ -1076,6 +1136,101 @@ fun ScoreBoardScreen(
                 showCardCountDialog = false
             },
             onDismiss = { showCardCountDialog = false }
+        )
+    }
+
+    // Diálogo de cartas a la mesa al inicio de partida o nuevo reparto
+    if (showMesaCardsDialog) {
+        val dealerTeam = dealerPlayer?.team ?: Team.TEAM_A
+        val dealerTeamName = when (dealerTeam) {
+            Team.TEAM_A -> gameState.nameTeamA
+            Team.TEAM_B -> gameState.nameTeamB
+            Team.TEAM_C -> gameState.nameTeamC
+            Team.TEAM_D -> gameState.nameTeamD
+            else -> "Equipo Repartidor"
+        }
+        val canApplyStones = uiState.isLocalGame || uiState.isHost || uiState.isLeader || effectiveMyTeam == dealerTeam
+
+        MesaCardsDealDialog(
+            dealerName = dealerName,
+            dealerTeam = dealerTeam,
+            dealerTeamName = dealerTeamName,
+            currentDeal = gameState.currentDeal,
+            currentHand = gameState.currentHand,
+            maxDeals = maxDeals,
+            canApply = canApplyStones,
+            onApplyStones = { team, stones, reason ->
+                viewModel.manualScoreChange(team, stones, reason)
+                showMesaCardsDialog = false
+            },
+            onDismiss = { showMesaCardsDialog = false }
+        )
+    }
+
+    // Diálogo de Gestión de Líderes de Equipos Rivales para el Anfitrión (multijugador 4, 6 y 8)
+    if (showManageLeadersDialog) {
+        val hostTeam = gameState.connectedPlayers.find { it.isHost }?.team ?: Team.TEAM_A
+        val rivalPlayers = gameState.connectedPlayers.filter {
+            it.team != hostTeam && it.team != Team.SPECTATOR && !it.isHost
+        }
+        AlertDialog(
+            onDismissRequest = { showManageLeadersDialog = false },
+            title = {
+                Text("👑 Líderes de Equipos Rivales", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Elige a un líder por equipo rival. Tendrá permisos para cambiar repartidor, gestionar la mesa y contar cartas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (rivalPlayers.isEmpty()) {
+                        Text("No hay jugadores en equipos rivales conectados.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        rivalPlayers.forEach { rival ->
+                            val rivalTeamName = when (rival.team) {
+                                Team.TEAM_B -> gameState.nameTeamB
+                                Team.TEAM_C -> gameState.nameTeamC
+                                Team.TEAM_D -> gameState.nameTeamD
+                                Team.RESERVE -> "💤 Reserva"
+                                else -> rival.team.name
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(rival.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(rivalTeamName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                    FilledTonalButton(
+                                        onClick = { viewModel.togglePlayerLeader(rival.id) },
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = if (rival.isLeader) Color(0xFFFFD54F) else MaterialTheme.colorScheme.surfaceVariant,
+                                            contentColor = if (rival.isLeader) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    ) {
+                                        Text(if (rival.isLeader) "👑 Líder" else "Hacer Líder", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showManageLeadersDialog = false }) {
+                    Text("Cerrar")
+                }
+            }
         )
     }
 
@@ -1373,7 +1528,7 @@ fun ScoreBoardScreen(
                 }
             },
             confirmButton = {
-                if (uiState.isHost) {
+                if (uiState.isHost || uiState.isLeader) {
                     Button(onClick = { viewModel.resetGame(resetWins = false) }) {
                         Text("Siguiente Partida", textAlign = TextAlign.Center)
                     }
@@ -1384,10 +1539,23 @@ fun ScoreBoardScreen(
                 }
             },
             dismissButton = {
-                if (uiState.isHost) {
+                if (uiState.isHost || uiState.isLeader) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = { viewModel.returnToHostLobby() }) {
-                            Text("Volver a la Sala", textAlign = TextAlign.Center)
+                        TextButton(
+                            onClick = {
+                                if (uiState.isLocalGame) {
+                                    viewModel.exitGame()
+                                } else if (uiState.isHost) {
+                                    viewModel.returnToHostLobby()
+                                } else {
+                                    showExitConfirmationDialog = true
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = if (uiState.isLocalGame) "Volver al Menú" else (if (uiState.isHost) "Volver a la Sala" else "Salir"),
+                                textAlign = TextAlign.Center
+                            )
                         }
                         TextButton(onClick = { viewModel.resetGame(resetWins = true) }) {
                             Text("Reiniciar a 0", textAlign = TextAlign.Center)
@@ -2481,7 +2649,7 @@ fun MoveHistoryDialog(
                                                     }
 
                                                     Text(
-                                                        text = move.reason + if (move.authorName != null) " (por ${move.authorName})" else "",
+                                                        text = move.reason,
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -2575,7 +2743,7 @@ fun CardCountDialog(
 
     fun updateTeamCount(changedTeam: Team, newCountStr: String) {
         textInputs[changedTeam] = newCountStr
-        if (isLocal && maxPlayers != 3 && activeTeams.size == 2) {
+        if (maxPlayers != 3 && activeTeams.size == 2) {
             val otherTeam = activeTeams.firstOrNull { it.first != changedTeam }?.first
             if (otherTeam != null) {
                 if (newCountStr.isBlank()) {

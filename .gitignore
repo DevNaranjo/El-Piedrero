@@ -82,6 +82,7 @@ $RECYCLE.BIN/
 # ==========================================
 .gemini/
 .antigravity/
+.system_generated/
 .aider*
 .cursor/
 .vscode/

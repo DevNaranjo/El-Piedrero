@@ -2,9 +2,9 @@
 
 **Aplicación:** El Piedrero  
 **Desarrollador / Mantenedor:** DevNaranjo  
-**Versión del Software:** MVP v1.0.7  
+**Versión del Software:** v1.0 (Stable)  
 **Licencia:** Licencia MIT (Open Source)  
-**Fecha de última actualización:** 4 de septiembre de 2026  
+**Fecha de última actualización:** 5 de septiembre de 2026  
 **Repositorio Oficial:** [https://github.com/DevNaranjo/El-Piedrero](https://github.com/DevNaranjo/El-Piedrero)
 
 ---
