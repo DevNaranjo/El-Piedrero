@@ -115,11 +115,38 @@ fun ScoreBoardScreen(
     var showManageLeadersDialog by remember { mutableStateOf(false) }
     var lastSeenMesaKey by rememberSaveable(gameState.gameId) { mutableStateOf("") }
 
+    val dealerPlayer = remember(gameState.dealerPlayerId, gameState.connectedPlayers) {
+        val dId = gameState.dealerPlayerId ?: gameState.connectedPlayers.firstOrNull()?.id
+        gameState.connectedPlayers.find { it.id == dId } ?: gameState.connectedPlayers.firstOrNull()
+    }
+    val dealerName = dealerPlayer?.name ?: (if (isTwoPlayers || isThreePlayers) gameState.nameTeamA else "Jugador 1")
+
+    val myPlayer = remember(uiState.isHost, uiState.isLocalGame, gameState.connectedPlayers, viewModel.localPlayerId, uiState.playerName) {
+        if (uiState.isLocalGame) {
+            null
+        } else if (uiState.isHost) {
+            gameState.connectedPlayers.find { it.isHost }
+        } else {
+            gameState.connectedPlayers.find { it.id == viewModel.localPlayerId }
+                ?: gameState.connectedPlayers.find { it.name.isNotBlank() && it.name == uiState.playerName && !it.isHost }
+        }
+    }
+
+    val isMeDealing = remember(uiState.isLocalGame, dealerPlayer?.id, myPlayer?.id) {
+        if (uiState.isLocalGame) {
+            true
+        } else {
+            dealerPlayer != null && myPlayer != null && dealerPlayer.id == myPlayer.id
+        }
+    }
+
+    val canShowMesaCards = uiState.isLocalGame || isMeDealing
+
     // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa
     val effectiveGameId = gameState.gameId.ifBlank { "game" }
     val currentMesaKey = "${effectiveGameId}_H${gameState.currentHand}"
-    LaunchedEffect(effectiveGameId, gameState.currentHand, gameState.currentDeal, gameState.status) {
-        if (gameState.status != GameStatus.FINISHED && gameState.currentDeal == 1 && lastSeenMesaKey != currentMesaKey) {
+    LaunchedEffect(effectiveGameId, gameState.currentHand, gameState.currentDeal, gameState.status, canShowMesaCards) {
+        if (canShowMesaCards && gameState.status != GameStatus.FINISHED && gameState.currentDeal == 1 && lastSeenMesaKey != currentMesaKey) {
             delay(300)
             lastSeenMesaKey = currentMesaKey
             showMesaCardsDialog = true
@@ -170,12 +197,6 @@ fun ScoreBoardScreen(
         else -> 3
     }
 
-    val dealerPlayer = remember(gameState.dealerPlayerId, gameState.connectedPlayers) {
-        val dId = gameState.dealerPlayerId ?: gameState.connectedPlayers.firstOrNull()?.id
-        gameState.connectedPlayers.find { it.id == dId } ?: gameState.connectedPlayers.firstOrNull()
-    }
-    val dealerName = dealerPlayer?.name ?: (if (isTwoPlayers || isThreePlayers) gameState.nameTeamA else "Jugador 1")
-
     val isDealerInA = dealerPlayer?.team == Team.TEAM_A
     val isDealerInB = dealerPlayer?.team == Team.TEAM_B
     val isDealerInC = dealerPlayer?.team == Team.TEAM_C
@@ -219,11 +240,11 @@ fun ScoreBoardScreen(
     val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam))
 
     // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
-    // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO.
-    val canModifyA = showTeamA && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_A && !isReserve))
-    val canModifyB = showTeamB && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_B && !isReserve))
-    val canModifyC = showTeamC && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_C && !isReserve))
-    val canModifyD = showTeamD && (uiState.isLocalGame || uiState.isHost || (uiState.isLeader && !isReserve) || (effectiveMyTeam == Team.TEAM_D && !isReserve))
+    // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO (muestra candado).
+    val canModifyA = showTeamA && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_A && !isReserve))
+    val canModifyB = showTeamB && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_B && !isReserve))
+    val canModifyC = showTeamC && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_C && !isReserve))
+    val canModifyD = showTeamD && (uiState.isLocalGame || (effectiveMyTeam == Team.TEAM_D && !isReserve))
 
     val activeTeamsCount = listOf(showTeamA, showTeamB, showTeamC, showTeamD).count { it }
     val isCompactCards = activeTeamsCount > 2
@@ -353,8 +374,8 @@ fun ScoreBoardScreen(
                             onDismissRequest = { showSettingsMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Ajustes de Sonido", fontWeight = FontWeight.SemiBold) },
-                                leadingIcon = { Icon(Icons.Default.VolumeUp, contentDescription = null) },
+                                text = { Text("Ajustes y Accesibilidad", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                 onClick = {
                                     showSettingsMenu = false
                                     showAudioSettingsDialog = true
@@ -640,7 +661,7 @@ fun ScoreBoardScreen(
                         }
                     }
 
-                    if (gameState.currentDeal == 1 && !isReserve) {
+                    if (gameState.currentDeal == 1 && !isReserve && canShowMesaCards) {
                         Spacer(modifier = Modifier.height(6.dp))
                         OutlinedButton(
                             onClick = { showMesaCardsDialog = true },
@@ -786,7 +807,6 @@ fun ScoreBoardScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Column {
-                                val isMeDealing = dealerPlayer?.id == (if (uiState.isHost) gameState.connectedPlayers.find { it.isHost }?.id else viewModel.localPlayerId)
                                 Text(
                                     text = buildString {
                                         append(if (isThreePlayers || isTwoPlayers) "Jugador: $myTeamName" else "Equipo: $myTeamName")
@@ -920,14 +940,18 @@ fun ScoreBoardScreen(
                 val buttonPairs = uiState.cantoButtonOrder.chunked(2)
                 buttonPairs.forEach { pair ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         pair.forEach { cantoType ->
                             CantoActionButton(
                                 cantoType = cantoType,
                                 onClick = { viewModel.callCanto(cantoTargetTeam, cantoType) },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
                             )
                         }
                         if (pair.size == 1) {
@@ -1004,12 +1028,14 @@ fun ScoreBoardScreen(
             isMusicEnabled = uiState.isMusicEnabled,
             isSfxEnabled = uiState.isSfxEnabled,
             isVibrationEnabled = uiState.isVibrationEnabled,
+            fontScale = uiState.fontScale,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
             onToggleMusic = { viewModel.toggleMusic(it) },
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
+            onFontScaleChange = { viewModel.setFontScale(it) },
             onSkipSong = { viewModel.skipSong() },
             onOpenCustomizeButtons = {
                 showAudioSettingsDialog = false
@@ -1140,7 +1166,7 @@ fun ScoreBoardScreen(
     }
 
     // Diálogo de cartas a la mesa al inicio de partida o nuevo reparto
-    if (showMesaCardsDialog) {
+    if (showMesaCardsDialog && canShowMesaCards) {
         val dealerTeam = dealerPlayer?.team ?: Team.TEAM_A
         val dealerTeamName = when (dealerTeam) {
             Team.TEAM_A -> gameState.nameTeamA
@@ -1149,7 +1175,7 @@ fun ScoreBoardScreen(
             Team.TEAM_D -> gameState.nameTeamD
             else -> "Equipo Repartidor"
         }
-        val canApplyStones = uiState.isLocalGame || uiState.isHost || uiState.isLeader || effectiveMyTeam == dealerTeam
+        val canApplyStones = uiState.isLocalGame || isMeDealing
 
         MesaCardsDealDialog(
             dealerName = dealerName,
@@ -1426,6 +1452,7 @@ fun ScoreBoardScreen(
             title = { Text("¡Partida Ganada! 🏆", textAlign = TextAlign.Center) },
             text = {
                 Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -1525,6 +1552,31 @@ fun ScoreBoardScreen(
                             )
                         }
                     }
+
+                    if (gameState.moveHistory.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = { viewModel.undoLastMove() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = "Deshacer última jugada",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Deshacer última jugada",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -1606,14 +1658,28 @@ fun RondaScoreCard(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = teamName,
-                    fontSize = if (isCompact) 14.sp else 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = teamName,
+                        fontSize = if (isCompact) 14.sp else 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!canModify) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Equipo rival bloqueado",
+                            tint = contentColor.copy(alpha = 0.75f),
+                            modifier = Modifier.size(if (isCompact) 13.dp else 15.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(1.dp))
                 Surface(
                     color = if (wins > 0) Color(0xFFFFB300) else contentColor.copy(alpha = 0.18f),
@@ -3214,7 +3280,7 @@ private fun CantoActionButton(
 
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
+        modifier = modifier.defaultMinSize(minHeight = 48.dp),
         shape = RoundedCornerShape(12.dp),
         contentPadding = contentPadding,
         colors = colors

@@ -83,9 +83,11 @@ $RECYCLE.BIN/
 .gemini/
 .antigravity/
 .system_generated/
+.user_uploaded/
 .aider*
 .cursor/
 .vscode/
 *.orig
 Github.txt
+
 

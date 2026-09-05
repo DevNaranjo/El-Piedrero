@@ -817,11 +817,11 @@ class HostGameUseCase(
             val newScoreC = if (teamId == Team.TEAM_C) TeamScore.calculate(revertedTotal) else current.scoreTeamC
             val newScoreD = if (teamId == Team.TEAM_D) TeamScore.calculate(revertedTotal) else current.scoreTeamD
 
-            val hadWon = current.winnerTeam == teamId
-            val newWinsA = if (hadWon && teamId == Team.TEAM_A) maxOf(0, current.winsTeamA - 1) else current.winsTeamA
-            val newWinsB = if (hadWon && teamId == Team.TEAM_B) maxOf(0, current.winsTeamB - 1) else current.winsTeamB
-            val newWinsC = if (hadWon && teamId == Team.TEAM_C) maxOf(0, current.winsTeamC - 1) else current.winsTeamC
-            val newWinsD = if (hadWon && teamId == Team.TEAM_D) maxOf(0, current.winsTeamD - 1) else current.winsTeamD
+            val hadWon = current.winnerTeam != null || current.status == GameStatus.FINISHED
+            val newWinsA = if (current.winnerTeam == Team.TEAM_A) maxOf(0, current.winsTeamA - 1) else current.winsTeamA
+            val newWinsB = if (current.winnerTeam == Team.TEAM_B) maxOf(0, current.winsTeamB - 1) else current.winsTeamB
+            val newWinsC = if (current.winnerTeam == Team.TEAM_C) maxOf(0, current.winsTeamC - 1) else current.winsTeamC
+            val newWinsD = if (current.winnerTeam == Team.TEAM_D) maxOf(0, current.winsTeamD - 1) else current.winsTeamD
 
             val newStatus = if (hadWon) GameStatus.PLAYING else current.status
             val newWinner = if (hadWon) null else current.winnerTeam

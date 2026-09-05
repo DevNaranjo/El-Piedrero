@@ -87,6 +87,7 @@ class RondaAudioPlayer(private val context: Context) {
     private var isPlayingBuenas = false
     private var isPlayingVictory = false
     private var isPlayingOneStoneToWin = false
+    private var isPlayingUltimas = false
     private val playerLock = Any()
     private val bgmLock = Any()
 
@@ -334,6 +335,7 @@ class RondaAudioPlayer(private val context: Context) {
             isPlayingBuenas = false
             isPlayingVictory = false
             isPlayingOneStoneToWin = false
+            isPlayingUltimas = false
             stopActiveMediaPlayerOnly()
             updateBgmVolume()
         }
@@ -369,7 +371,7 @@ class RondaAudioPlayer(private val context: Context) {
         triggerHapticFeedback(type)
         if (!isSfxEnabled) return
 
-        if (type == SoundType.ENTERED_BUENAS || type == SoundType.ONE_STONE_TO_WIN || type == SoundType.GAME_WON) {
+        if (type == SoundType.ENTERED_BUENAS || type == SoundType.ONE_STONE_TO_WIN || type == SoundType.GAME_WON || type == SoundType.LAST_DEAL_ULTIMAS) {
             // Si hay un cántico de voz sonando, se encola para sonar inmediatamente al terminar dicho cántico sin cortarlo
             synchronized(playerLock) {
                 if (isPlayingVoice) {
@@ -380,24 +382,25 @@ class RondaAudioPlayer(private val context: Context) {
                 isPlayingBuenas = (type == SoundType.ENTERED_BUENAS)
                 isPlayingVictory = (type == SoundType.GAME_WON)
                 isPlayingOneStoneToWin = (type == SoundType.ONE_STONE_TO_WIN)
+                isPlayingUltimas = (type == SoundType.LAST_DEAL_ULTIMAS)
             }
             playVoiceType(type)
         } else if (isStoneSound(type)) {
-            // El sonido de sumar o restar piedras NO debe cortar el audio de cuando estás en buenas o al ganar la partida
+            // El sonido de sumar o restar piedras NO debe cortar el audio de cuando estás en buenas, últimas o al ganar la partida
             synchronized(playerLock) {
-                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin) {
-                    // Reproducir el sonido de la piedra en paralelo sin interrumpir el audio de Buenas, Queda Una o Victoria
+                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin || isPlayingUltimas) {
+                    // Reproducir el sonido de la piedra en paralelo sin interrumpir el audio de Buenas, Queda Una, Victoria o Últimas
                     playSfx(type)
                     return
                 }
             }
             playSfx(type)
         } else {
-            // Si está sonando el audio de Buenas (o Queda Una o Victoria),
+            // Si está sonando el audio de Buenas (o Queda Una o Victoria o Últimas, o están encolados),
             // NO cortar dicho audio si se canta algo: encolar el cántico para que se reproduzca
             // al terminar, tal y como ocurre a la inversa para no cortar los cánticos.
             synchronized(playerLock) {
-                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin) {
+                if (isPlayingBuenas || isPlayingVictory || isPlayingOneStoneToWin || isPlayingUltimas || voiceAudioQueue.any { it == SoundType.ENTERED_BUENAS || it == SoundType.LAST_DEAL_ULTIMAS || it == SoundType.ONE_STONE_TO_WIN || it == SoundType.GAME_WON }) {
                     if (isVoiceAudio(type)) {
                         voiceAudioQueue.offer(type)
                     }
@@ -679,6 +682,7 @@ class RondaAudioPlayer(private val context: Context) {
             isPlayingBuenas = (type == SoundType.ENTERED_BUENAS)
             isPlayingVictory = (type == SoundType.GAME_WON)
             isPlayingOneStoneToWin = (type == SoundType.ONE_STONE_TO_WIN)
+            isPlayingUltimas = (type == SoundType.LAST_DEAL_ULTIMAS)
         }
         updateBgmVolume()
         val volume = if (type == SoundType.GAME_WON) getEffectiveSfxVolume(0.35f) else getEffectiveSfxVolume(1.0f)
@@ -692,6 +696,9 @@ class RondaAudioPlayer(private val context: Context) {
                 }
                 if (type == SoundType.ONE_STONE_TO_WIN) {
                     isPlayingOneStoneToWin = false
+                }
+                if (type == SoundType.LAST_DEAL_ULTIMAS) {
+                    isPlayingUltimas = false
                 }
             }
             onVoiceCompleted()
@@ -709,6 +716,9 @@ class RondaAudioPlayer(private val context: Context) {
                 if (type == SoundType.ONE_STONE_TO_WIN) {
                     isPlayingOneStoneToWin = false
                 }
+                if (type == SoundType.LAST_DEAL_ULTIMAS) {
+                    isPlayingUltimas = false
+                }
             }
             onVoiceCompleted()
         }
@@ -724,6 +734,7 @@ class RondaAudioPlayer(private val context: Context) {
                 isPlayingBuenas = false
                 isPlayingVictory = false
                 isPlayingOneStoneToWin = false
+                isPlayingUltimas = false
                 updateBgmVolume()
             }
         }

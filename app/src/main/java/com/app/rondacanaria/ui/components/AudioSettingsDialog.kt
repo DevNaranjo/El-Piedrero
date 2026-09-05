@@ -1,9 +1,13 @@
 package com.app.rondacanaria.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
@@ -21,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.app.rondacanaria.data.history.AccessibilityPersistence
 import kotlin.math.roundToInt
 
 @Composable
@@ -31,12 +36,14 @@ fun AudioSettingsDialog(
     isMusicEnabled: Boolean,
     isSfxEnabled: Boolean,
     isVibrationEnabled: Boolean = true,
+    fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
     onMasterVolumeChange: (Float) -> Unit,
     onMusicVolumeChange: (Float) -> Unit,
     onSfxVolumeChange: (Float) -> Unit,
     onToggleMusic: (Boolean) -> Unit,
     onToggleSfx: (Boolean) -> Unit,
     onToggleVibration: (Boolean) -> Unit = {},
+    onFontScaleChange: (Float) -> Unit = {},
     onSkipSong: () -> Unit = {},
     onOpenCustomizeButtons: (() -> Unit)? = null,
     onDismiss: () -> Unit
@@ -54,7 +61,7 @@ fun AudioSettingsDialog(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Ajustes de Sonido",
+                    text = "Ajustes y Accesibilidad",
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
@@ -64,6 +71,7 @@ fun AudioSettingsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -328,6 +336,92 @@ fun AudioSettingsDialog(
                                 onCheckedChange = onToggleVibration,
                                 modifier = Modifier.height(28.dp)
                             )
+                        }
+                    }
+                }
+
+                // 5. Accesibilidad: Tamaño de Fuente / Texto
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FormatSize,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Tamaño de Fuente",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = "Ajusta la visibilidad sin alterar los botones",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val options = listOf(
+                                Triple("Normal", "100%", AccessibilityPersistence.FONT_SCALE_NORMAL),
+                                Triple("Grande", "+12%", AccessibilityPersistence.FONT_SCALE_LARGE),
+                                Triple("Extra", "+25%", AccessibilityPersistence.FONT_SCALE_EXTRA_LARGE)
+                            )
+                            options.forEach { (label, percent, scale) ->
+                                val isSelected = kotlin.math.abs(fontScale - scale) < 0.03f
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onFontScaleChange(scale) }
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.5.sp,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = percent,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -69,11 +69,12 @@ class MainActivity : ComponentActivity() {
             android.util.Log.e("MainActivity", "Error iniciando AppCleanupService: ${e.message}")
         }
         setContent {
+            val uiState by viewModel.uiState.collectAsState()
             val currentDensity = LocalDensity.current
             CompositionLocalProvider(
                 LocalDensity provides Density(
                     density = currentDensity.density,
-                    fontScale = 1.0f
+                    fontScale = uiState.fontScale
                 )
             ) {
                 MaterialTheme {
@@ -81,7 +82,6 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        val uiState by viewModel.uiState.collectAsState()
 
                         // Interceptar el botón físico o gesto de "Atrás" de Android para no cerrar la app
                         BackHandler(enabled = uiState.currentScreen != AppScreen.MODE_SELECTION && uiState.currentScreen != AppScreen.SCOREBOARD && uiState.currentScreen != AppScreen.HOST_LOBBY) {

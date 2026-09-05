@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.rondacanaria.data.audio.RondaAudioPlayer
+import com.app.rondacanaria.data.history.AccessibilityPersistence
 import com.app.rondacanaria.data.history.ButtonLayoutPersistence
 import com.app.rondacanaria.data.history.DEFAULT_CANTO_BUTTON_ORDER
 import com.app.rondacanaria.data.history.GameHistoryRepository
@@ -55,7 +56,8 @@ data class ScoreUiState(
     val sfxVolume: Float = 0.9f,
     val isTvAudioOptimizationEnabled: Boolean = true,
     val isTvCastingActive: Boolean = false,
-    val cantoButtonOrder: List<CantoType> = DEFAULT_CANTO_BUTTON_ORDER
+    val cantoButtonOrder: List<CantoType> = DEFAULT_CANTO_BUTTON_ORDER,
+    val fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL
 )
 
 class ScoreViewModel(
@@ -68,6 +70,7 @@ class ScoreViewModel(
     private val historyRepository = GameHistoryRepository(application.applicationContext)
     private val localPersistence = LocalGamePersistence(application.applicationContext)
     private val buttonLayoutPersistence = ButtonLayoutPersistence(application.applicationContext)
+    private val accessibilityPersistence = AccessibilityPersistence(application.applicationContext)
     val gameHistory: StateFlow<List<GameHistoryRecord>> = historyRepository.history
     private var lastRecordedGameId: String? = null
 
@@ -81,7 +84,8 @@ class ScoreViewModel(
             sfxVolume = audioPlayer.sfxVolume,
             isTvAudioOptimizationEnabled = audioPlayer.isTvAudioOptimizationEnabled,
             isTvCastingActive = audioPlayer.isTvCastingActive,
-            cantoButtonOrder = buttonLayoutPersistence.loadButtonOrder()
+            cantoButtonOrder = buttonLayoutPersistence.loadButtonOrder(),
+            fontScale = accessibilityPersistence.loadFontScale()
         )
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
@@ -608,9 +612,9 @@ class ScoreViewModel(
                 android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam está en reserva")
                 return
             }
-            if (effectiveMyTeam != teamId && !state.isLeader) {
+            if (effectiveMyTeam != teamId) {
                 android.util.Log.w("ScoreViewModel", "Ajuste ignorado: jugador local $effectiveMyTeam intentó modificar tanteo de $teamId")
-                return // En multijugador los clientes normales no pueden modificar el tanteo del equipo rival
+                return // En multijugador no se puede modificar el tanteo del equipo rival
             }
         }
 
@@ -834,6 +838,9 @@ class ScoreViewModel(
             historyRepository.saveGame(record)
             lastRecordedGameId = state.gameId
             localPersistence.clearLocalGame()
+        } else if (winner == null && lastRecordedGameId != null && lastRecordedGameId == state.gameId) {
+            historyRepository.deleteGame(state.gameId)
+            lastRecordedGameId = null
         }
     }
 
@@ -856,7 +863,9 @@ class ScoreViewModel(
                 musicVolume = audioPlayer.musicVolume,
                 sfxVolume = audioPlayer.sfxVolume,
                 isTvAudioOptimizationEnabled = audioPlayer.isTvAudioOptimizationEnabled,
-                isTvCastingActive = audioPlayer.isTvCastingActive
+                isTvCastingActive = audioPlayer.isTvCastingActive,
+                cantoButtonOrder = it.cantoButtonOrder,
+                fontScale = it.fontScale
             )
         }
     }
@@ -927,6 +936,11 @@ class ScoreViewModel(
     fun resetCantoButtonOrder() {
         buttonLayoutPersistence.resetButtonOrder()
         _uiState.update { it.copy(cantoButtonOrder = DEFAULT_CANTO_BUTTON_ORDER) }
+    }
+
+    fun setFontScale(scale: Float) {
+        accessibilityPersistence.saveFontScale(scale)
+        _uiState.update { it.copy(fontScale = scale) }
     }
 
     override fun onCleared() {
