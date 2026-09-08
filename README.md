@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-v1.0.1%20(Code%202)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-v1.0.2%20(Code%203)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -16,20 +16,31 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 
 ---
 
-## 🚀 Novedades de la Versión 1.0.1 (Parche v1.0.1)
+## 🚀 Novedades de la Versión 1.0.2 (Parche v1.0.2)
 
-* 🃏 **"Cartas a la Mesa" Exclusivo del Repartidor:** En partidas en red, el diálogo y botón de recuento de las 4 cartas iniciales solo se muestran al jugador que reparte la mano.
-* 🔊 **Prioridad y Continuidad Sonora ("Buenas" y "Últimas"):** La locución de *"¡Buenas!"* queda blindada en cola y ya no se interrumpe ni se corta al entrar inmediatamente en el último reparto (*"¡Últimas!"*).
-* 👁️ **Accesibilidad de Tamaño de Fuente Protegida:** Nuevo menú de Accesibilidad en Ajustes con 3 niveles (*Normal 100%*, *Grande +12%* y *Extra +25%*). Los botones de cantos y marcadores adaptan su altura manteniendo la simetría y sin descuadrar la interfaz.
-* ↩️ **Botón Deshacer al Ganar / Terminar Partida:** Si una partida finaliza por error o un toque involuntario, el diálogo de victoria incluye ahora un botón para **deshacer la última jugada**, restaurando el tanteo, victorias, turno de reparto e historial limpio.
-* 🔒 **Candado Reforzado en Multijugador:** Se bloquea de forma estricta cualquier modificación de piedras del equipo rival en partidas por red, mostrando el candado 🔒 y la etiqueta *"Equipo Rival"* tanto para anfitriones como para invitados.
+* 🔠 **Escalabilidad y Protección con Fuente Extra Grande (+25%):**
+  * Solucionado el problema donde los botones se encogían y los textos desbordaban al activar tipografías grandes en el menú de Accesibilidad.
+  * **Tarjetas de tanteo elásticas:** Las tarjetas adaptan dinámicamente su altura según la escala tipográfica activa, evitando que el texto de malas/buenas y puntos comprima la fila de botones de suma y resta.
+  * **Ajuste inteligente de cantos:** Los botones de cantos largos (*"Requetecontramajo (+4)"*, *"Majo y Limpio (+2)"*, *"Caracolillo (+5)"*) soportan ajuste en dos líneas con interlineado optimizado sin recortar nombres ni puntuación.
+  * **Acciones elásticas sin compresión:** La botonera de reparto, *"Deshacer"* y *"Terminar Partida"* ahora utilizan alturas mínimas adaptables en lugar de fijas, preservando la proporción en cualquier tamaño de pantalla.
+* ⏳ **Miniventana Flotante de Recordatorio de Reparto:**
+  * Si los jugadores se despistan y olvidan avanzar al siguiente reparto, transcurrido 1 minuto tras pulsar `+` (o tras comenzar la partida en el 1.ᵉʳ reparto), aparece automáticamente una miniventana flotante no intrusiva.
+  * Permite avanzar directamente con un toque (*"Reparto Xº"*) o descartar si siguen disputando la mano (*"Aún jugando"* / ✕).
+  * En el último reparto, recuerda el paso al *"Recuento de Cartas"*. Se oculta al instante al cambiar de reparto o finalizar la partida.
+* 👑 **Opción Contextual "De Bufos" en Cantos:**
+  * Al cantar **Ronda** o **Parranda**, aparece un botón extra *"De bufos (+1)"* para sumar 1 piedra adicional de rey/bufo.
+  * Al cantar **Caracol** o **Caracolillo**, el botón extra permite sumar **+2 piedras** adicionales (*"De bufos (+2)"*).
+  * **Exclusivo del reparto en curso:** La opción solo permanece activa durante el reparto en el que se efectuó el canto, expirando y ocultándose automáticamente al cambiar de mano/reparto.
+* 👥 **Pantalla de Espera en Multijugador durante el Reparto de Cartas a la Mesa:**
+  * Al comenzar la mano (1.ᵉʳ reparto), el repartidor/líder visualiza la pantalla interactiva de las 4 cartas de la mesa mientras que a los demás jugadores conectados les aparece una pantalla informativa de espera indicando quién está repartiendo.
+  * Se sincroniza en tiempo real: se cierra automáticamente en todos los móviles en cuanto el repartidor aplica las piedras o concluye el recuento (incluso con 0 piedras), o bien manualmente pulsando *"Entendido"*.
 
 ---
 
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0.1 / versionCode 2**).
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0.2 / versionCode 3**).
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.

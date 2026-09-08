@@ -519,7 +519,7 @@ class HostGameUseCase(
             }
             val effectiveDelta = newTotal - oldTotal
 
-            val updatedHistory = if (effectiveDelta != 0) {
+            val updatedHistory = if (effectiveDelta != 0 || reason.startsWith("Cartas a la mesa")) {
                 val moveDesc = when {
                     reason.isNotBlank() -> reason
                     cantoType != null -> cantoType.displayName

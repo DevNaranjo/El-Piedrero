@@ -1,6 +1,8 @@
 package com.app.rondacanaria.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -40,6 +43,7 @@ import kotlinx.coroutines.delay
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
 import com.app.rondacanaria.ui.components.MesaCardsDealDialog
+import com.app.rondacanaria.ui.components.MesaWaitingDialog
 import com.app.rondacanaria.ui.components.TvCastDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,8 +116,13 @@ fun ScoreBoardScreen(
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
     var showMesaCardsDialog by remember { mutableStateOf(false) }
+    var showMesaWaitingDialog by remember { mutableStateOf(false) }
     var showManageLeadersDialog by remember { mutableStateOf(false) }
     var lastSeenMesaKey by rememberSaveable(gameState.gameId) { mutableStateOf("") }
+    var showDealReminder by remember { mutableStateOf(false) }
+    var activeBufoOption by remember { mutableStateOf<ActiveBufoOption?>(null) }
+
+    val isMultiplayer = !uiState.isLocalGame
 
     val dealerPlayer = remember(gameState.dealerPlayerId, gameState.connectedPlayers) {
         val dId = gameState.dealerPlayerId ?: gameState.connectedPlayers.firstOrNull()?.id
@@ -142,14 +151,25 @@ fun ScoreBoardScreen(
 
     val canShowMesaCards = uiState.isLocalGame || isMeDealing
 
-    // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa
+    // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa (al repartidor) o pantalla de espera (a los demás jugadores)
     val effectiveGameId = gameState.gameId.ifBlank { "game" }
     val currentMesaKey = "${effectiveGameId}_H${gameState.currentHand}"
     LaunchedEffect(effectiveGameId, gameState.currentHand, gameState.currentDeal, gameState.status, canShowMesaCards) {
-        if (canShowMesaCards && gameState.status != GameStatus.FINISHED && gameState.currentDeal == 1 && lastSeenMesaKey != currentMesaKey) {
+        if (gameState.status != GameStatus.FINISHED && gameState.currentDeal == 1 && lastSeenMesaKey != currentMesaKey) {
             delay(300)
             lastSeenMesaKey = currentMesaKey
-            showMesaCardsDialog = true
+            if (canShowMesaCards) {
+                showMesaCardsDialog = true
+            } else if (isMultiplayer) {
+                showMesaWaitingDialog = true
+            }
+        }
+    }
+
+    // Cerrar automáticamente la pantalla de espera de cartas a la mesa cuando se apliquen o avance el reparto
+    LaunchedEffect(gameState.moveHistory.size, gameState.currentDeal) {
+        if (gameState.currentDeal > 1 || gameState.moveHistory.lastOrNull()?.reason?.startsWith("Cartas a la mesa") == true) {
+            showMesaWaitingDialog = false
         }
     }
 
@@ -159,6 +179,8 @@ fun ScoreBoardScreen(
             showManageLeadersDialog = false
         } else if (showMesaCardsDialog) {
             showMesaCardsDialog = false
+        } else if (showMesaWaitingDialog) {
+            showMesaWaitingDialog = false
         } else if (showCustomizeButtonsDialog) {
             showCustomizeButtonsDialog = false
         } else if (showTvCastDialog) {
@@ -236,8 +258,20 @@ fun ScoreBoardScreen(
     val showTeamC = hasTeamC && !isTeamCReserve
     val showTeamD = hasTeamD && !isTeamDReserve
 
-    val isMultiplayer = !uiState.isLocalGame
     val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam))
+    val isAtMaxDeals = gameState.currentDeal >= maxDeals
+
+    // Miniventana flotante: recordatorio tras 1 minuto en el reparto (o al iniciar la partida)
+    LaunchedEffect(gameState.gameId, gameState.currentHand, gameState.currentDeal, gameState.winnerTeam, gameState.status, isReserve) {
+        showDealReminder = false
+        if (isReserve || gameState.winnerTeam != null || gameState.status == GameStatus.FINISHED) {
+            return@LaunchedEffect
+        }
+        delay(60_000L)
+        if (!isReserve && gameState.winnerTeam == null && gameState.status != GameStatus.FINISHED) {
+            showDealReminder = true
+        }
+    }
 
     // En local (dispositivo compartido en mesa): SIEMPRE se pueden modificar ambos equipos activos en mesa.
     // En multijugador: cada jugador SOLO puede modificar su respectivo equipo, de los rivales NO (muestra candado).
@@ -258,6 +292,36 @@ fun ScoreBoardScreen(
         )
         if (effectiveReserveTeams.contains(selectedTeamForCanto) || !activeTeamsList.contains(selectedTeamForCanto)) {
             selectedTeamForCanto = activeTeamsList.firstOrNull() ?: Team.TEAM_A
+        }
+    }
+
+    // La opción "De bufos" solo dura un reparto (se limpia al cambiar de reparto o reiniciar la partida)
+    LaunchedEffect(gameState.currentDeal, gameState.currentHand, gameState.gameId, gameState.status) {
+        activeBufoOption = null
+    }
+
+    // Si se canta Ronda, Parranda, Caracol o Caracolillo, habilitar la opción de "De bufos" durante ese reparto
+    LaunchedEffect(gameState.moveHistory.size) {
+        val lastMove = gameState.moveHistory.lastOrNull()
+        if (lastMove != null && lastMove.dealNumber == gameState.currentDeal) {
+            val bufoPoints = when {
+                lastMove.reason.startsWith("Ronda") -> 1
+                lastMove.reason.startsWith("Parranda") -> 1
+                lastMove.reason.startsWith("Caracolillo") -> 2
+                lastMove.reason.startsWith("Caracol") -> 2
+                else -> null
+            }
+            if (bufoPoints != null && !lastMove.reason.contains("bufos")) {
+                val canModifyTeam = if (isMultiplayer) effectiveMyTeam == lastMove.teamId else true
+                if (canModifyTeam) {
+                    activeBufoOption = ActiveBufoOption(
+                        team = lastMove.teamId,
+                        cantoName = lastMove.reason.substringBefore(" ("),
+                        bufoPoints = bufoPoints,
+                        dealNumber = gameState.currentDeal
+                    )
+                }
+            }
         }
     }
 
@@ -409,14 +473,18 @@ fun ScoreBoardScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             if (!uiState.isLocalGame && uiState.sessionStatus != SessionStatus.CONNECTED) {
                 ConnectionStatusBanner(
                     status = uiState.sessionStatus,
@@ -543,8 +611,6 @@ fun ScoreBoardScreen(
                 }
             }
 
-            val isAtMaxDeals = gameState.currentDeal >= maxDeals
-
             // Sumador de Reparto de Cartas
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -561,7 +627,12 @@ fun ScoreBoardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .padding(end = 6.dp)
+                        ) {
                             Icon(
                                 Icons.Default.Style,
                                 contentDescription = null,
@@ -575,15 +646,19 @@ fun ScoreBoardScreen(
                                         text = "Reparto de cartas:",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "🃏 $dealerName",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        fontSize = 10.5.sp
+                                        fontSize = 10.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 Text(
@@ -591,45 +666,50 @@ fun ScoreBoardScreen(
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 13.sp
+                                    fontSize = 12.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             FilledTonalIconButton(
-                                onClick = { viewModel.changeDeal(gameState.currentDeal - 1) },
+                                onClick = {
+                                    showDealReminder = false
+                                    viewModel.changeDeal(gameState.currentDeal - 1)
+                                },
                                 enabled = !isReserve && gameState.currentDeal > 1,
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                shape = RoundedCornerShape(12.dp)
+                                    .size(42.dp)
+                                    .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp),
+                                shape = RoundedCornerShape(10.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Remove,
                                     contentDescription = "Reparto anterior",
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(48.dp)
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.height(42.dp)
                             ) {
                                 Box(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
                                         .fillMaxHeight()
-                                        .padding(horizontal = 14.dp)
+                                        .padding(horizontal = 10.dp)
                                 ) {
                                     Text(
                                         text = "${gameState.currentDeal}º / $maxDeals",
                                         fontWeight = FontWeight.Black,
-                                        fontSize = 14.sp,
+                                        fontSize = 13.5.sp,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                 }
@@ -637,6 +717,7 @@ fun ScoreBoardScreen(
 
                             FilledIconButton(
                                 onClick = {
+                                    showDealReminder = false
                                     if (isAtMaxDeals) {
                                         showCardCountDialog = true
                                     } else {
@@ -645,9 +726,9 @@ fun ScoreBoardScreen(
                                 },
                                 enabled = !isReserve,
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                    .size(42.dp)
+                                    .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
                                 )
@@ -655,7 +736,7 @@ fun ScoreBoardScreen(
                                 Icon(
                                     imageVector = if (isAtMaxDeals) Icons.Default.Style else Icons.Default.Add,
                                     contentDescription = if (isAtMaxDeals) "Recuento de cartas fin de mano" else "Siguiente reparto",
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -671,9 +752,15 @@ fun ScoreBoardScreen(
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("🃏", fontSize = 16.sp)
+                            Text("🃏", fontSize = 15.sp)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Cartas a la Mesa (1.ᵉʳ Reparto)", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Cartas a la Mesa (1.ᵉʳ Reparto)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
 
@@ -687,7 +774,13 @@ fun ScoreBoardScreen(
                         ) {
                             Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("🃏 Finalizar Mano: Recuento de Cartas", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "🃏 Finalizar Mano: Recuento de Cartas",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -695,10 +788,16 @@ fun ScoreBoardScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
+            val cardHeight = when {
+                uiState.fontScale >= 1.20f -> if (isCompactCards) 296.dp else 284.dp
+                uiState.fontScale >= 1.10f -> if (isCompactCards) 270.dp else 260.dp
+                else -> if (isCompactCards) 246.dp else 240.dp
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(242.dp),
+                    .height(cardHeight),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Tarjeta Equipo A (si no está en reserva)
@@ -933,6 +1032,109 @@ fun ScoreBoardScreen(
             // Botonera de Jugadas y Cantos con Distribución Personalizable de 2 Columnas
             val cantoTargetTeam = if (isMultiplayer) effectiveMyTeam else selectedTeamForCanto
 
+            // Botón Extra contextual: "De bufos" (si se cantó Ronda, Parranda, Caracol o Caracolillo en este reparto)
+            AnimatedVisibility(
+                visible = activeBufoOption != null && activeBufoOption?.dealNumber == gameState.currentDeal,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                activeBufoOption?.let { bufo ->
+                    val teamName = when (bufo.team) {
+                        Team.TEAM_A -> gameState.nameTeamA
+                        Team.TEAM_B -> gameState.nameTeamB
+                        Team.TEAM_C -> gameState.nameTeamC
+                        Team.TEAM_D -> gameState.nameTeamD
+                        else -> "Equipo"
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("👑", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "¿${bufo.cantoName} de bufos?",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (isMultiplayer) "+${bufo.bufoPoints} extra este reparto" else "+${bufo.bufoPoints} extra para $teamName",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { activeBufoOption = null },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Descartar opción de bufos",
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.manualScoreChange(
+                                            bufo.team,
+                                            bufo.bufoPoints,
+                                            reason = "${bufo.cantoName} de bufos (+${bufo.bufoPoints})"
+                                        )
+                                        Toast.makeText(context, "+${bufo.bufoPoints} piedra(s) de bufos sumada(s)", Toast.LENGTH_SHORT).show()
+                                        activeBufoOption = null
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiary,
+                                        contentColor = MaterialTheme.colorScheme.onTertiary
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.defaultMinSize(minHeight = 38.dp)
+                                ) {
+                                    Text(
+                                        text = "De bufos (+${bufo.bufoPoints})",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.5.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -948,7 +1150,22 @@ fun ScoreBoardScreen(
                         pair.forEach { cantoType ->
                             CantoActionButton(
                                 cantoType = cantoType,
-                                onClick = { viewModel.callCanto(cantoTargetTeam, cantoType) },
+                                onClick = {
+                                    viewModel.callCanto(cantoTargetTeam, cantoType)
+                                    val bufoPoints = when (cantoType) {
+                                        CantoType.RONDA, CantoType.PARRANDA -> 1
+                                        CantoType.CARACOL, CantoType.CARACOLILLO -> 2
+                                        else -> null
+                                    }
+                                    if (bufoPoints != null) {
+                                        activeBufoOption = ActiveBufoOption(
+                                            team = cantoTargetTeam,
+                                            cantoName = cantoType.displayName.substringBefore(" ("),
+                                            bufoPoints = bufoPoints,
+                                            dealNumber = gameState.currentDeal
+                                        )
+                                    }
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
@@ -966,7 +1183,7 @@ fun ScoreBoardScreen(
             // Fila fija de acciones principales: Deshacer y Terminar Partida (50% de ancho c/u)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
@@ -974,18 +1191,18 @@ fun ScoreBoardScreen(
                     enabled = gameState.moveHistory.isNotEmpty(),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .defaultMinSize(minHeight = 48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "Deshacer",
-                        fontSize = 13.5.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -997,16 +1214,16 @@ fun ScoreBoardScreen(
                     onClick = { showEndGameConfirmation = true },
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .defaultMinSize(minHeight = 48.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                 ) {
                     Icon(Icons.Default.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "Terminar Partida",
-                        fontSize = 13.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1017,7 +1234,147 @@ fun ScoreBoardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+
+        // Miniventana Flotante de Recordatorio de Siguiente Reparto
+        AnimatedVisibility(
+            visible = showDealReminder,
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 480.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.HourglassEmpty,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = if (isAtMaxDeals) "🃏 ¿Finalizar Mano?" else "🃏 ¿Siguiente Reparto?",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 13.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isAtMaxDeals) {
+                                        "1 min. en el último reparto (${gameState.currentDeal}º de $maxDeals)"
+                                    } else {
+                                        "1 min. en el reparto actual (${gameState.currentDeal}º de $maxDeals)"
+                                    },
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { showDealReminder = false },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Cerrar recordatorio",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { showDealReminder = false },
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 38.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Aún jugando",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                showDealReminder = false
+                                if (isAtMaxDeals) {
+                                    showCardCountDialog = true
+                                } else {
+                                    viewModel.changeDeal(gameState.currentDeal + 1)
+                                }
+                            },
+                            enabled = !isReserve,
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .defaultMinSize(minHeight = 38.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isAtMaxDeals) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isAtMaxDeals) Icons.Default.Style else Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isAtMaxDeals) "Recuento" else "Reparto ${gameState.currentDeal + 1}º",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
+}
 
     // Diálogo de Ajustes de Audio (Música y Efectos de Sonido)
     if (showAudioSettingsDialog) {
@@ -1190,6 +1547,15 @@ fun ScoreBoardScreen(
                 showMesaCardsDialog = false
             },
             onDismiss = { showMesaCardsDialog = false }
+        )
+    }
+
+    // Diálogo de espera para los demás jugadores en multijugador mientras el repartidor comprueba las 4 cartas de la mesa
+    if (showMesaWaitingDialog && isMultiplayer && !canShowMesaCards) {
+        MesaWaitingDialog(
+            dealerName = dealerName,
+            currentHand = gameState.currentHand,
+            onDismiss = { showMesaWaitingDialog = false }
         )
     }
 
@@ -1558,7 +1924,7 @@ fun ScoreBoardScreen(
                             onClick = { viewModel.undoLastMove() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
+                                .defaultMinSize(minHeight = 48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
@@ -1664,7 +2030,7 @@ fun RondaScoreCard(
                 ) {
                     Text(
                         text = teamName,
-                        fontSize = if (isCompact) 14.sp else 16.sp,
+                        fontSize = if (isCompact) 13.5.sp else 15.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = contentColor,
                         maxLines = 1,
@@ -1687,7 +2053,7 @@ fun RondaScoreCard(
                 ) {
                     Text(
                         text = "🏆 $wins ${if (wins == 1) "victoria" else "victorias"}",
-                        fontSize = if (isCompact) 10.sp else 11.5.sp,
+                        fontSize = if (isCompact) 9.5.sp else 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (wins > 0) Color.Black else contentColor,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
@@ -1709,7 +2075,7 @@ fun RondaScoreCard(
                             text = if (score.totalPiedras >= TeamScore.TOTAL_PIEDRAS_VICTORY) "🏆 ¡Ganador!" else "🌟 Buenas (${score.buenas}/10)",
                             color = Color.Black,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = if (isCompact) 10.5.sp else 11.5.sp,
+                            fontSize = if (isCompact) 10.sp else 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1733,8 +2099,8 @@ fun RondaScoreCard(
                         ) {
                             Text(
                                 text = "🎯 $cantosPhrase",
-                                fontSize = if (isCompact) 8.sp else 9.sp,
-                                lineHeight = if (isCompact) 10.sp else 11.5.sp,
+                                fontSize = if (isCompact) 7.5.sp else 8.5.sp,
+                                lineHeight = if (isCompact) 9.5.sp else 11.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = contentColor,
                                 textAlign = TextAlign.Center,
@@ -1758,7 +2124,7 @@ fun RondaScoreCard(
                         text = "Malas (${score.malas}/11)",
                         color = contentColor,
                         fontWeight = FontWeight.Bold,
-                        fontSize = if (isCompact) 10.5.sp else 11.5.sp,
+                        fontSize = if (isCompact) 10.sp else 11.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1769,14 +2135,14 @@ fun RondaScoreCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "${score.totalPiedras}",
-                    fontSize = if (isCompact) 30.sp else 36.sp,
+                    fontSize = if (isCompact) 28.sp else 34.sp,
                     fontWeight = FontWeight.Black,
                     color = contentColor,
-                    lineHeight = if (isCompact) 32.sp else 38.sp
+                    lineHeight = if (isCompact) 30.sp else 36.sp
                 )
                 Text(
                     text = "Piedras / 21",
-                    fontSize = if (isCompact) 9.5.sp else 11.sp,
+                    fontSize = if (isCompact) 9.sp else 10.5.sp,
                     color = contentColor.copy(alpha = 0.8f),
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1786,29 +2152,28 @@ fun RondaScoreCard(
             if (!canModify) {
                 Surface(
                     color = contentColor.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp)
-                        .defaultMinSize(minHeight = 40.dp)
+                        .height(42.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             Icons.Default.Lock,
-                            contentDescription = "Equipo rival bloqueado para modificación",
+                            contentDescription = "Equipo rival bloqueado",
                             tint = contentColor.copy(alpha = 0.85f),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(if (isCompact) 13.dp else 15.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Equipo Rival",
-                            fontSize = 12.5.sp,
+                            text = if (isCompact) "Rival" else "Equipo Rival",
+                            fontSize = if (isCompact) 10.5.sp else 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = contentColor,
                             maxLines = 1,
@@ -1821,8 +2186,8 @@ fun RondaScoreCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        .height(42.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 3.dp else 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Botón Restar (-)
@@ -1831,9 +2196,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras > 0,
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
-                            .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
-                        shape = RoundedCornerShape(12.dp),
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = contentColor.copy(alpha = 0.18f),
@@ -1842,8 +2206,8 @@ fun RondaScoreCard(
                     ) {
                         Text(
                             text = "−",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 20.sp,
+                            fontSize = if (isCompact) 16.sp else 18.sp,
+                            lineHeight = if (isCompact) 16.sp else 18.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1856,9 +2220,8 @@ fun RondaScoreCard(
                         enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
-                            .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
-                        shape = RoundedCornerShape(12.dp),
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = contentColor.copy(alpha = 0.25f),
@@ -1867,8 +2230,8 @@ fun RondaScoreCard(
                     ) {
                         Text(
                             text = "+",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 20.sp,
+                            fontSize = if (isCompact) 16.sp else 18.sp,
+                            lineHeight = if (isCompact) 16.sp else 18.sp,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1882,9 +2245,8 @@ fun RondaScoreCard(
                             enabled = score.totalPiedras < TeamScore.TOTAL_PIEDRAS_VICTORY,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
-                                .defaultMinSize(minWidth = 38.dp, minHeight = 40.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                .fillMaxHeight(),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = contentColor.copy(alpha = 0.32f),
@@ -1893,8 +2255,7 @@ fun RondaScoreCard(
                         ) {
                             Text(
                                 text = "+N",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontSize = 15.sp,
+                                fontSize = if (isCompact) 11.5.sp else 13.sp,
                                 fontWeight = FontWeight.Black,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,
@@ -3267,15 +3628,15 @@ private fun CantoActionButton(
     }
 
     val fontSize = when (cantoType) {
-        CantoType.RONDA, CantoType.PARRANDA, CantoType.CARACOL, CantoType.CARACOLILLO -> 13.5.sp
-        CantoType.LIMPIAR, CantoType.MAJO -> 13.sp
-        CantoType.CONTRAMAJO -> 12.5.sp
-        else -> 12.sp
+        CantoType.RONDA, CantoType.PARRANDA, CantoType.CARACOL -> 13.sp
+        CantoType.CARACOLILLO, CantoType.LIMPIAR, CantoType.MAJO -> 12.5.sp
+        CantoType.CONTRAMAJO, CantoType.MAJO_Y_LIMPIO -> 12.sp
+        else -> 11.5.sp
     }
 
     val contentPadding = when (cantoType) {
-        CantoType.SOBREMAJO, CantoType.REQUETECONTRAMAJO -> PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-        else -> PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+        CantoType.SOBREMAJO, CantoType.REQUETECONTRAMAJO, CantoType.MAJO_Y_LIMPIO -> PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+        else -> PaddingValues(horizontal = 4.dp, vertical = 2.dp)
     }
 
     FilledTonalButton(
@@ -3288,11 +3649,19 @@ private fun CantoActionButton(
         Text(
             text = cantoType.displayName,
             fontSize = fontSize,
+            lineHeight = (fontSize.value * 1.15f).sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
         )
     }
 }
+
+private data class ActiveBufoOption(
+    val team: Team,
+    val cantoName: String,
+    val bufoPoints: Int,
+    val dealNumber: Int
+)
 

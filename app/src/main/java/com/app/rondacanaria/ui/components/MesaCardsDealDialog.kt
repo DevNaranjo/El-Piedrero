@@ -310,13 +310,17 @@ fun MesaCardsDealDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (totalStones > 0 && canApply) {
-                        val reason = if (selectedCards.isNotEmpty()) {
-                            val cardsStr = selectedCards.sorted().joinToString(", ")
-                            val matchText = if (selectedCards.size == 1) "coincidió la carta $cardsStr" else "coincidieron las cartas $cardsStr"
-                            "Cartas a la mesa: $matchText${if (isBienDada) " (+1 bien dada)" else ""}"
+                    if (canApply) {
+                        val reason = if (totalStones > 0) {
+                            if (selectedCards.isNotEmpty()) {
+                                val cardsStr = selectedCards.sorted().joinToString(", ")
+                                val matchText = if (selectedCards.size == 1) "coincidió la carta $cardsStr" else "coincidieron las cartas $cardsStr"
+                                "Cartas a la mesa: $matchText${if (isBienDada) " (+1 bien dada)" else ""}"
+                            } else {
+                                "Cartas a la mesa: bien dada (no se repitió carta)"
+                            }
                         } else {
-                            "Cartas a la mesa: bien dada (no se repitió carta)"
+                            "Cartas a la mesa: sin coincidencias (0 piedras)"
                         }
                         onApplyStones(dealerTeam, totalStones, reason)
                     }
@@ -336,9 +340,91 @@ fun MesaCardsDealDialog(
         },
         dismissButton = {
             TextButton(
-                onClick = onDismiss
+                onClick = {
+                    if (canApply) {
+                        onApplyStones(dealerTeam, 0, "Cartas a la mesa: cerrado")
+                    }
+                    onDismiss()
+                }
             ) {
                 Text("Cerrar")
+            }
+        }
+    )
+}
+
+/**
+ * Pantalla de espera para los demás jugadores en multijugador mientras el repartidor
+ * comprueba las 4 cartas de la mesa en el primer reparto.
+ */
+@Composable
+fun MesaWaitingDialog(
+    dealerName: String,
+    currentHand: Int,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false),
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "🃏", fontSize = 28.sp)
+                }
+            }
+        },
+        title = {
+            Text(
+                text = "Reparto de Cartas a la Mesa",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                )
+                Text(
+                    text = "El repartidor ($dealerName) está repartiendo las 4 cartas a la mesa.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Comprobando si hay coincidencias y si la mano está bien dada.\n\nLa partida continuará automáticamente en cuanto finalice el recuento.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Entendido", fontWeight = FontWeight.Bold)
             }
         }
     )
