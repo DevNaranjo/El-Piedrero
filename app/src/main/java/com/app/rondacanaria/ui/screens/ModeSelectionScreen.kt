@@ -742,6 +742,8 @@ fun ModeSelectionScreen(
             isSfxEnabled = uiState.isSfxEnabled,
             isVibrationEnabled = uiState.isVibrationEnabled,
             fontScale = uiState.fontScale,
+            isDealReminderEnabled = uiState.isDealReminderEnabled,
+            dealReminderSeconds = uiState.dealReminderSeconds,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
@@ -749,6 +751,8 @@ fun ModeSelectionScreen(
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
             onFontScaleChange = { viewModel.setFontScale(it) },
+            onToggleDealReminder = { viewModel.setDealReminderEnabled(it) },
+            onDealReminderSecondsChange = { viewModel.setDealReminderSeconds(it) },
             onSkipSong = { viewModel.skipSong() },
             onDismiss = { showAudioSettingsDialog = false }
         )

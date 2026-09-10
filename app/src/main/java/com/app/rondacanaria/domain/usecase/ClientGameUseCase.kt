@@ -319,6 +319,18 @@ class ClientGameUseCase(
         sent
     }
 
+    suspend fun requestSetCountingCards(isCounting: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.SET_COUNTING_CARDS,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            setCountingCards = SetCountingCardsPayload(isCounting = isCounting)
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestSetCountingCards ($isCounting) enviado=$sent")
+        sent
+    }
+
     suspend fun requestResetGame(resetWins: Boolean): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.RESET_GAME,

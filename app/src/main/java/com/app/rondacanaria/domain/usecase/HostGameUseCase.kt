@@ -414,20 +414,22 @@ class HostGameUseCase(
             MessageType.APPLY_CARD_COUNT -> {
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
-                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
-                    android.util.Log.w("HostGameUseCase", "Petición APPLY_CARD_COUNT descartada: sender ${envelope.senderId} no es host ni líder")
+                val isAllowed = senderPlayer?.isHost == true || senderPlayer?.isLeader == true || senderPlayer?.id == _gameState.value.dealerPlayerId
+                if (!isAllowed) {
+                    android.util.Log.w("HostGameUseCase", "Petición APPLY_CARD_COUNT descartada: sender ${envelope.senderId} no tiene permisos")
                     return
                 }
                 val payload = envelope.applyCardCount ?: return
-                val author = payload.authorName.ifBlank { senderPlayer.name }
+                val author = payload.authorName.ifBlank { senderPlayer?.name ?: "Jugador" }
                 applyCardCount(payload.cardCounts, author)
             }
 
             MessageType.RESTART_HAND -> {
                 val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
                     ?: _connectedClients.value[clientId]
-                if (senderPlayer == null || (!senderPlayer.isHost && !senderPlayer.isLeader)) {
-                    android.util.Log.w("HostGameUseCase", "Petición RESTART_HAND descartada: sender ${envelope.senderId} no es host ni líder")
+                val isAllowed = senderPlayer?.isHost == true || senderPlayer?.isLeader == true || senderPlayer?.id == _gameState.value.dealerPlayerId
+                if (!isAllowed) {
+                    android.util.Log.w("HostGameUseCase", "Petición RESTART_HAND descartada: sender ${envelope.senderId} no tiene permisos")
                     return
                 }
                 restartHand()
@@ -442,6 +444,18 @@ class HostGameUseCase(
                 }
                 val resetWins = envelope.resetGame?.resetWins ?: false
                 resetGame(resetWins = resetWins)
+            }
+
+            MessageType.SET_COUNTING_CARDS -> {
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                    ?: _connectedClients.value[clientId]
+                val isAllowed = senderPlayer?.isHost == true || senderPlayer?.isLeader == true || senderPlayer?.id == _gameState.value.dealerPlayerId
+                if (!isAllowed) {
+                    android.util.Log.w("HostGameUseCase", "Petición SET_COUNTING_CARDS descartada: sender ${envelope.senderId} no tiene permisos")
+                    return
+                }
+                val isCounting = envelope.setCountingCards?.isCounting ?: false
+                setCountingCards(isCounting)
             }
 
             else -> {}
@@ -1046,8 +1060,22 @@ class HostGameUseCase(
                 currentHand = current.currentHand + 1,
                 moveHistory = current.moveHistory,
                 dealerPlayerId = nextDealer,
-                version = current.version + 1
+                version = current.version + 1,
+                isCountingCards = false
             )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun setCountingCards(isCounting: Boolean) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            if (current.isCountingCards != isCounting) {
+                _gameState.value = current.copy(
+                    isCountingCards = isCounting,
+                    version = current.version + 1
+                )
+            }
         }
         broadcastCurrentState()
     }

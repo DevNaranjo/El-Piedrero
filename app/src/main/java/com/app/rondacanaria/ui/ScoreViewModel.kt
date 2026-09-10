@@ -57,7 +57,9 @@ data class ScoreUiState(
     val isTvAudioOptimizationEnabled: Boolean = true,
     val isTvCastingActive: Boolean = false,
     val cantoButtonOrder: List<CantoType> = DEFAULT_CANTO_BUTTON_ORDER,
-    val fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL
+    val fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
+    val isDealReminderEnabled: Boolean = true,
+    val dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS
 )
 
 class ScoreViewModel(
@@ -85,7 +87,9 @@ class ScoreViewModel(
             isTvAudioOptimizationEnabled = audioPlayer.isTvAudioOptimizationEnabled,
             isTvCastingActive = audioPlayer.isTvCastingActive,
             cantoButtonOrder = buttonLayoutPersistence.loadButtonOrder(),
-            fontScale = accessibilityPersistence.loadFontScale()
+            fontScale = accessibilityPersistence.loadFontScale(),
+            isDealReminderEnabled = accessibilityPersistence.loadDealReminderEnabled(),
+            dealReminderSeconds = accessibilityPersistence.loadDealReminderSeconds()
         )
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
@@ -673,7 +677,7 @@ class ScoreViewModel(
                 if (totalSum >= totalDeckCards || cardCounts.any { it.value > threshold }) {
                     hostUseCase.applyCardCount(cardCounts, state.playerName)
                 }
-            } else if (state.isLeader) {
+            } else if (state.isLeader || state.gameState.dealerPlayerId == localPlayerId) {
                 clientUseCase.requestApplyCardCount(cardCounts, state.playerName)
             } else {
                 val effectiveMyTeam = getEffectiveLocalTeam()
@@ -697,10 +701,20 @@ class ScoreViewModel(
         viewModelScope.launch {
             if (state.isHost || state.isLocalGame) {
                 hostUseCase.restartHand()
-            } else if (state.isLeader) {
+            } else if (state.isLeader || state.gameState.dealerPlayerId == localPlayerId) {
                 clientUseCase.requestRestartHand()
             } else {
                 clientUseCase.requestUpdateDeal(1)
+            }
+        }
+    }
+
+    fun setCountingCards(isCounting: Boolean) {
+        viewModelScope.launch {
+            if (_uiState.value.isHost || _uiState.value.isLocalGame) {
+                hostUseCase.setCountingCards(isCounting)
+            } else {
+                clientUseCase.requestSetCountingCards(isCounting)
             }
         }
     }
@@ -941,6 +955,16 @@ class ScoreViewModel(
     fun setFontScale(scale: Float) {
         accessibilityPersistence.saveFontScale(scale)
         _uiState.update { it.copy(fontScale = scale) }
+    }
+
+    fun setDealReminderEnabled(enabled: Boolean) {
+        accessibilityPersistence.saveDealReminderEnabled(enabled)
+        _uiState.update { it.copy(isDealReminderEnabled = enabled) }
+    }
+
+    fun setDealReminderSeconds(seconds: Int) {
+        accessibilityPersistence.saveDealReminderSeconds(seconds)
+        _uiState.update { it.copy(dealReminderSeconds = seconds) }
     }
 
     override fun onCleared() {

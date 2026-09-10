@@ -1,8 +1,5 @@
 package com.app.rondacanaria.data.audio
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
@@ -19,21 +16,21 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
-import android.view.animation.LinearInterpolator
-import android.media.MediaDataSource
 import android.os.Process
 import com.app.rondacanaria.data.model.SoundType
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
@@ -58,10 +55,6 @@ class RondaAudioPlayer(private val context: Context) {
     private val audioDispatcher = audioExecutor.asCoroutineDispatcher()
     private val audioScope = CoroutineScope(SupervisorJob() + audioDispatcher)
 
-    // Búfer en memoria RAM para pistas de música ambiental: pre-carga y reproducción directa
-    // desde memoria para eliminar latencias de I/O y evitar que micro-cortes vacíen el búfer
-    private val bgmRamCache = ConcurrentHashMap<String, ByteArray>()
-
     private var soundPool: SoundPool? = null
     private var soundAddId = 0
     private var soundSubId = 0
@@ -69,18 +62,40 @@ class RondaAudioPlayer(private val context: Context) {
     private var currentToneVolume = -1
     private var activeMediaPlayer: MediaPlayer? = null
     private var sfxMediaPlayer: MediaPlayer? = null
+
+    @Volatile
     private var bgmMediaPlayer: MediaPlayer? = null
     private var bgmPlaylist: List<String> = emptyList()
     private var currentBgmIndex = 0
-    private var bgmFadeAnimator: ValueAnimator? = null
+    private var fadeJob: Job? = null
+    private val isTransitioningTrack = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val trackEndFadeRunnable = Runnable {
-        if (!isMusicEnabled) return@Runnable
-        fadeOutBgm(1000L) {
-            if (isMusicEnabled) {
-                playNextBgmTrack()
-            }
+
+    private fun safeIsPlaying(player: MediaPlayer?): Boolean {
+        return try {
+            player?.isPlaying == true
+        } catch (_: Exception) {
+            false
         }
+    }
+
+    private fun safeSetVolume(player: MediaPlayer?, volume: Float) {
+        try {
+            val v = volume.coerceIn(0f, 1f)
+            player?.setVolume(v, v)
+        } catch (_: Exception) {}
+    }
+
+    private fun safeRelease(player: MediaPlayer?) {
+        if (player == null) return
+        try {
+            player.setOnCompletionListener(null)
+            player.setOnErrorListener(null)
+            if (safeIsPlaying(player)) {
+                try { player.stop() } catch (_: Exception) {}
+            }
+            player.release()
+        } catch (_: Exception) {}
     }
     private val voiceAudioQueue = ConcurrentLinkedQueue<SoundType>()
     private var isPlayingVoice = false
@@ -169,14 +184,13 @@ class RondaAudioPlayer(private val context: Context) {
         set(value) {
             prefs.edit().putBoolean(KEY_MUSIC_ENABLED, value).apply()
             if (!value) {
-                mainHandler.removeCallbacks(trackEndFadeRunnable)
-                bgmFadeAnimator?.cancel()
+                fadeJob?.cancel()
                 synchronized(bgmLock) {
                     try {
-                        bgmMediaPlayer?.apply {
-                            setVolume(0f, 0f)
-                            if (isPlaying) {
-                                pause()
+                        bgmMediaPlayer?.let { player ->
+                            safeSetVolume(player, 0f)
+                            if (safeIsPlaying(player)) {
+                                try { player.pause() } catch (_: Exception) {}
                             }
                         }
                     } catch (e: Exception) {
@@ -267,7 +281,8 @@ class RondaAudioPlayer(private val context: Context) {
     fun getEffectiveBgmVolume(): Float {
         if (!isMusicEnabled) return 0f
         val duck = if (isPlayingVoice) 0.33f else 1.0f
-        return (masterVolume * musicVolume * MAX_BGM_GAIN * duck).coerceIn(0f, 1f)
+        val tvDamping = if (isTvCastingActive) 0.90f else 1.0f
+        return (masterVolume * musicVolume * MAX_BGM_GAIN * duck * tvDamping).coerceIn(0f, 1f)
     }
 
     companion object {
@@ -343,7 +358,7 @@ class RondaAudioPlayer(private val context: Context) {
 
     fun pauseAllAudio() {
         isForeground = false
-        mainHandler.removeCallbacks(trackEndFadeRunnable)
+        fadeJob?.cancel()
         pauseBackgroundMusic()
         stopCurrentPlayback()
         stopSfxMediaPlayer()
@@ -1032,20 +1047,27 @@ class RondaAudioPlayer(private val context: Context) {
     }
 
     private fun stopBgmMediaPlayerOnly() {
-        mainHandler.removeCallbacks(trackEndFadeRunnable)
-        bgmFadeAnimator?.cancel()
-        try {
-            bgmMediaPlayer?.apply {
-                setOnCompletionListener(null)
-                setOnErrorListener(null)
-                try {
-                    if (isPlaying) stop()
-                } catch (_: Exception) {}
-                release()
+        fadeJob?.cancel()
+        val player = bgmMediaPlayer
+        bgmMediaPlayer = null
+        safeRelease(player)
+    }
+
+    private fun getBgmFile(trackPath: String): File? {
+        return try {
+            val safeName = trackPath.replace("/", "_").replace("\\", "_")
+            val outFile = File(context.cacheDir, "bgm_$safeName")
+            if (!outFile.exists() || outFile.length() == 0L) {
+                context.assets.open(trackPath).use { input ->
+                    FileOutputStream(outFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
             }
-        } catch (_: Exception) {
-        } finally {
-            bgmMediaPlayer = null
+            outFile
+        } catch (e: Exception) {
+            Log.e(tag, "Error extrayendo fichero BGM a caché: $trackPath", e)
+            null
         }
     }
 
@@ -1071,7 +1093,7 @@ class RondaAudioPlayer(private val context: Context) {
             }
 
             bgmPlaylist = allFiles.shuffled()
-            Log.i(tag, "Playlist BGM cargada con ${bgmPlaylist.size} canciones (IA): $bgmPlaylist")
+            Log.i(tag, "Playlist BGM cargada con ${bgmPlaylist.size} canciones: $bgmPlaylist")
         } catch (e: Exception) {
             Log.e(tag, "Error cargando playlist de música BGM", e)
             bgmPlaylist = listOf(
@@ -1084,52 +1106,10 @@ class RondaAudioPlayer(private val context: Context) {
             ).shuffled()
         }
 
-        // Pre-cargar en memoria RAM las primeras pistas con prioridad THREAD_PRIORITY_AUDIO
+        // Pre-extraer pistas en segundo plano a almacenamiento local para streaming directo sin latencia
         audioScope.launch {
-            try {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
-            } catch (_: Exception) {}
-            bgmPlaylist.take(2).forEach { track ->
-                getOrLoadTrackBytes(track)
-            }
-        }
-    }
-
-    /**
-     * Fuente de datos multimedia en memoria RAM. Almacena 100% de la pista en memoria principal,
-     * eliminando cualquier lectura de disco/flash durante la reproducción y evitando que el búfer
-     * se vacíe durante micro-cortes o congestión de CPU/red por transmisión a Smart TV.
-     */
-    private class MemoryAudioDataSource(private val data: ByteArray) : MediaDataSource() {
-        override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
-            if (position >= data.size) return -1
-            val remaining = (data.size - position).toInt()
-            val toRead = minOf(size, remaining)
-            System.arraycopy(data, position.toInt(), buffer, offset, toRead)
-            return toRead
-        }
-
-        override fun getSize(): Long = data.size.toLong()
-        override fun close() {}
-    }
-
-    private fun getOrLoadTrackBytes(trackPath: String): ByteArray? {
-        bgmRamCache[trackPath]?.let { return it }
-        return try {
-            val bytes = context.assets.open(trackPath).use { it.readBytes() }
-            bgmRamCache[trackPath] = bytes
-            Log.d(tag, "Pista de música precargada en búfer de memoria RAM (${bytes.size} bytes): $trackPath")
-            bytes
-        } catch (e: Exception) {
-            Log.e(tag, "Error precargando pista en memoria RAM: $trackPath", e)
-            null
-        }
-    }
-
-    private fun preloadNextTrack(trackPath: String) {
-        audioScope.launch {
-            if (!bgmRamCache.containsKey(trackPath)) {
-                getOrLoadTrackBytes(trackPath)
+            bgmPlaylist.forEach { track ->
+                getBgmFile(track)
             }
         }
     }
@@ -1163,62 +1143,39 @@ class RondaAudioPlayer(private val context: Context) {
         }
     }
 
-    private fun fadeInBgm(targetVolume: Float, durationMs: Long = 1000L) {
-        mainHandler.post {
-            bgmFadeAnimator?.cancel()
-            val player = bgmMediaPlayer ?: return@post
-            try {
-                player.setVolume(0f, 0f)
-                if (!player.isPlaying) {
-                    player.start()
-                }
-            } catch (_: Exception) {
-                return@post
+    private fun fadeInBgm(targetVolume: Float, durationMs: Long = 800L) {
+        fadeJob?.cancel()
+        fadeJob = audioScope.launch {
+            val player = bgmMediaPlayer ?: return@launch
+            val steps = 8
+            val stepDelay = durationMs / steps
+            for (i in 1..steps) {
+                val vol = (targetVolume * (i.toFloat() / steps)).coerceIn(0f, 1f)
+                safeSetVolume(player, vol)
+                delay(stepDelay)
             }
-
-            bgmFadeAnimator = ValueAnimator.ofFloat(0f, targetVolume).apply {
-                duration = durationMs
-                interpolator = LinearInterpolator()
-                addUpdateListener { animator ->
-                    val v = animator.animatedValue as Float
-                    try {
-                        bgmMediaPlayer?.setVolume(v, v)
-                    } catch (_: Exception) {}
-                }
-                start()
-            }
+            safeSetVolume(player, targetVolume)
         }
     }
 
-    private fun fadeOutBgm(durationMs: Long = 1000L, onComplete: (() -> Unit)? = null) {
-        mainHandler.post {
-            bgmFadeAnimator?.cancel()
+    private fun fadeOutBgm(durationMs: Long = 400L, onComplete: (() -> Unit)? = null) {
+        fadeJob?.cancel()
+        fadeJob = audioScope.launch {
             val player = bgmMediaPlayer
-            if (player == null || !player.isPlaying) {
+            if (player == null || !safeIsPlaying(player)) {
                 onComplete?.invoke()
-                return@post
+                return@launch
             }
-
-            val currentVol = getEffectiveBgmVolume()
-            bgmFadeAnimator = ValueAnimator.ofFloat(currentVol, 0f).apply {
-                duration = durationMs
-                interpolator = LinearInterpolator()
-                addUpdateListener { animator ->
-                    val v = animator.animatedValue as Float
-                    try {
-                        bgmMediaPlayer?.setVolume(v, v)
-                    } catch (_: Exception) {}
-                }
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        try {
-                            bgmMediaPlayer?.setVolume(0f, 0f)
-                        } catch (_: Exception) {}
-                        onComplete?.invoke()
-                    }
-                })
-                start()
+            val startVol = getEffectiveBgmVolume()
+            val steps = 5
+            val stepDelay = durationMs / steps
+            for (i in steps downTo 0) {
+                val vol = (startVol * (i.toFloat() / steps)).coerceIn(0f, 1f)
+                safeSetVolume(player, vol)
+                delay(stepDelay)
             }
+            safeSetVolume(player, 0f)
+            onComplete?.invoke()
         }
     }
 
@@ -1234,9 +1191,8 @@ class RondaAudioPlayer(private val context: Context) {
                 val trackPath = bgmPlaylist[currentBgmIndex % bgmPlaylist.size]
                 stopBgmMediaPlayerOnly()
 
-                // AudioAttributes optimizados para proyección y Smart TV:
-                // USAGE_MEDIA instruye a AudioFlinger a asignar un búfer nativo mayor (1-2 segundos)
-                // en lugar de la baja latencia reducida de juegos que sufre microcortes en Wi-Fi.
+                // AudioAttributes optimizados para TV Cast y streaming multimedia:
+                // USAGE_MEDIA asigna un búfer nativo mayor (2-4 segundos) inmune al tráfico Wi-Fi y GC
                 val attributes = AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -1246,74 +1202,81 @@ class RondaAudioPlayer(private val context: Context) {
 
                 try {
                     var player: MediaPlayer? = null
-                    val trackBytes = getOrLoadTrackBytes(trackPath)
-                    if (trackBytes != null) {
-                        try {
-                            player = MediaPlayer().apply {
-                                setAudioAttributes(attributes)
-                                setDataSource(MemoryAudioDataSource(trackBytes))
-                            }
-                        } catch (e: Exception) {
-                            Log.w(tag, "Fallo al inicializar MediaPlayer con MemoryAudioDataSource, reintentando con descriptor", e)
+
+                    // 1. Streaming nativo directo vía AssetFileDescriptor
+                    try {
+                        val afd = context.assets.openFd(trackPath)
+                        player = MediaPlayer().apply {
+                            setAudioAttributes(attributes)
+                            setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                            afd.close()
                         }
+                    } catch (e: Exception) {
+                        Log.d(tag, "openFd no disponible para $trackPath, usando archivo caché")
                     }
 
+                    // 2. Fallback: archivo en caché local con streaming de kernel directo
                     if (player == null) {
-                        try {
-                            val afd = context.assets.openFd(trackPath)
+                        val cachedFile = getBgmFile(trackPath)
+                        if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0) {
                             player = MediaPlayer().apply {
                                 setAudioAttributes(attributes)
-                                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                                afd.close()
-                            }
-                        } catch (_: Exception) {
-                            val cachedFile = extractAssetToCache(trackPath)
-                            if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0) {
-                                player = MediaPlayer().apply {
-                                    setAudioAttributes(attributes)
-                                    setDataSource(cachedFile.absolutePath)
-                                }
+                                setDataSource(cachedFile.absolutePath)
                             }
                         }
                     }
 
                     player?.apply {
-                        setVolume(0f, 0f)
+                        safeSetVolume(this, 0f)
                         isLooping = false
                         prepare()
                         bgmMediaPlayer = this
-                        fadeInBgm(targetVolume, 1000L)
+                        fadeInBgm(targetVolume, 800L)
 
-                        // Precargar la siguiente pista de fondo en memoria RAM por adelantado
-                        val nextIndex = (currentBgmIndex + 1) % bgmPlaylist.size
-                        preloadNextTrack(bgmPlaylist[nextIndex])
-
-                        // Programar fundido de salida (1s) antes de que termine la canción
-                        mainHandler.removeCallbacks(trackEndFadeRunnable)
-                        val durationMs = duration
-                        if (durationMs > 2500) {
-                            mainHandler.postDelayed(trackEndFadeRunnable, (durationMs - 1000L).toLong())
-                        }
-
-                        setOnCompletionListener {
-                            mainHandler.removeCallbacks(trackEndFadeRunnable)
-                            it.release()
-                            if (bgmMediaPlayer == it) bgmMediaPlayer = null
-                            if (isMusicEnabled) {
-                                playNextBgmTrack()
+                        // Única fuente de verdad para el avance de pista: callback nativo con guarda atómica
+                        setOnCompletionListener { completedPlayer ->
+                            if (isTransitioningTrack.compareAndSet(false, true)) {
+                                audioScope.launch {
+                                    try {
+                                        safeRelease(completedPlayer)
+                                        if (bgmMediaPlayer == completedPlayer) {
+                                            bgmMediaPlayer = null
+                                        }
+                                        if (isMusicEnabled) {
+                                            delay(300L)
+                                            currentBgmIndex = pickNextRandomIndex()
+                                            playCurrentBgmTrack()
+                                        }
+                                    } finally {
+                                        isTransitioningTrack.set(false)
+                                    }
+                                }
                             }
                         }
-                        setOnErrorListener { it, _, _ ->
-                            mainHandler.removeCallbacks(trackEndFadeRunnable)
-                            it.release()
-                            if (bgmMediaPlayer == it) bgmMediaPlayer = null
-                            if (isMusicEnabled) {
-                                playNextBgmTrack()
+
+                        setOnErrorListener { errPlayer, what, extra ->
+                            Log.w(tag, "Error en MediaPlayer BGM: what=$what, extra=$extra")
+                            if (isTransitioningTrack.compareAndSet(false, true)) {
+                                audioScope.launch {
+                                    try {
+                                        safeRelease(errPlayer)
+                                        if (bgmMediaPlayer == errPlayer) {
+                                            bgmMediaPlayer = null
+                                        }
+                                        if (isMusicEnabled) {
+                                            delay(500L)
+                                            currentBgmIndex = pickNextRandomIndex()
+                                            playCurrentBgmTrack()
+                                        }
+                                    } finally {
+                                        isTransitioningTrack.set(false)
+                                    }
+                                }
                             }
                             true
                         }
                     }
-                    Log.i(tag, "Reproduciendo música ambiental desde búfer RAM con prioridad THREAD_PRIORITY_AUDIO: $trackPath (volumen: $targetVolume con fundido)")
+                    Log.i(tag, "Reproduciendo música ambiental BGM (streaming nativo): $trackPath (volumen: $targetVolume)")
                 } catch (e: Exception) {
                     Log.e(tag, "Error al reproducir pista BGM: $trackPath", e)
                 }
@@ -1323,17 +1286,22 @@ class RondaAudioPlayer(private val context: Context) {
 
     fun playNextBgmTrack() {
         if (!isMusicEnabled) return
-        mainHandler.removeCallbacks(trackEndFadeRunnable)
-        fadeOutBgm(400L) {
-            audioScope.launch {
-                try {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
-                } catch (_: Exception) {}
-                synchronized(bgmLock) {
-                    if (!isMusicEnabled) return@synchronized
-                    if (bgmPlaylist.isNotEmpty()) {
-                        currentBgmIndex = pickNextRandomIndex()
-                        playCurrentBgmTrack()
+        if (isTransitioningTrack.compareAndSet(false, true)) {
+            fadeOutBgm(300L) {
+                audioScope.launch {
+                    try {
+                        Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
+                    } catch (_: Exception) {}
+                    synchronized(bgmLock) {
+                        try {
+                            stopBgmMediaPlayerOnly()
+                            if (isMusicEnabled && bgmPlaylist.isNotEmpty()) {
+                                currentBgmIndex = pickNextRandomIndex()
+                                playCurrentBgmTrack()
+                            }
+                        } finally {
+                            isTransitioningTrack.set(false)
+                        }
                     }
                 }
             }
@@ -1341,20 +1309,17 @@ class RondaAudioPlayer(private val context: Context) {
     }
 
     fun pauseBackgroundMusic() {
-        mainHandler.removeCallbacks(trackEndFadeRunnable)
-        bgmFadeAnimator?.cancel()
+        fadeJob?.cancel()
         audioScope.launch {
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             } catch (_: Exception) {}
             synchronized(bgmLock) {
                 try {
-                    bgmMediaPlayer?.let {
-                        try {
-                            it.setVolume(0f, 0f)
-                        } catch (_: Exception) {}
-                        if (it.isPlaying) {
-                            it.pause()
+                    bgmMediaPlayer?.let { player ->
+                        safeSetVolume(player, 0f)
+                        if (safeIsPlaying(player)) {
+                            try { player.pause() } catch (_: Exception) {}
                         }
                     }
                 } catch (e: Exception) {
@@ -1374,19 +1339,14 @@ class RondaAudioPlayer(private val context: Context) {
             } catch (_: Exception) {}
             synchronized(bgmLock) {
                 try {
-                    bgmFadeAnimator?.cancel()
+                    fadeJob?.cancel()
                     val player = bgmMediaPlayer
                     if (player != null) {
                         val targetVol = getEffectiveBgmVolume()
-                        player.setVolume(targetVol, targetVol)
-                        if (!player.isPlaying) {
-                            player.start()
+                        if (!safeIsPlaying(player)) {
+                            try { player.start() } catch (_: Exception) {}
                         }
-                        mainHandler.removeCallbacks(trackEndFadeRunnable)
-                        val remainingMs = player.duration - player.currentPosition
-                        if (remainingMs > 2500) {
-                            mainHandler.postDelayed(trackEndFadeRunnable, (remainingMs - 1000L).toLong())
-                        }
+                        safeSetVolume(player, targetVol)
                     } else {
                         startBackgroundMusic()
                     }
@@ -1404,13 +1364,11 @@ class RondaAudioPlayer(private val context: Context) {
         synchronized(bgmLock) {
             try {
                 val player = bgmMediaPlayer ?: return
-                if (bgmFadeAnimator?.isRunning != true) {
+                if (fadeJob?.isActive != true) {
                     val targetVol = getEffectiveBgmVolume()
-                    player.setVolume(targetVol, targetVol)
-                    if (targetVol > 0f && isMusicEnabled && !player.isPlaying) {
-                        try {
-                            player.start()
-                        } catch (_: Exception) {}
+                    safeSetVolume(player, targetVol)
+                    if (targetVol > 0f && isMusicEnabled && !safeIsPlaying(player)) {
+                        try { player.start() } catch (_: Exception) {}
                     }
                 }
             } catch (_: Exception) {}
@@ -1419,7 +1377,7 @@ class RondaAudioPlayer(private val context: Context) {
 
     fun release() {
         mainHandler.removeCallbacksAndMessages(null)
-        bgmFadeAnimator?.cancel()
+        fadeJob?.cancel()
         abandonSystemAudioFocus()
         stopCurrentPlayback()
         stopSfxMediaPlayer()
@@ -1433,10 +1391,9 @@ class RondaAudioPlayer(private val context: Context) {
         try {
             audioScope.cancel()
             audioExecutor.shutdown()
-            bgmRamCache.clear()
         } catch (_: Exception) {}
         try {
-            val cacheFiles = context.cacheDir.listFiles { _, name -> name.startsWith("audio_") }
+            val cacheFiles = context.cacheDir.listFiles { _, name -> name.startsWith("bgm_") || name.startsWith("audio_") }
             cacheFiles?.forEach { it.delete() }
         } catch (_: Exception) {}
     }

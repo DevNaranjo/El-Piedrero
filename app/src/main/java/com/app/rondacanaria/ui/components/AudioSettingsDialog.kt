@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeOff
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.rondacanaria.data.history.AccessibilityPersistence
@@ -37,6 +39,8 @@ fun AudioSettingsDialog(
     isSfxEnabled: Boolean,
     isVibrationEnabled: Boolean = true,
     fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
+    isDealReminderEnabled: Boolean = true,
+    dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS,
     onMasterVolumeChange: (Float) -> Unit,
     onMusicVolumeChange: (Float) -> Unit,
     onSfxVolumeChange: (Float) -> Unit,
@@ -44,6 +48,8 @@ fun AudioSettingsDialog(
     onToggleSfx: (Boolean) -> Unit,
     onToggleVibration: (Boolean) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
+    onToggleDealReminder: (Boolean) -> Unit = {},
+    onDealReminderSecondsChange: (Int) -> Unit = {},
     onSkipSong: () -> Unit = {},
     onOpenCustomizeButtons: (() -> Unit)? = null,
     onDismiss: () -> Unit
@@ -418,6 +424,114 @@ fun AudioSettingsDialog(
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 6. Ajustes de Recordatorio de Reparto (Ventana Flotante)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = if (isDealReminderEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Recordatorio de Reparto",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = if (isDealReminderEnabled) "Aviso flotante tras $dealReminderSeconds s" else "Desactivado",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Badge(
+                                    containerColor = if (isDealReminderEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (isDealReminderEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                ) {
+                                    Text(
+                                        text = if (isDealReminderEnabled) "${dealReminderSeconds}s" else "Apagado",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Switch(
+                                    checked = isDealReminderEnabled,
+                                    onCheckedChange = onToggleDealReminder,
+                                    modifier = Modifier.height(28.dp)
+                                )
+                            }
+                        }
+
+                        if (isDealReminderEnabled) {
+                            Text(
+                                text = "Tiempo de espera para mostrar el aviso:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val reminderOptions = listOf(
+                                    15 to "15s",
+                                    30 to "30s",
+                                    45 to "45s",
+                                    60 to "1 min",
+                                    90 to "1.5 min"
+                                )
+                                reminderOptions.forEach { (seconds, label) ->
+                                    val isSelected = dealReminderSeconds == seconds
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { onDealReminderSecondsChange(seconds) }
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 12.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 8.dp)
                                         )
                                     }
                                 }

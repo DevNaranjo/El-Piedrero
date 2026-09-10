@@ -10,6 +10,10 @@ class AccessibilityPersistence(context: Context) {
         const val FONT_SCALE_NORMAL = 1.0f
         const val FONT_SCALE_LARGE = 1.12f
         const val FONT_SCALE_EXTRA_LARGE = 1.25f
+
+        private const val KEY_DEAL_REMINDER_ENABLED = "deal_reminder_enabled"
+        private const val KEY_DEAL_REMINDER_SECONDS = "deal_reminder_seconds"
+        const val DEFAULT_DEAL_REMINDER_SECONDS = 30
     }
 
     fun loadFontScale(): Float {
@@ -18,5 +22,21 @@ class AccessibilityPersistence(context: Context) {
 
     fun saveFontScale(scale: Float) {
         prefs.edit().putFloat(KEY_FONT_SCALE, scale).apply()
+    }
+
+    fun loadDealReminderEnabled(): Boolean {
+        return prefs.getBoolean(KEY_DEAL_REMINDER_ENABLED, true)
+    }
+
+    fun saveDealReminderEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DEAL_REMINDER_ENABLED, enabled).apply()
+    }
+
+    fun loadDealReminderSeconds(): Int {
+        return prefs.getInt(KEY_DEAL_REMINDER_SECONDS, DEFAULT_DEAL_REMINDER_SECONDS)
+    }
+
+    fun saveDealReminderSeconds(seconds: Int) {
+        prefs.edit().putInt(KEY_DEAL_REMINDER_SECONDS, seconds).apply()
     }
 }

@@ -20,7 +20,8 @@ enum class MessageType {
     SET_DEALER,
     APPLY_CARD_COUNT,
     RESET_GAME,
-    RESTART_HAND
+    RESTART_HAND,
+    SET_COUNTING_CARDS
 }
 
 @Serializable
@@ -155,7 +156,8 @@ data class GameState(
     val reserveTeams: List<Team> = emptyList(),
     val currentDeal: Int = 1,
     val currentHand: Int = 1,
-    val dealerPlayerId: String? = null
+    val dealerPlayerId: String? = null,
+    val isCountingCards: Boolean = false
 ) {
     fun maxDeals(): Int = getMaxDeals(maxPlayers)
 }
@@ -239,6 +241,11 @@ data class ResetGamePayload(
 )
 
 @Serializable
+data class SetCountingCardsPayload(
+    val isCounting: Boolean
+)
+
+@Serializable
 data class NetworkEnvelope(
     val type: MessageType,
     val id: String = UUID.randomUUID().toString(),
@@ -256,5 +263,6 @@ data class NetworkEnvelope(
     val setDealer: SetDealerPayload? = null,
     val applyCardCount: ApplyCardCountPayload? = null,
     val resetGame: ResetGamePayload? = null,
+    val setCountingCards: SetCountingCardsPayload? = null,
     val gameStateBroadcast: GameState? = null
 )

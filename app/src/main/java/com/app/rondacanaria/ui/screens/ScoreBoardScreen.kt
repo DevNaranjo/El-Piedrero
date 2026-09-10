@@ -7,8 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -41,9 +43,13 @@ import com.app.rondacanaria.ui.ScoreViewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.delay
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
+import com.app.rondacanaria.ui.components.AutoResizedText
 import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
+import com.app.rondacanaria.ui.components.FloatingControlDock
 import com.app.rondacanaria.ui.components.MesaCardsDealDialog
 import com.app.rondacanaria.ui.components.MesaWaitingDialog
+import com.app.rondacanaria.ui.components.ModernPlayerScoreCard
+import com.app.rondacanaria.ui.components.ReactiveCantosGrid
 import com.app.rondacanaria.ui.components.TvCastDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,6 +121,7 @@ fun ScoreBoardScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
+    var showCardCountWaitingDialog by remember { mutableStateOf(false) }
     var showMesaCardsDialog by remember { mutableStateOf(false) }
     var showMesaWaitingDialog by remember { mutableStateOf(false) }
     var showManageLeadersDialog by remember { mutableStateOf(false) }
@@ -173,6 +180,24 @@ fun ScoreBoardScreen(
         }
     }
 
+    // Sincronización del recuento de cartas en multijugador: mostrar pantalla de espera a los demás jugadores
+    LaunchedEffect(gameState.isCountingCards, canShowMesaCards, isMultiplayer) {
+        if (gameState.isCountingCards) {
+            if (!canShowMesaCards && isMultiplayer) {
+                showCardCountWaitingDialog = true
+            }
+        } else {
+            showCardCountWaitingDialog = false
+        }
+    }
+
+    // Cerrar automáticamente la pantalla de espera de recuento cuando inicie una nueva mano o finalice la partida
+    LaunchedEffect(gameState.currentHand, gameState.currentDeal, gameState.status) {
+        if (gameState.currentDeal < gameState.maxDeals() || gameState.status == GameStatus.FINISHED) {
+            showCardCountWaitingDialog = false
+        }
+    }
+
     // Al pulsar el botón 'Atrás' del móvil en partida: cerrar diálogos abiertos o pedir confirmación para no salir por error
     BackHandler {
         if (showManageLeadersDialog) {
@@ -181,6 +206,8 @@ fun ScoreBoardScreen(
             showMesaCardsDialog = false
         } else if (showMesaWaitingDialog) {
             showMesaWaitingDialog = false
+        } else if (showCardCountWaitingDialog) {
+            showCardCountWaitingDialog = false
         } else if (showCustomizeButtonsDialog) {
             showCustomizeButtonsDialog = false
         } else if (showTvCastDialog) {
@@ -189,6 +216,7 @@ fun ScoreBoardScreen(
             showAudioSettingsDialog = false
         } else if (showCardCountDialog) {
             showCardCountDialog = false
+            viewModel.setCountingCards(false)
         } else if (showMoveHistoryDialog) {
             showMoveHistoryDialog = false
         } else if (showSwitchTeamDialog) {
@@ -261,14 +289,24 @@ fun ScoreBoardScreen(
     val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam))
     val isAtMaxDeals = gameState.currentDeal >= maxDeals
 
-    // Miniventana flotante: recordatorio tras 1 minuto en el reparto (o al iniciar la partida)
-    LaunchedEffect(gameState.gameId, gameState.currentHand, gameState.currentDeal, gameState.winnerTeam, gameState.status, isReserve) {
+    // Miniventana flotante: recordatorio de reparto (por defecto 30s, configurable y desactivable)
+    LaunchedEffect(
+        gameState.gameId,
+        gameState.currentHand,
+        gameState.currentDeal,
+        gameState.winnerTeam,
+        gameState.status,
+        isReserve,
+        uiState.isDealReminderEnabled,
+        uiState.dealReminderSeconds
+    ) {
         showDealReminder = false
-        if (isReserve || gameState.winnerTeam != null || gameState.status == GameStatus.FINISHED) {
+        if (!uiState.isDealReminderEnabled || isReserve || gameState.winnerTeam != null || gameState.status == GameStatus.FINISHED) {
             return@LaunchedEffect
         }
-        delay(60_000L)
-        if (!isReserve && gameState.winnerTeam == null && gameState.status != GameStatus.FINISHED) {
+        val delayMillis = uiState.dealReminderSeconds.coerceAtLeast(5) * 1000L
+        delay(delayMillis)
+        if (uiState.isDealReminderEnabled && !isReserve && gameState.winnerTeam == null && gameState.status != GameStatus.FINISHED) {
             showDealReminder = true
         }
     }
@@ -477,6 +515,15 @@ fun ScoreBoardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.background,
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+                        )
+                    )
+                )
         ) {
             Column(
                 modifier = Modifier
@@ -719,12 +766,15 @@ fun ScoreBoardScreen(
                                 onClick = {
                                     showDealReminder = false
                                     if (isAtMaxDeals) {
-                                        showCardCountDialog = true
+                                        if (canShowMesaCards) {
+                                            showCardCountDialog = true
+                                            viewModel.setCountingCards(true)
+                                        }
                                     } else {
                                         viewModel.changeDeal(gameState.currentDeal + 1)
                                     }
                                 },
-                                enabled = !isReserve,
+                                enabled = !isReserve && (!isAtMaxDeals || canShowMesaCards),
                                 modifier = Modifier
                                     .size(42.dp)
                                     .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp),
@@ -764,10 +814,13 @@ fun ScoreBoardScreen(
                         }
                     }
 
-                    if (isAtMaxDeals && !isReserve) {
+                    if (isAtMaxDeals && !isReserve && canShowMesaCards) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(
-                            onClick = { showCardCountDialog = true },
+                            onClick = {
+                                showCardCountDialog = true
+                                viewModel.setCountingCards(true)
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -802,14 +855,12 @@ fun ScoreBoardScreen(
             ) {
                 // Tarjeta Equipo A (si no está en reserva)
                 if (showTeamA) {
-                    RondaScoreCard(
+                    ModernPlayerScoreCard(
                         modifier = Modifier.weight(1f),
                         teamName = if (isDealerInA && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamA} 🃏" else gameState.nameTeamA,
                         score = gameState.scoreTeamA,
                         wins = gameState.winsTeamA,
                         isSelected = selectedTeamForCanto == Team.TEAM_A,
-                        teamColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         isCompact = isCompactCards,
                         canModify = canModifyA,
                         onSelect = { if (canModifyA) selectedTeamForCanto = Team.TEAM_A },
@@ -820,14 +871,12 @@ fun ScoreBoardScreen(
 
                 // Tarjeta Equipo B (si no está en reserva)
                 if (showTeamB) {
-                    RondaScoreCard(
+                    ModernPlayerScoreCard(
                         modifier = Modifier.weight(1f),
                         teamName = if (isDealerInB && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamB} 🃏" else gameState.nameTeamB,
                         score = gameState.scoreTeamB,
                         wins = gameState.winsTeamB,
                         isSelected = selectedTeamForCanto == Team.TEAM_B,
-                        teamColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         isCompact = isCompactCards,
                         canModify = canModifyB,
                         onSelect = { if (canModifyB) selectedTeamForCanto = Team.TEAM_B },
@@ -838,14 +887,12 @@ fun ScoreBoardScreen(
 
                 // Tarjeta Equipo C (si 3, 6 u 8 jugadores y no está en reserva)
                 if (showTeamC) {
-                    RondaScoreCard(
+                    ModernPlayerScoreCard(
                         modifier = Modifier.weight(1f),
                         teamName = if (isDealerInC && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamC} 🃏" else gameState.nameTeamC,
                         score = gameState.scoreTeamC,
                         wins = gameState.winsTeamC,
                         isSelected = selectedTeamForCanto == Team.TEAM_C,
-                        teamColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                         isCompact = isCompactCards,
                         canModify = canModifyC,
                         onSelect = { if (canModifyC) selectedTeamForCanto = Team.TEAM_C },
@@ -856,14 +903,12 @@ fun ScoreBoardScreen(
 
                 // Tarjeta Equipo D (si 8 jugadores y no está en reserva)
                 if (showTeamD) {
-                    RondaScoreCard(
+                    ModernPlayerScoreCard(
                         modifier = Modifier.weight(1f),
                         teamName = if (isDealerInD && (isTwoPlayers || isThreePlayers)) "${gameState.nameTeamD} 🃏" else gameState.nameTeamD,
                         score = gameState.scoreTeamD,
                         wins = gameState.winsTeamD,
                         isSelected = selectedTeamForCanto == Team.TEAM_D,
-                        teamColor = MaterialTheme.colorScheme.outlineVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
                         isCompact = isCompactCards,
                         canModify = canModifyD,
                         onSelect = { if (canModifyD) selectedTeamForCanto = Team.TEAM_D },
@@ -1135,104 +1180,29 @@ fun ScoreBoardScreen(
                 }
             }
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val buttonPairs = uiState.cantoButtonOrder.chunked(2)
-                buttonPairs.forEach { pair ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Min),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        pair.forEach { cantoType ->
-                            CantoActionButton(
-                                cantoType = cantoType,
-                                onClick = {
-                                    viewModel.callCanto(cantoTargetTeam, cantoType)
-                                    val bufoPoints = when (cantoType) {
-                                        CantoType.RONDA, CantoType.PARRANDA -> 1
-                                        CantoType.CARACOL, CantoType.CARACOLILLO -> 2
-                                        else -> null
-                                    }
-                                    if (bufoPoints != null) {
-                                        activeBufoOption = ActiveBufoOption(
-                                            team = cantoTargetTeam,
-                                            cantoName = cantoType.displayName.substringBefore(" ("),
-                                            bufoPoints = bufoPoints,
-                                            dealNumber = gameState.currentDeal
-                                        )
-                                    }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                            )
-                        }
-                        if (pair.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+            // Cuadrícula de cantos reactiva con física de resortes y Zero Scroll
+            ReactiveCantosGrid(
+                cantoButtonOrder = uiState.cantoButtonOrder,
+                onCantoClick = { cantoType ->
+                    viewModel.callCanto(cantoTargetTeam, cantoType)
+                    val bufoPoints = when (cantoType) {
+                        CantoType.RONDA, CantoType.PARRANDA -> 1
+                        CantoType.CARACOL, CantoType.CARACOLILLO -> 2
+                        else -> null
+                    }
+                    if (bufoPoints != null) {
+                        activeBufoOption = ActiveBufoOption(
+                            team = cantoTargetTeam,
+                            cantoName = cantoType.displayName.substringBefore(" ("),
+                            bufoPoints = bufoPoints,
+                            dealNumber = gameState.currentDeal
+                        )
                     }
                 }
-            }
+            )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Fila fija de acciones principales: Deshacer y Terminar Partida (50% de ancho c/u)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = { viewModel.undoLastMove() },
-                    enabled = gameState.moveHistory.isNotEmpty(),
-                    modifier = Modifier
-                        .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Deshacer",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { showEndGameConfirmation = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Terminar Partida",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
+            // Espacio de resguardo para la barra flotante inferior
+            Spacer(modifier = Modifier.height(72.dp))
         }
 
         // Miniventana Flotante de Recordatorio de Siguiente Reparto
@@ -1340,12 +1310,15 @@ fun ScoreBoardScreen(
                             onClick = {
                                 showDealReminder = false
                                 if (isAtMaxDeals) {
-                                    showCardCountDialog = true
+                                    if (canShowMesaCards) {
+                                        showCardCountDialog = true
+                                        viewModel.setCountingCards(true)
+                                    }
                                 } else {
                                     viewModel.changeDeal(gameState.currentDeal + 1)
                                 }
                             },
-                            enabled = !isReserve,
+                            enabled = !isReserve && (!isAtMaxDeals || canShowMesaCards),
                             modifier = Modifier
                                 .weight(1.2f)
                                 .defaultMinSize(minHeight = 38.dp),
@@ -1372,6 +1345,20 @@ fun ScoreBoardScreen(
                     }
                 }
             }
+
+            // Barra Flotante Inferior de Control (Floating Control Dock)
+            FloatingControlDock(
+                canUndo = gameState.moveHistory.isNotEmpty(),
+                onUndo = { viewModel.undoLastMove() },
+                moveCount = gameState.moveHistory.size,
+                onOpenHistory = { showMoveHistoryDialog = true },
+                canShowMesaCards = gameState.currentDeal == 1 && !isReserve && canShowMesaCards,
+                onOpenMesaCards = { showMesaCardsDialog = true },
+                onEndGame = { showEndGameConfirmation = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
+            )
         }
     }
 }
@@ -1386,6 +1373,8 @@ fun ScoreBoardScreen(
             isSfxEnabled = uiState.isSfxEnabled,
             isVibrationEnabled = uiState.isVibrationEnabled,
             fontScale = uiState.fontScale,
+            isDealReminderEnabled = uiState.isDealReminderEnabled,
+            dealReminderSeconds = uiState.dealReminderSeconds,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
@@ -1393,6 +1382,8 @@ fun ScoreBoardScreen(
             onToggleSfx = { viewModel.toggleSfx(it) },
             onToggleVibration = { viewModel.toggleVibration(it) },
             onFontScaleChange = { viewModel.setFontScale(it) },
+            onToggleDealReminder = { viewModel.setDealReminderEnabled(it) },
+            onDealReminderSecondsChange = { viewModel.setDealReminderSeconds(it) },
             onSkipSong = { viewModel.skipSong() },
             onOpenCustomizeButtons = {
                 showAudioSettingsDialog = false
@@ -1495,8 +1486,9 @@ fun ScoreBoardScreen(
         )
     }
 
-    // Diálogo de recuento de cartas al final de la mano
-    if (showCardCountDialog) {
+    // Diálogo de recuento de cartas al final de la mano (para el repartidor / líder)
+    val shouldShowCardCountDialog = (showCardCountDialog || gameState.isCountingCards) && canShowMesaCards
+    if (shouldShowCardCountDialog) {
         val activeTeamsList = buildList {
             if (showTeamA) add(Team.TEAM_A to gameState.nameTeamA)
             if (showTeamB) add(Team.TEAM_B to gameState.nameTeamB)
@@ -1512,13 +1504,27 @@ fun ScoreBoardScreen(
             nextDealerName = nextDealerName,
             onApplyCount = { counts ->
                 viewModel.applyCardCount(counts)
+                viewModel.setCountingCards(false)
                 showCardCountDialog = false
             },
             onSkipWithoutCards = {
                 viewModel.restartHand()
+                viewModel.setCountingCards(false)
                 showCardCountDialog = false
             },
-            onDismiss = { showCardCountDialog = false }
+            onDismiss = {
+                viewModel.setCountingCards(false)
+                showCardCountDialog = false
+            }
+        )
+    }
+
+    // Diálogo de espera para los demás jugadores en multijugador mientras el repartidor realiza el recuento de cartas
+    if (showCardCountWaitingDialog && isMultiplayer && !canShowMesaCards) {
+        CardCountWaitingDialog(
+            dealerName = dealerName,
+            currentHand = gameState.currentHand,
+            onDismiss = { showCardCountWaitingDialog = false }
         )
     }
 
@@ -3607,6 +3613,85 @@ fun CardCountDialog(
             }
         )
     }
+}
+
+/**
+ * Pantalla de espera para los demás jugadores en multijugador mientras el repartidor
+ * realiza el recuento de cartas al final de la mano.
+ */
+@Composable
+fun CardCountWaitingDialog(
+    dealerName: String,
+    currentHand: Int,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false),
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "🃏", fontSize = 28.sp)
+                }
+            }
+        },
+        title = {
+            Text(
+                text = "Recuento de Cartas",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Text(
+                    text = "El repartidor ($dealerName) está realizando el recuento de cartas de la mano.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Contando las cartas de cada equipo para sumar las piedras correspondientes.\n\nLa siguiente mano comenzará automáticamente al finalizar el recuento.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text("Entendido", fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable

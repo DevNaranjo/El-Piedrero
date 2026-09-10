@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-v1.0.2%20(Code%203)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-v1.0.3%20(Code%204)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -16,31 +16,29 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 
 ---
 
-## 🚀 Novedades de la Versión 1.0.2 (Parche v1.0.2)
+## 🚀 Novedades de la Versión 1.0.3 (Parche v1.0.3)
 
-* 🔠 **Escalabilidad y Protección con Fuente Extra Grande (+25%):**
-  * Solucionado el problema donde los botones se encogían y los textos desbordaban al activar tipografías grandes en el menú de Accesibilidad.
-  * **Tarjetas de tanteo elásticas:** Las tarjetas adaptan dinámicamente su altura según la escala tipográfica activa, evitando que el texto de malas/buenas y puntos comprima la fila de botones de suma y resta.
-  * **Ajuste inteligente de cantos:** Los botones de cantos largos (*"Requetecontramajo (+4)"*, *"Majo y Limpio (+2)"*, *"Caracolillo (+5)"*) soportan ajuste en dos líneas con interlineado optimizado sin recortar nombres ni puntuación.
-  * **Acciones elásticas sin compresión:** La botonera de reparto, *"Deshacer"* y *"Terminar Partida"* ahora utilizan alturas mínimas adaptables en lugar de fijas, preservando la proporción en cualquier tamaño de pantalla.
-* ⏳ **Miniventana Flotante de Recordatorio de Reparto:**
-  * Si los jugadores se despistan y olvidan avanzar al siguiente reparto, transcurrido 1 minuto tras pulsar `+` (o tras comenzar la partida en el 1.ᵉʳ reparto), aparece automáticamente una miniventana flotante no intrusiva.
-  * Permite avanzar directamente con un toque (*"Reparto Xº"*) o descartar si siguen disputando la mano (*"Aún jugando"* / ✕).
-  * En el último reparto, recuerda el paso al *"Recuento de Cartas"*. Se oculta al instante al cambiar de reparto o finalizar la partida.
-* 👑 **Opción Contextual "De Bufos" en Cantos:**
-  * Al cantar **Ronda** o **Parranda**, aparece un botón extra *"De bufos (+1)"* para sumar 1 piedra adicional de rey/bufo.
-  * Al cantar **Caracol** o **Caracolillo**, el botón extra permite sumar **+2 piedras** adicionales (*"De bufos (+2)"*).
-  * **Exclusivo del reparto en curso:** La opción solo permanece activa durante el reparto en el que se efectuó el canto, expirando y ocultándose automáticamente al cambiar de mano/reparto.
-* 👥 **Pantalla de Espera en Multijugador durante el Reparto de Cartas a la Mesa:**
-  * Al comenzar la mano (1.ᵉʳ reparto), el repartidor/líder visualiza la pantalla interactiva de las 4 cartas de la mesa mientras que a los demás jugadores conectados les aparece una pantalla informativa de espera indicando quién está repartiendo.
-  * Se sincroniza en tiempo real: se cierra automáticamente en todos los móviles en cuanto el repartidor aplica las piedras o concluye el recuento (incluso con 0 piedras), o bien manualmente pulsando *"Entendido"*.
+* 🎵 **Estabilidad Total del Reproductor de Música (Crash Fix):**
+  * Solucionado definitivamente el cierre inesperado de la aplicación que ocurría al terminar de reproducirse cualquier canción ambiental de fondo.
+  * **Unificación del ciclo de vida:** Se eliminaron los temporizadores de fade-out que competían con el final de pista. El avance de canción pasa a depender exclusivamente del callback nativo `setOnCompletionListener` con guarda atómica de concurrencia (`AtomicBoolean`).
+  * **Blindaje contra excepciones:** Todas las llamadas a métodos del sistema (`isPlaying`, `setVolume`, `start`, `stop`, `release`) están encapsuladas con captura defensiva, garantizando que un estado transitorio del reproductor nunca cause una excepción no controlada en el hilo principal.
+* 📺 **Eliminación de Interferencias y Chasquidos en TV Cast / Miracast:**
+  * **Streaming nativo del kernel:** Se reemplazó el búfer en memoria RAM basado en JNI (`MemoryAudioDataSource`) por reproducción directa mediante `AssetFileDescriptor` y ficheros locales en caché.
+  * **Búfer de 2 a 4 segundos inmune a la CPU:** Al desacoplar la lectura de audio de la máquina virtual Java, el decodificador nativo de Android (`NuPlayer`) mantiene el flujo hacia la televisión sin micro-cortes ni distorsiones provocadas por la codificación de vídeo de pantalla o el recolector de basura (GC).
+  * **Fundidos en corrutinas (10 Hz):** Sustitución del animador `ValueAnimator` a 60 FPS por rampas de volumen escalonadas en corrutinas secundarias, evitando saturar el bus IPC de `AudioFlinger` y `RemoteSubmix`.
+  * **Atenuación protectora:** Factor de escala para prevenir saturación y distorsión acústica digital en los altavoces de la Smart TV.
+* 👥 **Pantallas de Espera Sincronizadas en Multijugador (Mesa y Recuento):**
+  * Al comenzar la mano (1.ᵉʳ reparto), los jugadores no repartidores ven la pantalla de espera de mesa.
+  * Al concluir la mano, cuando el repartidor abre el diálogo de recuento de cartas, los demás jugadores ven la pantalla informativa de espera con barra de progreso y nombre del repartidor hasta que se aplican las piedras.
+* ⏳ **Recordatorio Flotante de Reparto Configurable (30s por defecto):**
+  * El aviso flotante pasa a 30s por defecto, con interruptor de activación y selector de tiempos (15s, 30s, 45s, 60s, 90s) persistente en el menú de Ajustes y Accesibilidad.
 
 ---
 
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0.2 / versionCode 3**).
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0.3 / versionCode 4**).
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.
