@@ -32,6 +32,8 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
   * Al concluir la mano, cuando el repartidor abre el diálogo de recuento de cartas, los demás jugadores ven la pantalla informativa de espera con barra de progreso y nombre del repartidor hasta que se aplican las piedras.
 * ⏳ **Recordatorio Flotante de Reparto Configurable (30s por defecto):**
   * El aviso flotante pasa a 30s por defecto, con interruptor de activación y selector de tiempos (15s, 30s, 45s, 60s, 90s) persistente en el menú de Ajustes y Accesibilidad.
+* 🪟 **Desacoplamiento del Dock de Control Inferior (UI Fix):**
+  * Solucionado el solapamiento visual entre la cápsula flotante inferior de controles (deshacer, historial, cartas a la mesa y terminar partida) y la ventana emergente superior de recordatorio de reparto. Ambos elementos operan ahora de forma totalmente independiente.
 
 ---
 

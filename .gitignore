@@ -87,6 +87,10 @@ $RECYCLE.BIN/
 .aider*
 .cursor/
 .vscode/
+GEMINI.md
+*.gemini.md
+*.patch
+*.diff
 *.orig
 Github.txt
 github.txt
