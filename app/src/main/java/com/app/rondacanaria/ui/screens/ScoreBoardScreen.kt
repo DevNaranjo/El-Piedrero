@@ -1345,21 +1345,21 @@ fun ScoreBoardScreen(
                     }
                 }
             }
-
-            // Barra Flotante Inferior de Control (Floating Control Dock)
-            FloatingControlDock(
-                canUndo = gameState.moveHistory.isNotEmpty(),
-                onUndo = { viewModel.undoLastMove() },
-                moveCount = gameState.moveHistory.size,
-                onOpenHistory = { showMoveHistoryDialog = true },
-                canShowMesaCards = gameState.currentDeal == 1 && !isReserve && canShowMesaCards,
-                onOpenMesaCards = { showMesaCardsDialog = true },
-                onEndGame = { showEndGameConfirmation = true },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
-            )
         }
+
+        // Barra Flotante Inferior de Control (Floating Control Dock)
+        FloatingControlDock(
+            canUndo = gameState.moveHistory.isNotEmpty(),
+            onUndo = { viewModel.undoLastMove() },
+            moveCount = gameState.moveHistory.size,
+            onOpenHistory = { showMoveHistoryDialog = true },
+            canShowMesaCards = gameState.currentDeal == 1 && !isReserve && canShowMesaCards,
+            onOpenMesaCards = { showMesaCardsDialog = true },
+            onEndGame = { showEndGameConfirmation = true },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp)
+        )
     }
 }
 
