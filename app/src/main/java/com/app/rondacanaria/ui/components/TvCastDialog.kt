@@ -55,6 +55,7 @@ fun TvCastDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.large,
         icon = {
             Icon(
                 imageVector = Icons.Default.Tv,
@@ -79,7 +80,7 @@ fun TvCastDialog(
             ) {
                 // Tarjeta con instrucciones claras
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -138,7 +139,7 @@ fun TvCastDialog(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = MaterialTheme.shapes.small,
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -159,6 +160,7 @@ fun TvCastDialog(
                     launchCastSettings()
                     onDismiss()
                 },
+                shape = MaterialTheme.shapes.medium,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Icon(

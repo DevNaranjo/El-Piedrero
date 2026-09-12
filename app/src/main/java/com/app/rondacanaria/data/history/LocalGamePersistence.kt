@@ -6,15 +6,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable
-data class LocalSavedGame(
-    val gameState: GameState,
-    val maxPlayers: Int,
-    val teamAName: String,
-    val teamBName: String,
-    val teamCName: String,
-    val teamDName: String
-)
 
 class LocalGamePersistence(context: Context) {
     private val prefs = context.getSharedPreferences("ronda_local_game_prefs", Context.MODE_PRIVATE)

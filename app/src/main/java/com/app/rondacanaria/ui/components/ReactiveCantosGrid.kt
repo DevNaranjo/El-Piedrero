@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -80,23 +81,24 @@ fun SpringCantoButton(
     )
 
     val isQueenPlay = cantoType == CantoType.CARACOLILLO
+    val isHeavySpecialPlay = cantoType == CantoType.SOBREMAJO || cantoType == CantoType.REQUETECONTRAMAJO
+    val isSpecialPlay = isQueenPlay || isHeavySpecialPlay
 
-    val colors = if (isQueenPlay) {
-        ButtonDefaults.filledTonalButtonColors(
+    val colors = when {
+        isQueenPlay -> ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
         )
-    } else {
-        ButtonDefaults.filledTonalButtonColors(
+        else -> ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
 
-    val border = if (isQueenPlay) {
-        BorderStroke(1.8.dp, MaterialTheme.colorScheme.tertiary)
-    } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    val border = when {
+        isQueenPlay -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        isHeavySpecialPlay -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f))
+        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     }
 
     FilledTonalButton(
@@ -108,19 +110,30 @@ fun SpringCantoButton(
                 scaleX = scale
                 scaleY = scale
             },
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = colors,
         border = border,
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
     ) {
-        AutoResizedText(
-            text = cantoType.displayName,
-            targetFontSize = 14.5.sp,
-            minFontSize = 10.5.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            textAlign = TextAlign.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
-        )
+        ) {
+            if (isQueenPlay) {
+                Text("👑 ", fontSize = 12.sp)
+            } else if (isHeavySpecialPlay) {
+                Text("⚡ ", fontSize = 12.sp)
+            }
+            AutoResizedText(
+                text = cantoType.displayName,
+                targetFontSize = 14.5.sp,
+                minFontSize = 10.5.sp,
+                fontWeight = if (isSpecialPlay) FontWeight.Black else FontWeight.Bold,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+        }
     }
 }

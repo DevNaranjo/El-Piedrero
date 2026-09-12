@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-v1.0.3%20(Code%204)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Version](https://img.shields.io/badge/Version-v1.1--Beta%20(Code%206)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -12,14 +12,25 @@
 
 **El Piedrero** is a native open-source Android application designed to keep track of scores ("piedras") in the traditional **Canary Ronda** card game conveniently, automatically, and 100% offline (no Internet connection required).
 
-Play with a single phone in the center of the table or synchronize scores across multiple devices via **Local Wi-Fi and QR codes**, playing authentic sound effects for each traditional call and play (*Ronda, Parranda, Caracol, Caracolillo, Majo, Limpiar, Majo y Limpio, and ¡Buenas!*), featuring a persistent history of the **last 30 games**.
+Play with a single phone in the center of the table or synchronize scores across multiple devices via **Local Wi-Fi and QR codes**, playing authentic sound effects for each traditional call and play (*Ronda, Parranda, Caracol, Caracolillo, Majo, Limpiar, Majo y Limpio, ¡Buenas!, and De bufos*), featuring a persistent history of the **last 30 games**.
+
+---
+
+## 🚀 What's New in Version 1.1-Beta
+
+> **Update focused on optimizing and polishing the scoreboard GUI:** fluid animations during the transition from bad stones to good stones, touch accessibility enhancements for seniors, advanced haptic micro-interactions, and custom themes with team avatars.
+
+* 🎵 **Comprehensive Audio Stability (RAM Architecture):** 100% in-memory audio playback via `MemoryAudioDataSource`, eliminating disk race conditions, stuttering, and chipmunk speed-up artifacts.
+* 👑 **Contextual "De bufos" Audio (`De-bufos.mp3`):** Authentic call sound synced over local P2P network for Host and Clients.
+* 🌓 **Smooth Theme Transitions:** Material 3 color animations with 380 ms `FastOutSlowInEasing`.
+* 👥 **Multiplayer Flexibility:** Host and game Leader can switch teams directly from the waiting lobby.
 
 ---
 
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases)** page (**v1.0.3 / versionCode 4**).
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases)** page (**v1.1-Beta / versionCode 6**).
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.
@@ -52,18 +63,18 @@ If you want to install and play Ronda Canaria with friends and family:
 
 ---
 
-## 🚀 What's New in Version 1.0.3 (Patch v1.0.3)
- 
-* 🎵 **BGM Player Reliability (Crash Fix):**
-  * Fixed unexpected app crashes upon song track completion by unifying lifecycle management directly on the native `setOnCompletionListener` callback with atomic concurrency protection.
-  * Robust defensive wrappers around all media playback system calls.
-* 📺 **TV Cast & Miracast Audio Smoothing:**
-  * Replaced JNI-based RAM audio data source with direct kernel streaming via `AssetFileDescriptor` and local cache file, providing a dedicated 2-4 second buffer.
-  * Coroutine-based volume ramping (10 Hz) preventing IPC saturation on `AudioFlinger`.
-* ⏳ **Configurable Deal Reminder Floating Alert:**
-  * Adjusted default reminder timeout to 30s, with toggle and custom interval selector (15s, 30s, 45s, 60s, 90s) in Settings & Accessibility.
-* 🪟 **Floating Control Dock Decoupling (UI Fix):**
-  * Resolved visual overlapping between the bottom floating pill (undo, history, table cards, end game) and the top deal reminder prompt. Both components now operate completely independently.
+## 🚀 What's New in Version 1.0-stable (versionCode 1)
+
+* 🃏 **Official "Cartas a la Mesa" Modal:** Interactive dialog (`MesaCardsDealDialog`) displaying authentic card illustrations for the 4 table cards on the first deal of each hand, with matching stone summation and "¿Bien dada?" option (+1 stone to dealer).
+* 🎯 **Deal 1 Contextual Visibility:**
+  * Window-transition safe auto-trigger with Compose stabilization delay and `rememberSaveable`.
+  * Dedicated button **`🃏 Cartas a la Mesa (1.ᵉʳ Reparto)`** in the deal control panel visible exclusively during Deal 1.
+* 👑 **Rival Team Leaders in Multiplayer (4, 6, and 8 Players):** The host can appoint leaders on opposing teams to delegate host permissions (changing dealer, managing table cards, and applying final card count).
+* 🔊 **Audio & TV Casting Engine Optimization:**
+  * Pre-buffering and elevated thread priority (`Process.setThreadPriority`) in `RondaAudioPlayer` to eliminate audio micro-stutters during screen casting.
+  * Constant 128 kbps (44.1 kHz stereo) BGM compression reducing network bandwidth competition.
+* 🔄 **Local Game Finish Flow:** Redirection button on the victory dialog updated to "Volver al Menú" to cleanly return to mode selection and reset local persistence.
+* 📝 **Text Polish:** Accurate singular/plural formatting for matching cards and corrected negation phrasing when no cards repeat.
 
 ---
 

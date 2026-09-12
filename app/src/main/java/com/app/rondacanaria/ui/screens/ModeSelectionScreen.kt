@@ -8,11 +8,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
@@ -20,6 +22,10 @@ import androidx.compose.runtime.*
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.PrivacyPolicyDialog
 import com.app.rondacanaria.ui.components.TvCastDialog
+import com.app.rondacanaria.ui.theme.canarianBadgeContainerColor
+import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
+import com.app.rondacanaria.ui.theme.goldActionButtonColors
+import com.app.rondacanaria.ui.theme.headlineContentColor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -93,10 +99,7 @@ fun ModeSelectionScreen(
                         Icon(Icons.Default.History, contentDescription = "Ver Historial")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                colors = elPiedreroTopAppBarColors()
             )
         }
     ) { padding ->
@@ -108,38 +111,67 @@ fun ModeSelectionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = "Logo El Piedrero",
-                modifier = Modifier
-                    .size(115.dp)
-                    .clip(CircleShape)
-            )
+            Surface(
+                shape = CircleShape,
+                shadowElevation = 8.dp,
+                color = androidx.compose.ui.graphics.Color.Transparent,
+                modifier = Modifier.size(116.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.app_logo),
+                    contentDescription = "Logo El Piedrero",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "¿Cómo vas a jugar hoy?",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.primary
+                fontWeight = FontWeight.Bold,
+                color = headlineContentColor(),
+                textAlign = TextAlign.Center
             )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                    modifier = Modifier.width(32.dp).height(2.dp),
+                    shape = CircleShape
+                ) {}
+                Text("🪨", fontSize = 11.sp)
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                    modifier = Modifier.width(32.dp).height(2.dp),
+                    shape = CircleShape
+                ) {}
+            }
 
             Text(
                 text = "Selecciona la modalidad para iniciar la mesa",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
+                textAlign = TextAlign.Center
             )
 
             // Opción 1: Marcador Local (1 Dispositivo)
-            Card(
+            ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showLocalSetupDialog = true },
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                shape = MaterialTheme.shapes.large,
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
                 Row(
                     modifier = Modifier
@@ -148,16 +180,17 @@ fun ModeSelectionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.primary,
+                        color = canarianBadgeContainerColor(),
                         shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f)),
                         modifier = Modifier.size(56.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Default.PhoneAndroid,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(32.dp)
+                                Icons.Default.Style,
+                                contentDescription = "Partida Local",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(30.dp)
                             )
                         }
                     }
@@ -167,8 +200,7 @@ fun ModeSelectionScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Partida Local",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -180,16 +212,18 @@ fun ModeSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Opción 2: Partida en Red (Varios Dispositivos Wi-Fi)
-            Card(
+            ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { viewModel.goToNetworkLobby() },
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
-                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                shape = MaterialTheme.shapes.large,
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
                 Row(
                     modifier = Modifier
@@ -198,15 +232,16 @@ fun ModeSelectionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = canarianBadgeContainerColor(),
                         shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f)),
                         modifier = Modifier.size(56.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Default.Wifi,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondary,
+                                Icons.Default.Groups,
+                                contentDescription = "Partida Multijugador",
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -217,8 +252,7 @@ fun ModeSelectionScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Partida Multijugador",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -235,20 +269,26 @@ fun ModeSelectionScreen(
             // Opción 3: Ver Historial de Partidas
             OutlinedButton(
                 onClick = { viewModel.goToHistory() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.History,
                     contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Historial de Partidas (Últimas 30)",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
+                    style = MaterialTheme.typography.labelLarge,
                     textAlign = TextAlign.Center
                 )
             }
@@ -256,39 +296,47 @@ fun ModeSelectionScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             // Subapartado: Privacidad y Protección de Datos
-            Card(
+            ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showPrivacyDialog = true },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                shape = MaterialTheme.shapes.large,
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = "Privacidad y Uso de Datos",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = "Privacidad y Uso de Datos",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Privacidad y Uso de Datos",
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "100% Offline & P2P · Cero recopilación · Licencia MIT",
-                            fontSize = 11.sp,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -298,39 +346,47 @@ fun ModeSelectionScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Subapartado: Licencias de Código Abierto (Atribución Apache 2.0 / MIT)
-            Card(
+            ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showLicensesDialog = true },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                shape = MaterialTheme.shapes.large,
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Licencias de Software Libre",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Licencias de Software Libre",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Licencias de Código Abierto",
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "ZXing, AndroidX, Jetpack Compose · Apache 2.0",
-                            fontSize = 11.sp,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -343,7 +399,15 @@ fun ModeSelectionScreen(
     if (showLocalSetupDialog) {
         AlertDialog(
             onDismissRequest = { showLocalSetupDialog = false },
-            title = { Text("Configurar Partida Local", textAlign = TextAlign.Center) },
+            shape = MaterialTheme.shapes.large,
+            title = {
+                Text(
+                    text = "Configurar Partida Local",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
             text = {
                 Column(
                     modifier = Modifier
@@ -721,12 +785,18 @@ fun ModeSelectionScreen(
                         reserveTeams = reserves,
                         customPlayers = finalPlayers
                     )
-                }) {
-                    Text("Empezar Partida", textAlign = TextAlign.Center)
+                },
+                shape = MaterialTheme.shapes.medium,
+                colors = goldActionButtonColors()
+                ) {
+                    Text("Empezar Partida", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLocalSetupDialog = false }) {
+                TextButton(
+                    onClick = { showLocalSetupDialog = false },
+                    shape = MaterialTheme.shapes.medium
+                ) {
                     Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
@@ -744,6 +814,7 @@ fun ModeSelectionScreen(
             fontScale = uiState.fontScale,
             isDealReminderEnabled = uiState.isDealReminderEnabled,
             dealReminderSeconds = uiState.dealReminderSeconds,
+            themeMode = uiState.themeMode,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
@@ -753,6 +824,7 @@ fun ModeSelectionScreen(
             onFontScaleChange = { viewModel.setFontScale(it) },
             onToggleDealReminder = { viewModel.setDealReminderEnabled(it) },
             onDealReminderSecondsChange = { viewModel.setDealReminderSeconds(it) },
+            onThemeModeChange = { viewModel.setThemeMode(it) },
             onSkipSong = { viewModel.skipSong() },
             onDismiss = { showAudioSettingsDialog = false }
         )

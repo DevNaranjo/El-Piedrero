@@ -229,6 +229,23 @@ class ClientGameUseCase(
         sent
     }
 
+    suspend fun requestScoreUpdate(teamId: Team, cantoType: CantoType?, piedras: Int, reason: String): Boolean = withContext(Dispatchers.IO) {
+        val envelope = NetworkEnvelope(
+            type = MessageType.SCORE_UPDATE,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            scoreUpdate = ScoreUpdatePayload(
+                teamId = teamId,
+                cantoType = cantoType,
+                piedras = piedras,
+                reason = reason
+            )
+        )
+        val sent = socketClient.sendMessage(envelope)
+        android.util.Log.d("ClientGameUseCase", "requestScoreUpdate ($reason, $piedras piedras para $teamId) enviado=$sent (seq=${envelope.sequenceNumber})")
+        sent
+    }
+
     suspend fun requestEndGame(reason: String = "Fin de partida solicitado"): Boolean = withContext(Dispatchers.IO) {
         val envelope = NetworkEnvelope(
             type = MessageType.END_GAME,
@@ -241,7 +258,7 @@ class ClientGameUseCase(
         sent
     }
 
-    suspend fun requestSwitchTeam(targetTeam: Team): Boolean = withContext(Dispatchers.IO) {
+    suspend fun requestSwitchTeam(targetTeam: Team, targetPlayerId: String = localPlayerId): Boolean = withContext(Dispatchers.IO) {
         if (_gameState.value?.maxPlayers == 2) return@withContext false
         // En tríos, solo se puede usar suplente antes de contar cualquier piedra
         if (_gameState.value?.maxPlayers == 3 && _gameState.value?.moveHistory?.isNotEmpty() == true) return@withContext false
@@ -250,13 +267,13 @@ class ClientGameUseCase(
             sequenceNumber = outgoingSequence.incrementAndGet(),
             senderId = localPlayerId,
             switchTeam = SwitchTeamPayload(
-                playerId = localPlayerId,
+                playerId = targetPlayerId,
                 targetTeam = targetTeam,
                 playerName = localPlayerName
             )
         )
         val sent = socketClient.sendMessage(envelope)
-        android.util.Log.d("ClientGameUseCase", "requestSwitchTeam ($targetTeam) enviado=$sent")
+        android.util.Log.d("ClientGameUseCase", "requestSwitchTeam ($targetTeam, targetPlayerId=$targetPlayerId) enviado=$sent")
         sent
     }
 

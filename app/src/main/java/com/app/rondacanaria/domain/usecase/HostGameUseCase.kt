@@ -310,6 +310,12 @@ class HostGameUseCase(
                         return
                     }
                 }
+                val senderPlayer = _gameState.value.connectedPlayers.find { it.id == envelope.senderId }
+                // El anfitrión y el líder pueden cambiarse de equipo directamente sin requerir autorización
+                if (senderPlayer?.isHost == true || senderPlayer?.isLeader == true) {
+                    switchPlayerTeam(switchPayload.playerId, switchPayload.targetTeam)
+                    return
+                }
                 val playerName = switchPayload.playerName.ifBlank { player?.name ?: "Un jugador" }
                 _pendingTeamChangeRequest.value = TeamChangeRequest(
                     playerId = switchPayload.playerId,
@@ -357,6 +363,9 @@ class HostGameUseCase(
                 val validPiedras = when (val canto = scoreUpdate.cantoType) {
                     null, CantoType.MANUAL_ADJUST -> {
                         if (scoreUpdate.piedras in -99..99 && scoreUpdate.piedras != 0) scoreUpdate.piedras else return
+                    }
+                    CantoType.DE_BUFOS -> {
+                        if (scoreUpdate.piedras in 1..2) scoreUpdate.piedras else 1
                     }
                     else -> canto.defaultPiedras
                 }

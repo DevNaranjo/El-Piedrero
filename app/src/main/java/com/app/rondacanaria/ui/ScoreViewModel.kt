@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.rondacanaria.data.audio.RondaAudioPlayer
 import com.app.rondacanaria.data.history.AccessibilityPersistence
+import com.app.rondacanaria.ui.theme.ThemeMode
 import com.app.rondacanaria.data.history.ButtonLayoutPersistence
 import com.app.rondacanaria.data.history.DEFAULT_CANTO_BUTTON_ORDER
 import com.app.rondacanaria.data.history.GameHistoryRepository
@@ -59,7 +60,8 @@ data class ScoreUiState(
     val cantoButtonOrder: List<CantoType> = DEFAULT_CANTO_BUTTON_ORDER,
     val fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
     val isDealReminderEnabled: Boolean = true,
-    val dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS
+    val dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 class ScoreViewModel(
@@ -89,7 +91,8 @@ class ScoreViewModel(
             cantoButtonOrder = buttonLayoutPersistence.loadButtonOrder(),
             fontScale = accessibilityPersistence.loadFontScale(),
             isDealReminderEnabled = accessibilityPersistence.loadDealReminderEnabled(),
-            dealReminderSeconds = accessibilityPersistence.loadDealReminderSeconds()
+            dealReminderSeconds = accessibilityPersistence.loadDealReminderSeconds(),
+            themeMode = accessibilityPersistence.loadThemeMode()
         )
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
@@ -101,7 +104,9 @@ class ScoreViewModel(
         viewModelScope.launch {
             hostUseCase.gameState.collect { state ->
                 if (_uiState.value.isHost) {
-                    _uiState.update { it.copy(gameState = state) }
+                    val hostPlayer = state.connectedPlayers.find { it.isHost }
+                    val myTeam = hostPlayer?.team ?: _uiState.value.myTeam
+                    _uiState.update { it.copy(gameState = state, myTeam = myTeam) }
                     checkAndRecordVictory(state)
                     if (_uiState.value.isLocalGame && _uiState.value.currentScreen == AppScreen.SCOREBOARD && state.status != GameStatus.FINISHED) {
                         localPersistence.saveLocalGame(
@@ -632,6 +637,36 @@ class ScoreViewModel(
         }
     }
 
+    fun callDeBufos(teamId: Team, points: Int, cantoName: String) {
+        val state = _uiState.value
+        android.util.Log.d("ScoreViewModel", "callDeBufos: $cantoName de bufos (+$points) para $teamId (isLocal=${state.isLocalGame}, isHost=${state.isHost})")
+        if (state.gameState.reserveTeams.contains(teamId)) {
+            android.util.Log.w("ScoreViewModel", "De bufos ignorado: equipo $teamId está en reserva")
+            return
+        }
+        if (!state.isLocalGame) {
+            val effectiveMyTeam = getEffectiveLocalTeam()
+            if (state.gameState.reserveTeams.contains(effectiveMyTeam) || effectiveMyTeam == Team.RESERVE) {
+                android.util.Log.w("ScoreViewModel", "De bufos ignorado: jugador local $effectiveMyTeam está en reserva")
+                return
+            }
+            if (effectiveMyTeam != teamId) {
+                android.util.Log.w("ScoreViewModel", "De bufos ignorado: jugador local $effectiveMyTeam intentó cantar para $teamId")
+                return
+            }
+        }
+
+        val reason = "$cantoName de bufos (+$points)"
+        val author = state.playerName
+        viewModelScope.launch(Dispatchers.IO) {
+            if (state.isHost) {
+                hostUseCase.applyScoreUpdate(teamId, CantoType.DE_BUFOS, points, reason, author)
+            } else {
+                clientUseCase.requestScoreUpdate(teamId, CantoType.DE_BUFOS, points, reason)
+            }
+        }
+    }
+
     fun undoLastMove() {
         val state = _uiState.value
         if (!state.isLocalGame) {
@@ -777,6 +812,8 @@ class ScoreViewModel(
         viewModelScope.launch {
             if (_uiState.value.isHost) {
                 hostUseCase.switchPlayerTeam(playerId, newTeam)
+            } else if (_uiState.value.isLeader) {
+                clientUseCase.requestSwitchTeam(newTeam, playerId)
             }
         }
     }
@@ -867,9 +904,23 @@ class ScoreViewModel(
             clientUseCase.leaveGame()
         }
         _uiState.update {
-            ScoreUiState(
+            it.copy(
                 currentScreen = AppScreen.MODE_SELECTION,
-                playerName = it.playerName,
+                teamAName = "Equipo A",
+                teamBName = "Equipo B",
+                teamCName = "Equipo C",
+                teamDName = "Equipo D",
+                maxPlayers = 4,
+                isHost = false,
+                isLeader = false,
+                isLocalGame = false,
+                myTeam = Team.SPECTATOR,
+                gameState = GameState(gameId = ""),
+                hostConnectionInfo = null,
+                sessionStatus = SessionStatus.IDLE,
+                reconnectCountdown = null,
+                errorMessage = null,
+                connectingHostName = null,
                 isMusicEnabled = audioPlayer.isMusicEnabled,
                 isSfxEnabled = audioPlayer.isSfxEnabled,
                 isVibrationEnabled = audioPlayer.isVibrationEnabled,
@@ -877,9 +928,7 @@ class ScoreViewModel(
                 musicVolume = audioPlayer.musicVolume,
                 sfxVolume = audioPlayer.sfxVolume,
                 isTvAudioOptimizationEnabled = audioPlayer.isTvAudioOptimizationEnabled,
-                isTvCastingActive = audioPlayer.isTvCastingActive,
-                cantoButtonOrder = it.cantoButtonOrder,
-                fontScale = it.fontScale
+                isTvCastingActive = audioPlayer.isTvCastingActive
             )
         }
     }
@@ -965,6 +1014,11 @@ class ScoreViewModel(
     fun setDealReminderSeconds(seconds: Int) {
         accessibilityPersistence.saveDealReminderSeconds(seconds)
         _uiState.update { it.copy(dealReminderSeconds = seconds) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        accessibilityPersistence.saveThemeMode(mode)
+        _uiState.update { it.copy(themeMode = mode) }
     }
 
     override fun onCleared() {

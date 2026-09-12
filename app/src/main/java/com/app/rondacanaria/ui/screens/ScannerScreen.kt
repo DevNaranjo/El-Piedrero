@@ -32,6 +32,7 @@ import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import com.app.rondacanaria.ui.qr.QrCameraScanner
+import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +92,8 @@ fun ScannerScreen(
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
+                colors = elPiedreroTopAppBarColors()
             )
         }
     ) { padding ->
@@ -267,7 +269,8 @@ fun ScannerScreen(
                     onClick = {
                         showDeniedDialog = false
                         permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
+                    },
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Text("Reintentar", fontWeight = FontWeight.Bold)
                 }
@@ -282,12 +285,13 @@ fun ScannerScreen(
                             }
                             context.startActivity(intent)
                         } catch (_: Exception) {}
-                    }
+                    },
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Text("Ajustes de la App")
                 }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = MaterialTheme.shapes.large
         )
     }
 }

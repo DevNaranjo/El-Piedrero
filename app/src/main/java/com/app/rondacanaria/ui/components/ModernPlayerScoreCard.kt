@@ -48,7 +48,7 @@ fun ModernPlayerScoreCard(
     onManualAdjust: (Int) -> Unit,
     onCustomAdjustClick: (() -> Unit)? = null
 ) {
-    val cardShape = RoundedCornerShape(26.dp)
+    val cardShape = MaterialTheme.shapes.extraLarge
 
     // Pulso animado sutil de resplandor para el equipo en turno activo
     val infiniteTransition = rememberInfiniteTransition(label = "glowPulseTransition")
@@ -206,41 +206,81 @@ fun ModernPlayerScoreCard(
                 }
             }
 
-            // Número HÉROE de Piedras con AnimatedContent ultra-rápido (120ms)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(vertical = 2.dp)
+            // Número HÉROE de Piedras montado sobre contenedor tipo tapete/paño tradicional con acento dorado
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                },
+                border = BorderStroke(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .padding(vertical = 2.dp)
             ) {
-                AnimatedContent<Int>(
-                    targetState = score.totalPiedras,
-                    transitionSpec = {
-                        if (targetState > initialState) {
-                            (slideInVertically(animationSpec = tween(120)) { height -> height } + fadeIn(animationSpec = tween(120)))
-                                .togetherWith(slideOutVertically(animationSpec = tween(120)) { height -> -height } + fadeOut(animationSpec = tween(120)))
-                        } else {
-                            (slideInVertically(animationSpec = tween(120)) { height -> -height } + fadeIn(animationSpec = tween(120)))
-                                .togetherWith(slideOutVertically(animationSpec = tween(120)) { height -> height } + fadeOut(animationSpec = tween(120)))
-                        }.using(SizeTransform(clip = false))
-                    },
-                    label = "heroScoreNumberAnimation"
-                ) { piedras ->
-                    AutoResizedText(
-                        text = "$piedras",
-                        targetFontSize = if (isCompact) 48.sp else 58.sp,
-                        minFontSize = 30.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        lineHeight = if (isCompact) 50.sp else 60.sp
-                    )
-                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    AnimatedContent<Int>(
+                        targetState = score.totalPiedras,
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                (slideInVertically(animationSpec = tween(120)) { height -> height } + fadeIn(animationSpec = tween(120)))
+                                    .togetherWith(slideOutVertically(animationSpec = tween(120)) { height -> -height } + fadeOut(animationSpec = tween(120)))
+                            } else {
+                                (slideInVertically(animationSpec = tween(120)) { height -> -height } + fadeIn(animationSpec = tween(120)))
+                                    .togetherWith(slideOutVertically(animationSpec = tween(120)) { height -> height } + fadeOut(animationSpec = tween(120)))
+                            }.using(SizeTransform(clip = false))
+                        },
+                        label = "heroScoreNumberAnimation"
+                    ) { piedras ->
+                        AutoResizedText(
+                            text = "$piedras",
+                            targetFontSize = if (isCompact) 48.sp else 58.sp,
+                            minFontSize = 30.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
-                Text(
-                    text = "Piedras / 21",
-                    fontSize = if (isCompact) 9.5.sp else 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                    fontWeight = FontWeight.SemiBold
-                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "🪨",
+                            fontSize = if (isCompact) 9.sp else 10.sp
+                        )
+                        Text(
+                            text = "PIEDRAS",
+                            fontSize = if (isCompact) 8.5.sp else 10.sp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isSelected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                            modifier = Modifier.size(3.5.dp)
+                        ) {}
+                        Text(
+                            text = "21",
+                            fontSize = if (isCompact) 8.5.sp else 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             // Botonera de Ajuste Manual Integrada (Segmented Control Fijo 46.dp)

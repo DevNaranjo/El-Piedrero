@@ -53,6 +53,7 @@ fun CustomizeButtonsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.large,
         icon = {
             Icon(
                 imageVector = Icons.Default.DashboardCustomize,
@@ -100,7 +101,7 @@ fun CustomizeButtonsDialog(
                         val side = if (index % 2 == 0) "Izquierda" else "Derecha"
 
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                             tonalElevation = 1.dp,
                             modifier = Modifier.fillMaxWidth()

@@ -140,4 +140,51 @@ class GamePersistenceAndRulesTest {
 
         hostUseCase.stopHost()
     }
+
+    @Test
+    fun `canto de bufos aplica 1 o 2 piedras correctamente en tanteo e historial`() = runBlocking {
+        val hostUseCase = HostGameUseCase()
+        hostUseCase.startHost("Anfitrion", maxPlayers = 2)
+        hostUseCase.setGameStatus(GameStatus.PLAYING)
+
+        // Simular Ronda (+1) para Team A
+        hostUseCase.applyScoreUpdate(Team.TEAM_A, CantoType.RONDA, 1, "Ronda (+1)")
+        assertEquals(1, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+
+        // Canto contextual "De bufos" (+1) para Team A
+        hostUseCase.applyScoreUpdate(Team.TEAM_A, CantoType.DE_BUFOS, 1, "Ronda de bufos (+1)", "Anfitrion")
+        assertEquals(2, hostUseCase.gameState.value.scoreTeamA.totalPiedras)
+
+        val lastMove = hostUseCase.gameState.value.moveHistory.last()
+        assertEquals(Team.TEAM_A, lastMove.teamId)
+        assertEquals(1, lastMove.deltaPiedras)
+        assertTrue(lastMove.reason.contains("bufos"))
+
+        // Simular Caracol (+4) para Team B
+        hostUseCase.applyScoreUpdate(Team.TEAM_B, CantoType.CARACOL, 4, "Caracol (+4)")
+        assertEquals(4, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        // Canto contextual "De bufos" (+2) para Team B
+        hostUseCase.applyScoreUpdate(Team.TEAM_B, CantoType.DE_BUFOS, 2, "Caracol de bufos (+2)", "Rival")
+        assertEquals(6, hostUseCase.gameState.value.scoreTeamB.totalPiedras)
+
+        hostUseCase.stopHost()
+    }
+
+    @Test
+    fun `serializacion de CantoType DE_BUFOS y SoundType CANTO_BUFOS es bidireccional`() {
+        val payload = ScoreUpdatePayload(
+            teamId = Team.TEAM_A,
+            cantoType = CantoType.DE_BUFOS,
+            piedras = 2,
+            reason = "Caracolillo de bufos (+2)"
+        )
+        val encoded = json.encodeToString(payload)
+        assertTrue(encoded.contains("DE_BUFOS"))
+
+        val decoded = json.decodeFromString<ScoreUpdatePayload>(encoded)
+        assertEquals(CantoType.DE_BUFOS, decoded.cantoType)
+        assertEquals(2, decoded.piedras)
+        assertEquals(SoundType.CANTO_BUFOS, decoded.cantoType?.soundType)
+    }
 }

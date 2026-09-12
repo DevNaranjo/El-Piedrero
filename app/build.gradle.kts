@@ -16,8 +16,8 @@ android {
         applicationId = "com.app.rondacanaria"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 6
+        versionName = "1.1-Beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -103,6 +103,9 @@ dependencies {
 
     // Kotlinx Serialization JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // Jetpack DataStore Preferences
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // CameraX para escaneo de QR
     val cameraxVersion = "1.3.1"

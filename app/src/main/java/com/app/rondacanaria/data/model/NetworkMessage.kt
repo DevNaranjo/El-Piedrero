@@ -61,7 +61,8 @@ enum class SoundType {
     JUGADA_REQUETECONTRAMAJO,
     PIEDRA_ADD,
     PIEDRA_SUBTRACT,
-    LAST_DEAL_ULTIMAS
+    LAST_DEAL_ULTIMAS,
+    CANTO_BUFOS
 }
 
 @Serializable
@@ -77,7 +78,8 @@ enum class CantoType(val defaultPiedras: Int, val displayName: String, val sound
     REQUETEMAJO(3, "Requetemajo (+3)", SoundType.JUGADA_REQUETEMAJO),
     SOBREMAJO(4, "Sobremajo (+4)", SoundType.JUGADA_SOBREMAJO),
     REQUETECONTRAMAJO(4, "Sobremajo (+4)", SoundType.JUGADA_SOBREMAJO),
-    MANUAL_ADJUST(0, "Ajuste Manual", SoundType.CARD_PLAYED)
+    MANUAL_ADJUST(0, "Ajuste Manual", SoundType.CARD_PLAYED),
+    DE_BUFOS(1, "De bufos", SoundType.CANTO_BUFOS)
 }
 
 @Serializable

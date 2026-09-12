@@ -85,6 +85,7 @@ fun MesaCardsDealDialog(
             dismissOnBackPress = true,
             dismissOnClickOutside = false
         ),
+        shape = MaterialTheme.shapes.large,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("🃏", fontSize = 26.sp)
@@ -366,6 +367,7 @@ fun MesaWaitingDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false),
+        shape = MaterialTheme.shapes.large,
         icon = {
             Surface(
                 shape = CircleShape,

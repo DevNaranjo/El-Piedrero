@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.app.rondacanaria.data.model.GameHistoryRecord
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -50,10 +51,7 @@ fun HistoryScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                colors = elPiedreroTopAppBarColors()
             )
         }
     ) { padding ->
@@ -95,6 +93,7 @@ fun HistoryScreen(
         val record = recordToDelete!!
         AlertDialog(
             onDismissRequest = { recordToDelete = null },
+            shape = MaterialTheme.shapes.large,
             title = { Text("¿Eliminar partida?") },
             text = { Text("Se eliminará esta partida ganada por ${record.winnerName} del historial. Esta acción no se puede deshacer.") },
             confirmButton = {
@@ -118,6 +117,7 @@ fun HistoryScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
+            shape = MaterialTheme.shapes.large,
             title = { Text("¿Borrar historial?") },
             text = { Text("Se eliminará el registro de las últimas partidas guardadas en este dispositivo. Esta acción no se puede deshacer.") },
             confirmButton = {
@@ -147,13 +147,13 @@ fun HistoryCard(
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()) }
     val formattedDate = remember(record.timestamp) { dateFormat.format(Date(record.timestamp)) }
 
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -176,7 +176,7 @@ fun HistoryCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small,
                         color = if (record.isLocalGame) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.tertiaryContainer
                     ) {
                         Text(
@@ -206,7 +206,7 @@ fun HistoryCard(
             // Banner del Ganador
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             ) {
                 Row(
@@ -216,7 +216,7 @@ fun HistoryCard(
                     Icon(
                         imageVector = Icons.Default.EmojiEvents,
                         contentDescription = "Trofeo",
-                        tint = Color(0xFFFFB300),
+                        tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))

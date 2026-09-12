@@ -1,6 +1,7 @@
 package com.app.rondacanaria.data.history
 
 import android.content.Context
+import com.app.rondacanaria.ui.theme.ThemeMode
 
 class AccessibilityPersistence(context: Context) {
     private val prefs = context.getSharedPreferences("ronda_accessibility_prefs", Context.MODE_PRIVATE)
@@ -14,6 +15,8 @@ class AccessibilityPersistence(context: Context) {
         private const val KEY_DEAL_REMINDER_ENABLED = "deal_reminder_enabled"
         private const val KEY_DEAL_REMINDER_SECONDS = "deal_reminder_seconds"
         const val DEFAULT_DEAL_REMINDER_SECONDS = 30
+
+        private const val KEY_THEME_MODE = "theme_mode"
     }
 
     fun loadFontScale(): Float {
@@ -38,5 +41,18 @@ class AccessibilityPersistence(context: Context) {
 
     fun saveDealReminderSeconds(seconds: Int) {
         prefs.edit().putInt(KEY_DEAL_REMINDER_SECONDS, seconds).apply()
+    }
+
+    fun loadThemeMode(): ThemeMode {
+        val name = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
+        return try {
+            ThemeMode.valueOf(name)
+        } catch (_: Exception) {
+            ThemeMode.SYSTEM
+        }
+    }
+
+    fun saveThemeMode(mode: ThemeMode) {
+        prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
     }
 }

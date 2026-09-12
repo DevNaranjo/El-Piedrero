@@ -20,12 +20,7 @@ class AppCleanupService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.d("AppCleanupService", "Aplicación cerrada por el usuario (tarea eliminada de recientes). Limpiando partida activa.")
-        try {
-            LocalGamePersistence(applicationContext).clearLocalGame()
-        } catch (e: Exception) {
-            Log.e("AppCleanupService", "Error al limpiar partida activa en onTaskRemoved", e)
-        }
+        Log.d("AppCleanupService", "Aplicación pausada / tarea eliminada de recientes. Partida activa preservada en DataStore.")
         stopSelf()
     }
 }

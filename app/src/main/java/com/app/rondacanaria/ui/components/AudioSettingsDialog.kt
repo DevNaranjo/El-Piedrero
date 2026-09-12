@@ -6,6 +6,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.GraphicEq
@@ -16,9 +20,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.VolumeMute
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.rondacanaria.data.history.AccessibilityPersistence
+import com.app.rondacanaria.ui.theme.ThemeMode
 import kotlin.math.roundToInt
 
 @Composable
@@ -41,6 +43,7 @@ fun AudioSettingsDialog(
     fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
     isDealReminderEnabled: Boolean = true,
     dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     onMasterVolumeChange: (Float) -> Unit,
     onMusicVolumeChange: (Float) -> Unit,
     onSfxVolumeChange: (Float) -> Unit,
@@ -50,12 +53,14 @@ fun AudioSettingsDialog(
     onFontScaleChange: (Float) -> Unit = {},
     onToggleDealReminder: (Boolean) -> Unit = {},
     onDealReminderSecondsChange: (Int) -> Unit = {},
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     onSkipSong: () -> Unit = {},
     onOpenCustomizeButtons: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.large,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -102,7 +107,7 @@ fun AudioSettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (masterVolume > 0.05f) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
+                                    imageVector = if (masterVolume > 0.05f) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeMute,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
@@ -246,7 +251,7 @@ fun AudioSettingsDialog(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(
-                                    imageVector = if (isSfxEnabled && sfxVolume > 0.05f) Icons.Default.GraphicEq else Icons.Default.VolumeOff,
+                                    imageVector = if (isSfxEnabled && sfxVolume > 0.05f) Icons.Default.GraphicEq else Icons.AutoMirrored.Filled.VolumeOff,
                                     contentDescription = null,
                                     tint = if (isSfxEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                     modifier = Modifier.size(20.dp)
@@ -432,7 +437,89 @@ fun AudioSettingsDialog(
                     }
                 }
 
-                // 6. Ajustes de Recordatorio de Reparto (Ventana Flotante)
+                // 6. Tema de la Aplicación y Color Dinámico (Material You)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Brightness4,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Tema de la Aplicación",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = "Elige el esquema visual del marcador",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Selector de Modo de Tema: Sistema / Claro / Oscuro
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val themeOptions = listOf(
+                                Triple("📱 Sistema", ThemeMode.SYSTEM, "Auto"),
+                                Triple("☀️ Claro", ThemeMode.LIGHT, "Día"),
+                                Triple("🌙 Oscuro", ThemeMode.DARK, "Noche")
+                            )
+                            themeOptions.forEach { (label, mode, sub) ->
+                                val isSelected = themeMode == mode
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onThemeModeChange(mode) }
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = sub,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 7. Ajustes de Recordatorio de Reparto (Ventana Flotante)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -597,7 +684,6 @@ fun AudioSettingsDialog(
             ) {
                 Text("Listo", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
-        },
-        shape = RoundedCornerShape(20.dp)
+        }
     )
 }

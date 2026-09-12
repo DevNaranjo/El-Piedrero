@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-v1.0.3%20(Code%204)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-v1.1--Beta%20(Code%206)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -12,35 +12,34 @@
 
 **El Piedrero** es una aplicación móvil nativa de código abierto para Android diseñada para llevar el tanteo de la tradicional **Ronda** de forma cómoda, automática y 100% offline (sin conexión a Internet).
 
-Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las piedras entre varios dispositivos mediante **Wi-Fi Local y código QR**, reproduciendo los audios auténticos de cada canto (*Ronda, Parranda, Caracol, Caracolillo, Majo, Limpiar, Majo y Limpio y ¡Buenas!*), con historial persistente de las **últimas 30 partidas**.
+Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las piedras entre varios dispositivos mediante **Wi-Fi Local y código QR**, reproduciendo los audios auténticos de cada canto (*Ronda, Parranda, Caracol, Caracolillo, Majo, Limpiar, Majo y Limpio, ¡Buenas! y De bufos*), con historial persistente de las **últimas 30 partidas**.
 
 ---
 
-## 🚀 Novedades de la Versión 1.0.3 (Parche v1.0.3)
+## 🚀 Novedades de la Versión 1.1-Beta
 
-* 🎵 **Estabilidad Total del Reproductor de Música (Crash Fix):**
-  * Solucionado definitivamente el cierre inesperado de la aplicación que ocurría al terminar de reproducirse cualquier canción ambiental de fondo.
-  * **Unificación del ciclo de vida:** Se eliminaron los temporizadores de fade-out que competían con el final de pista. El avance de canción pasa a depender exclusivamente del callback nativo `setOnCompletionListener` con guarda atómica de concurrencia (`AtomicBoolean`).
-  * **Blindaje contra excepciones:** Todas las llamadas a métodos del sistema (`isPlaying`, `setVolume`, `start`, `stop`, `release`) están encapsuladas con captura defensiva, garantizando que un estado transitorio del reproductor nunca cause una excepción no controlada en el hilo principal.
-* 📺 **Eliminación de Interferencias y Chasquidos en TV Cast / Miracast:**
-  * **Streaming nativo del kernel:** Se reemplazó el búfer en memoria RAM basado en JNI (`MemoryAudioDataSource`) por reproducción directa mediante `AssetFileDescriptor` y ficheros locales en caché.
-  * **Búfer de 2 a 4 segundos inmune a la CPU:** Al desacoplar la lectura de audio de la máquina virtual Java, el decodificador nativo de Android (`NuPlayer`) mantiene el flujo hacia la televisión sin micro-cortes ni distorsiones provocadas por la codificación de vídeo de pantalla o el recolector de basura (GC).
-  * **Fundidos en corrutinas (10 Hz):** Sustitución del animador `ValueAnimator` a 60 FPS por rampas de volumen escalonadas en corrutinas secundarias, evitando saturar el bus IPC de `AudioFlinger` y `RemoteSubmix`.
-  * **Atenuación protectora:** Factor de escala para prevenir saturación y distorsión acústica digital en los altavoces de la Smart TV.
-* 👥 **Pantallas de Espera Sincronizadas en Multijugador (Mesa y Recuento):**
-  * Al comenzar la mano (1.ᵉʳ reparto), los jugadores no repartidores ven la pantalla de espera de mesa.
-  * Al concluir la mano, cuando el repartidor abre el diálogo de recuento de cartas, los demás jugadores ven la pantalla informativa de espera con barra de progreso y nombre del repartidor hasta que se aplican las piedras.
-* ⏳ **Recordatorio Flotante de Reparto Configurable (30s por defecto):**
-  * El aviso flotante pasa a 30s por defecto, con interruptor de activación y selector de tiempos (15s, 30s, 45s, 60s, 90s) persistente en el menú de Ajustes y Accesibilidad.
-* 🪟 **Desacoplamiento del Dock de Control Inferior (UI Fix):**
-  * Solucionado el solapamiento visual entre la cápsula flotante inferior de controles (deshacer, historial, cartas a la mesa y terminar partida) y la ventana emergente superior de recordatorio de reparto. Ambos elementos operan ahora de forma totalmente independiente.
+> **Actualización enfocada en optimizar y pulir la interfaz gráfica del marcador:** animaciones fluidas en la transición de piedras malas a buenas, mejoras de accesibilidad táctil para personas mayores, microinteracciones hápticas avanzadas y personalización de temas y avatares de equipo.
+
+* 🎵 **Consolidación Integral y Estabilidad de Audio (Arquitectura MVP en RAM):**
+  * **Reproducción 100% en Memoria RAM (`MediaDataSource`):** Se restaura la arquitectura original del MVP que alimenta al `MediaPlayer` desde un búfer en RAM con tamaño exacto de fin de fichero (`getSize()`), eliminando escrituras y lecturas de disco concurrentes en caché.
+  * **Erradicación de aceleraciones y distorsión:** Se elimina el desbordamiento de límites de tramas MP3 en el contenedor APK (`openFd`) y la manipulación de `playbackParams` (evitando el filtro DSP *Sonic* de time-stretching), garantizando velocidad 1.0x nativa sin pulsos ni chasquidos.
+  * **Transición atómica y debouncing:** Control estricto secuencial en hilo de audio dedicado que cancela y anula los listeners del reproductor saliente antes de iniciar el siguiente, eliminando solapamientos al pulsar repetidamente *"Saltar canción"*.
+  * **Ciclo de vida seguro:** Métodos seguros de liberación (`safeRelease()`, `safeIsPlaying()`, `safeSetVolume()`) y anulación de callbacks que previenen estados ilegales (`IllegalStateException`).
+* 👑 **Audio Contextual "De bufos" (`De-bufos.mp3`):**
+  * Integración del audio oficial `De-bufos.mp3` en memoria RAM al pulsar el botón contextual *"De bufos"*, sincronizado en red local mediante `SoundType.CANTO_BUFOS` para anfitrión y clientes.
+* 🌓 **Transición Suave y Sincronizada entre Modo Claro y Oscuro:**
+  * Animación fluida de todos los atributos de `ColorScheme` Material 3 y componentes personalizados con curva `FastOutSlowInEasing` sobre 380 ms.
+* 👥 **Flexibilidad en Multijugador (Cambio de Equipo para Anfitrión y Líder):**
+  * El anfitrión de la sala y el líder de la partida ahora pueden alternar y cambiar de equipo directamente desde la sala de espera multijugador.
+* 🎴 **Interfaz Moderna y Persistencia Reforzada:**
+  * Implementación de `ModernPlayerScoreCard`, `FloatingControlDock`, `ReactiveCantosGrid` y `ActiveGameDataStore` para una experiencia de tanteo más visual y persistencia robusta ante cierres inesperados.
 
 ---
 
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.0.3 / versionCode 4**).
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.1-Beta / versionCode 6**).
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.

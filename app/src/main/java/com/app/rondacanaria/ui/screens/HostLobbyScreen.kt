@@ -30,6 +30,7 @@ import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import com.app.rondacanaria.ui.components.TvCastDialog
 import com.app.rondacanaria.ui.qr.QrCodeGenerator
+import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +74,7 @@ fun HostLobbyScreen(
                         Text(
                             text = if (uiState.isHost) "El Piedrero 🃏" else "Mesa de $hostName 🃏",
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
                         )
                     }
                 },
@@ -87,10 +88,7 @@ fun HostLobbyScreen(
                         Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                colors = elPiedreroTopAppBarColors()
             )
         }
     ) { padding ->
@@ -396,6 +394,7 @@ fun HostLobbyScreen(
                                             }
                                         }
                                     }
+                                    val canChangeThisPlayerTeam = uiState.isHost || (uiState.isLeader && (player.id == viewModel.localPlayerId || player.isLeader || player.team == uiState.myTeam))
                                     Box {
                                         Surface(
                                             color = when (player.team) {
@@ -410,7 +409,7 @@ fun HostLobbyScreen(
                                             modifier = Modifier
                                                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                                 .then(
-                                                    if (uiState.isHost) Modifier.clickable { showTeamMenu = true } else Modifier
+                                                    if (canChangeThisPlayerTeam) Modifier.clickable { showTeamMenu = true } else Modifier
                                                 )
                                         ) {
                                         val (teamColor, teamLabel) = when (player.team) {
@@ -431,7 +430,7 @@ fun HostLobbyScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = teamColor
                                             )
-                                            if (uiState.isHost) {
+                                            if (canChangeThisPlayerTeam) {
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Icon(
                                                     imageVector = Icons.Default.ArrowDropDown,
@@ -721,7 +720,7 @@ fun HostLobbyScreen(
                     Text("No, esperar", fontWeight = FontWeight.SemiBold)
                 }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = MaterialTheme.shapes.large
         )
     }
 
@@ -778,7 +777,7 @@ fun HostLobbyScreen(
                     Text("No", fontWeight = FontWeight.SemiBold)
                 }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = MaterialTheme.shapes.large
         )
     }
 
@@ -797,6 +796,7 @@ fun HostLobbyScreen(
 
         AlertDialog(
             onDismissRequest = { viewModel.rejectTeamChange() },
+            shape = MaterialTheme.shapes.large,
             icon = {
                 Icon(
                     imageVector = Icons.Default.SwapHoriz,

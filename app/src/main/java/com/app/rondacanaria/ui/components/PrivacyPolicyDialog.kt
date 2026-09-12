@@ -59,7 +59,7 @@ fun PrivacyPolicyDialog(
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
@@ -116,13 +116,13 @@ fun PrivacyPolicyDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             ) {
                 Text("Entendido", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
         },
-        shape = RoundedCornerShape(20.dp)
+        shape = MaterialTheme.shapes.large
     )
 }
 

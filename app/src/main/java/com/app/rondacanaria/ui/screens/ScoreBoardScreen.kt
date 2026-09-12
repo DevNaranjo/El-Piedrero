@@ -51,6 +51,7 @@ import com.app.rondacanaria.ui.components.MesaWaitingDialog
 import com.app.rondacanaria.ui.components.ModernPlayerScoreCard
 import com.app.rondacanaria.ui.components.ReactiveCantosGrid
 import com.app.rondacanaria.ui.components.TvCastDialog
+import com.app.rondacanaria.ui.theme.headlineContentColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -797,8 +798,9 @@ fun ScoreBoardScreen(
                         OutlinedButton(
                             onClick = { showMesaCardsDialog = true },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1022,7 +1024,7 @@ fun ScoreBoardScreen(
                             text = "Cantar a:",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = headlineContentColor()
                         )
 
                         val teams = buildList {
@@ -1038,22 +1040,46 @@ fun ScoreBoardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             teams.forEach { (team, name) ->
-                                FilterChip(
-                                    selected = selectedTeamForCanto == team,
+                                val isSelected = selectedTeamForCanto == team
+                                Surface(
                                     onClick = { selectedTeamForCanto = team },
-                                    label = {
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                    border = BorderStroke(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.secondary
+                                        } else {
+                                            MaterialTheme.colorScheme.outlineVariant
+                                        }
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
                                         Text(
                                             text = name,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             textAlign = TextAlign.Center
                                         )
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                                    }
+                                }
                             }
                         }
 
@@ -1151,10 +1177,10 @@ fun ScoreBoardScreen(
 
                                 Button(
                                     onClick = {
-                                        viewModel.manualScoreChange(
+                                        viewModel.callDeBufos(
                                             bufo.team,
                                             bufo.bufoPoints,
-                                            reason = "${bufo.cantoName} de bufos (+${bufo.bufoPoints})"
+                                            bufo.cantoName
                                         )
                                         Toast.makeText(context, "+${bufo.bufoPoints} piedra(s) de bufos sumada(s)", Toast.LENGTH_SHORT).show()
                                         activeBufoOption = null
@@ -1375,6 +1401,7 @@ fun ScoreBoardScreen(
             fontScale = uiState.fontScale,
             isDealReminderEnabled = uiState.isDealReminderEnabled,
             dealReminderSeconds = uiState.dealReminderSeconds,
+            themeMode = uiState.themeMode,
             onMasterVolumeChange = { viewModel.setMasterVolume(it) },
             onMusicVolumeChange = { viewModel.setMusicVolume(it) },
             onSfxVolumeChange = { viewModel.setSfxVolume(it) },
@@ -1384,6 +1411,7 @@ fun ScoreBoardScreen(
             onFontScaleChange = { viewModel.setFontScale(it) },
             onToggleDealReminder = { viewModel.setDealReminderEnabled(it) },
             onDealReminderSecondsChange = { viewModel.setDealReminderSeconds(it) },
+            onThemeModeChange = { viewModel.setThemeMode(it) },
             onSkipSong = { viewModel.skipSong() },
             onOpenCustomizeButtons = {
                 showAudioSettingsDialog = false
@@ -3700,16 +3728,29 @@ private fun CantoActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = when (cantoType) {
-        CantoType.CARACOLILLO, CantoType.SOBREMAJO, CantoType.REQUETECONTRAMAJO -> ButtonDefaults.filledTonalButtonColors(
+    val isQueenPlay = cantoType == CantoType.CARACOLILLO
+    val isHeavySpecialPlay = cantoType == CantoType.SOBREMAJO || cantoType == CantoType.REQUETECONTRAMAJO
+    val isSpecialPlay = isQueenPlay || isHeavySpecialPlay
+
+    val colors = when {
+        isQueenPlay -> ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
         )
-        CantoType.MAJO, CantoType.CONTRAMAJO, CantoType.MAJO_Y_LIMPIO -> ButtonDefaults.filledTonalButtonColors(
+        isHeavySpecialPlay -> ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        else -> ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         )
-        else -> ButtonDefaults.filledTonalButtonColors()
+    }
+
+    val border = when {
+        isQueenPlay -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        isHeavySpecialPlay -> BorderStroke(1.8.dp, MaterialTheme.colorScheme.primary)
+        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     }
 
     val fontSize = when (cantoType) {
@@ -3727,19 +3768,30 @@ private fun CantoActionButton(
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = 48.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         contentPadding = contentPadding,
-        colors = colors
+        colors = colors,
+        border = border
     ) {
-        Text(
-            text = cantoType.displayName,
-            fontSize = fontSize,
-            lineHeight = (fontSize.value * 1.15f).sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (isQueenPlay) {
+                Text("👑 ", fontSize = 12.sp)
+            } else if (isHeavySpecialPlay) {
+                Text("⚡ ", fontSize = 12.sp)
+            }
+            Text(
+                text = cantoType.displayName,
+                fontSize = fontSize,
+                lineHeight = (fontSize.value * 1.15f).sp,
+                fontWeight = if (isSpecialPlay) FontWeight.Black else FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

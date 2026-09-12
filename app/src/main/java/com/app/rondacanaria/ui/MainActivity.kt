@@ -12,7 +12,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,7 +83,9 @@ class MainActivity : ComponentActivity() {
                     fontScale = uiState.fontScale
                 )
             ) {
-                MaterialTheme {
+                com.app.rondacanaria.ui.theme.ElPiedreroTheme(
+                    themeMode = uiState.themeMode
+                ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -93,7 +101,20 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Crossfade(targetState = uiState.currentScreen, label = "ScreenTransition") { screen ->
+                        AnimatedContent(
+                            targetState = uiState.currentScreen,
+                            transitionSpec = {
+                                val isForward = targetState.ordinal > initialState.ordinal
+                                if (isForward) {
+                                    (slideInHorizontally(tween(280)) { it } + fadeIn(tween(240)))
+                                        .togetherWith(slideOutHorizontally(tween(280)) { -it / 3 } + fadeOut(tween(200)))
+                                } else {
+                                    (slideInHorizontally(tween(280)) { -it } + fadeIn(tween(240)))
+                                        .togetherWith(slideOutHorizontally(tween(280)) { it / 3 } + fadeOut(tween(200)))
+                                }
+                            },
+                            label = "ScreenTransition"
+                        ) { screen ->
                             when (screen) {
                                 AppScreen.MODE_SELECTION -> ModeSelectionScreen(uiState = uiState, viewModel = viewModel)
                                 AppScreen.LOBBY -> LobbyScreen(uiState = uiState, viewModel = viewModel)

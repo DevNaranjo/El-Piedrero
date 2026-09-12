@@ -19,11 +19,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
 import androidx.core.content.ContextCompat
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import com.app.rondacanaria.ui.components.CanarianNames
+import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
+import com.app.rondacanaria.ui.theme.goldActionButtonColors
+import com.app.rondacanaria.ui.theme.headlineContentColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,13 +57,13 @@ fun LobbyScreen(
                 title = { Text("Partida en Red (Wi-Fi) 🃏", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.goToModeSelection() }) {
-                        Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver al inicio")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver al inicio"
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                colors = elPiedreroTopAppBarColors()
             )
         }
     ) { padding ->
@@ -75,13 +79,15 @@ fun LobbyScreen(
                 text = "Multijugador en Red",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
+                color = headlineContentColor(),
+                textAlign = TextAlign.Center
             )
             Text(
                 text = "Crea una sala o únete escaneando el código QR",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(top = 6.dp, bottom = 32.dp),
+                textAlign = TextAlign.Center
             )
 
             OutlinedTextField(
@@ -97,17 +103,18 @@ fun LobbyScreen(
                 placeholder = {
                     Text(
                         text = "(ej: $randomExampleName)",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                shape = MaterialTheme.shapes.medium,
                 isError = showNameError && !isNameValid,
                 supportingText = {
                     if (showNameError && !isNameValid) {
                         Text(
                             text = "Es obligatorio poner un nombre antes de entrar a una partida",
                             color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 },
@@ -115,7 +122,7 @@ fun LobbyScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Button(
                 onClick = {
@@ -128,16 +135,21 @@ fun LobbyScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    .height(54.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = goldActionButtonColors()
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = "Crear Mesa Host")
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Crear Mesa (Host con QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                Text(
+                    text = "Crear Mesa (Host con QR)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedButton(
                 onClick = {
@@ -159,12 +171,25 @@ fun LobbyScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                    .height(54.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = "Escanear código QR")
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = "Escanear código QR",
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Unirse a Mesa (Escanear QR)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                Text(
+                    text = "Unirse a Mesa (Escanear QR)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -210,13 +235,14 @@ fun LobbyScreen(
                     Text("Cancelar")
                 }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = MaterialTheme.shapes.large
         )
     }
 
     if (showHostDialog) {
         AlertDialog(
             onDismissRequest = { showHostDialog = false },
+            shape = MaterialTheme.shapes.large,
             title = { Text("Configurar Mesa de Ronda") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
