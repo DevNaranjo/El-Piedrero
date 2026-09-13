@@ -158,6 +158,7 @@ fun ScoreBoardScreen(
     }
 
     val canShowMesaCards = uiState.isLocalGame || isMeDealing
+    val canDoCardCount = uiState.isLocalGame || uiState.isHost || uiState.isLeader || isMeDealing
 
     // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa (al repartidor) o pantalla de espera (a los demás jugadores)
     val effectiveGameId = gameState.gameId.ifBlank { "game" }
@@ -182,9 +183,9 @@ fun ScoreBoardScreen(
     }
 
     // Sincronización del recuento de cartas en multijugador: mostrar pantalla de espera a los demás jugadores
-    LaunchedEffect(gameState.isCountingCards, canShowMesaCards, isMultiplayer) {
+    LaunchedEffect(gameState.isCountingCards, canDoCardCount, isMultiplayer) {
         if (gameState.isCountingCards) {
-            if (!canShowMesaCards && isMultiplayer) {
+            if (!canDoCardCount && isMultiplayer) {
                 showCardCountWaitingDialog = true
             }
         } else {
@@ -492,6 +493,17 @@ fun ScoreBoardScreen(
                                     showCustomizeButtonsDialog = true
                                 }
                             )
+                            if (canDoCardCount) {
+                                DropdownMenuItem(
+                                    text = { Text("Recuento de Cartas 🃏", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.Style, contentDescription = null) },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        showCardCountDialog = true
+                                        viewModel.setCountingCards(true)
+                                    }
+                                )
+                            }
                             if (uiState.isHost && !uiState.isLocalGame && gameState.maxPlayers in listOf(4, 6, 8)) {
                                 DropdownMenuItem(
                                     text = { Text("Gestionar Líderes 👑", fontWeight = FontWeight.SemiBold) },
@@ -640,7 +652,7 @@ fun ScoreBoardScreen(
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (uiState.isHost || uiState.isLeader) {
+                        if (uiState.isHost || uiState.isLeader || uiState.isLocalGame) {
                             TextButton(
                                 onClick = {
                                     val activePlayers = gameState.connectedPlayers.filter {
@@ -767,7 +779,7 @@ fun ScoreBoardScreen(
                                 onClick = {
                                     showDealReminder = false
                                     if (isAtMaxDeals) {
-                                        if (canShowMesaCards) {
+                                        if (canDoCardCount) {
                                             showCardCountDialog = true
                                             viewModel.setCountingCards(true)
                                         }
@@ -775,7 +787,7 @@ fun ScoreBoardScreen(
                                         viewModel.changeDeal(gameState.currentDeal + 1)
                                     }
                                 },
-                                enabled = !isReserve && (!isAtMaxDeals || canShowMesaCards),
+                                enabled = (!isAtMaxDeals && !isReserve) || (isAtMaxDeals && canDoCardCount),
                                 modifier = Modifier
                                     .size(42.dp)
                                     .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp),
@@ -816,7 +828,7 @@ fun ScoreBoardScreen(
                         }
                     }
 
-                    if (isAtMaxDeals && !isReserve && canShowMesaCards) {
+                    if (isAtMaxDeals && canDoCardCount) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(
                             onClick = {
@@ -1336,7 +1348,7 @@ fun ScoreBoardScreen(
                             onClick = {
                                 showDealReminder = false
                                 if (isAtMaxDeals) {
-                                    if (canShowMesaCards) {
+                                    if (canDoCardCount) {
                                         showCardCountDialog = true
                                         viewModel.setCountingCards(true)
                                     }
@@ -1344,7 +1356,7 @@ fun ScoreBoardScreen(
                                     viewModel.changeDeal(gameState.currentDeal + 1)
                                 }
                             },
-                            enabled = !isReserve && (!isAtMaxDeals || canShowMesaCards),
+                            enabled = (!isAtMaxDeals && !isReserve) || (isAtMaxDeals && canDoCardCount),
                             modifier = Modifier
                                 .weight(1.2f)
                                 .defaultMinSize(minHeight = 38.dp),
@@ -1514,8 +1526,8 @@ fun ScoreBoardScreen(
         )
     }
 
-    // Diálogo de recuento de cartas al final de la mano (para el repartidor / líder)
-    val shouldShowCardCountDialog = (showCardCountDialog || gameState.isCountingCards) && canShowMesaCards
+    // Diálogo de recuento de cartas al final de la mano (para el repartidor / líder / anfitrión)
+    val shouldShowCardCountDialog = (showCardCountDialog || gameState.isCountingCards) && canDoCardCount
     if (shouldShowCardCountDialog) {
         val activeTeamsList = buildList {
             if (showTeamA) add(Team.TEAM_A to gameState.nameTeamA)
@@ -1546,8 +1558,8 @@ fun ScoreBoardScreen(
         )
     }
 
-    // Diálogo de espera para los demás jugadores en multijugador mientras el repartidor realiza el recuento de cartas
-    if (showCardCountWaitingDialog && isMultiplayer && !canShowMesaCards) {
+    // Diálogo de espera para los demás jugadores en multijugador mientras se realiza el recuento de cartas
+    if (showCardCountWaitingDialog && isMultiplayer && !canDoCardCount) {
         CardCountWaitingDialog(
             dealerName = dealerName,
             currentHand = gameState.currentHand,
@@ -3684,7 +3696,7 @@ fun CardCountWaitingDialog(
                     color = MaterialTheme.colorScheme.tertiary
                 )
                 Text(
-                    text = "El repartidor ($dealerName) está realizando el recuento de cartas de la mano.",
+                    text = "Se está realizando el recuento de cartas de la mano ($dealerName reparte).",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
