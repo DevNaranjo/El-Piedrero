@@ -97,7 +97,7 @@ fun MesaCardsDealDialog(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Reparto $currentDeal de $maxDeals · Reparte: $dealerName",
+                        text = "Mano $currentHand · Reparto $currentDeal de $maxDeals · Reparte: $dealerName ($dealerTeamName)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -381,7 +381,7 @@ fun MesaWaitingDialog(
         },
         title = {
             Text(
-                text = "Reparto de Cartas a la Mesa",
+                text = "Mano $currentHand · Cartas a la Mesa",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,

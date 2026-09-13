@@ -307,7 +307,7 @@ fun ScoreBoardScreen(
         }
         val delayMillis = uiState.dealReminderSeconds.coerceAtLeast(5) * 1000L
         delay(delayMillis)
-        if (uiState.isDealReminderEnabled && !isReserve && gameState.winnerTeam == null && gameState.status != GameStatus.FINISHED) {
+        if (uiState.isDealReminderEnabled && !isReserve && gameState.status != GameStatus.FINISHED) {
             showDealReminder = true
         }
     }
@@ -1526,7 +1526,6 @@ fun ScoreBoardScreen(
         CardCountDialog(
             activeTeams = activeTeamsList,
             maxPlayers = if (isThreePlayers) 3 else (if (isTwoPlayers) 2 else gameState.maxPlayers),
-            isLocal = uiState.isLocalGame,
             currentDeal = gameState.currentDeal,
             maxDeals = maxDeals,
             nextDealerName = nextDealerName,
@@ -1716,7 +1715,6 @@ fun ScoreBoardScreen(
 
     // Diálogo de confirmación para Terminar Partida
     if (showEndGameConfirmation) {
-        val isMultiplayer = !uiState.isLocalGame
         AlertDialog(
             onDismissRequest = { showEndGameConfirmation = false },
             title = { Text("¿Terminar Partida?") },
@@ -1773,7 +1771,6 @@ fun ScoreBoardScreen(
 
     // Diálogo de confirmación para Salir de la Sala / Partida
     if (showExitConfirmationDialog) {
-        val isMultiplayer = !uiState.isLocalGame
         val hostPlayerName = gameState.connectedPlayers.find { it.isHost }?.name
             ?: uiState.hostConnectionInfo?.hostName
             ?: "el anfitrión"
@@ -1893,7 +1890,7 @@ fun ScoreBoardScreen(
                         }
                     }
 
-                    if ((gameState.maxPlayers in listOf(6, 8) || uiState.maxPlayers in listOf(6, 8)) && gameState.winnerTeam != null) {
+                    if (gameState.maxPlayers in listOf(6, 8) || uiState.maxPlayers in listOf(6, 8)) {
                         val allTeams = when {
                             (gameState.maxPlayers == 6 || uiState.maxPlayers == 6) -> listOf(Team.TEAM_A, Team.TEAM_B, Team.TEAM_C)
                             (gameState.maxPlayers == 8 || uiState.maxPlayers == 8) -> listOf(Team.TEAM_A, Team.TEAM_B, Team.TEAM_C, Team.TEAM_D)
@@ -3184,7 +3181,6 @@ fun MoveHistoryDialog(
 fun CardCountDialog(
     activeTeams: List<Pair<Team, String>>,
     maxPlayers: Int,
-    isLocal: Boolean = true,
     currentDeal: Int,
     maxDeals: Int,
     nextDealerName: String,
@@ -3669,7 +3665,7 @@ fun CardCountWaitingDialog(
         },
         title = {
             Text(
-                text = "Recuento de Cartas",
+                text = "Mano $currentHand · Recuento de Cartas",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
