@@ -28,6 +28,8 @@ import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.domain.usecase.SessionStatus
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.AvatarSelectionDialog
+import com.app.rondacanaria.ui.components.PlayerAvatarBadge
 import com.app.rondacanaria.ui.components.TvCastDialog
 import com.app.rondacanaria.ui.qr.QrCodeGenerator
 import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
@@ -42,6 +44,7 @@ fun HostLobbyScreen(
     val qrBitmap = remember(connectionInfo) {
         connectionInfo?.toJson()?.let { QrCodeGenerator.generateQrBitmap(it, 512) }
     }
+    var showAvatarDialog by remember { mutableStateOf(false) }
     var showIncompletePlayersDialog by remember { mutableStateOf(false) }
     var showExitHostRoomConfirmation by remember { mutableStateOf(false) }
     var showTvCastDialog by remember { mutableStateOf(false) }
@@ -195,6 +198,77 @@ fun HostLobbyScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            val isRoomFull = uiState.gameState.connectedPlayers.size >= maxCapacity
+            val connectingNotice = uiState.gameState.connectingPlayerName
+
+            // Banner de Estado en Tiempo Real: Esperando Jugadores o Alguien Uniéndose
+            Surface(
+                color = when {
+                    connectingNotice != null -> MaterialTheme.colorScheme.tertiaryContainer
+                    !isRoomFull -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                    else -> Color(0xFFE8F5E9)
+                },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(
+                    1.dp,
+                    when {
+                        connectingNotice != null -> MaterialTheme.colorScheme.tertiary
+                        !isRoomFull -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        else -> Color(0xFF43A047)
+                    }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (connectingNotice != null) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = connectingNotice,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    } else if (!isRoomFull) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Esperando jugadores (${uiState.gameState.connectedPlayers.size}/$maxCapacity)...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Mesa completa ($maxCapacity/$maxCapacity). ¡Listos para jugar!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B5E20)
+                        )
+                    }
+                }
+            }
+
             Text(
                 text = "Jugadores conectados (${uiState.gameState.connectedPlayers.size}/$maxCapacity):",
                 style = MaterialTheme.typography.titleSmall,
@@ -251,24 +325,19 @@ fun HostLobbyScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val teamColor = when (player.team) {
-                                    Team.TEAM_A -> MaterialTheme.colorScheme.primary
-                                    Team.TEAM_B -> MaterialTheme.colorScheme.secondary
-                                    Team.TEAM_C -> MaterialTheme.colorScheme.tertiary
-                                    Team.TEAM_D -> MaterialTheme.colorScheme.outline
-                                    Team.RESERVE -> Color(0xFFFFB300)
-                                    Team.SPECTATOR -> Color.Gray
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(teamColor)
-                                    )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                PlayerAvatarBadge(
+                                    avatarId = player.avatarId,
+                                    team = player.team,
+                                    isLeader = player.isLeader,
+                                    isDealer = isDealer,
+                                    size = 40.dp,
+                                    onClick = if (player.id == viewModel.localPlayerId) {
+                                        { showAvatarDialog = true }
+                                    } else null
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = if (isDealer) "${player.name} 🃏" else player.name,
+                                    text = player.name,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = if (isDealer) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -492,7 +561,83 @@ fun HostLobbyScreen(
                     }
                 }
             }
-        }
+
+            // Huecos vacíos esperando jugadores
+            val missingSlots = (maxCapacity - uiState.gameState.connectedPlayers.size).coerceAtLeast(0)
+            items(List(missingSlots) { it }) { slotIndex ->
+                    val isFirstWaiting = slotIndex == 0
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isFirstWaiting && connectingNotice != null) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                            }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(38.dp),
+                                shape = CircleShape,
+                                color = if (isFirstWaiting && connectingNotice != null) {
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                },
+                                border = BorderStroke(
+                                    1.5.dp,
+                                    if (isFirstWaiting && connectingNotice != null) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    }
+                                )
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (isFirstWaiting && connectingNotice != null) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "👤",
+                                            fontSize = 18.sp
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = if (isFirstWaiting && connectingNotice != null) {
+                                    connectingNotice
+                                } else {
+                                    "Esperando jugador..."
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isFirstWaiting && connectingNotice != null) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             // Selección de equipos en reserva (solo anfitrión) para 6 y 8 jugadores
             if ((uiState.gameState.maxPlayers == 6 || uiState.gameState.maxPlayers == 8) && uiState.isHost) {
@@ -840,6 +985,16 @@ fun HostLobbyScreen(
         TvCastDialog(
             onCastStarted = { viewModel.setTvCastingActive(true) },
             onDismiss = { showTvCastDialog = false }
+        )
+    }
+
+    if (showAvatarDialog) {
+        AvatarSelectionDialog(
+            currentAvatarId = uiState.selectedAvatarId,
+            onAvatarSelected = { newAvatarId ->
+                viewModel.selectAvatar(newAvatarId)
+            },
+            onDismissRequest = { showAvatarDialog = false }
         )
     }
 }

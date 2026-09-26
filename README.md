@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Versión](https://img.shields.io/badge/Versión-v1.1--Beta%20(Code%206)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Versión](https://img.shields.io/badge/Versión-v1.1--Beta.2%20(Code%207)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -16,10 +16,28 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 
 ---
 
-## 🚀 Novedades de la Versión 1.1-Beta
+## 🚀 Novedades de la Versión 1.1-Beta.2
 
 > **Actualización enfocada en optimizar y pulir la interfaz gráfica del marcador:** animaciones fluidas en la transición de piedras malas a buenas, mejoras de accesibilidad táctil para personas mayores, microinteracciones hápticas avanzadas y personalización de temas y avatares de equipo.
 
+* 🎭 **Sistema de Avatares Temáticos Canarios (13 Avatares Autóctonos):**
+  * **Catálogo identitario de 13 figuras:** *El Piedrero 🪨, El Tahúr 🃏, El Mago 👒, El Lagarto 🦎, El Bardino 🐕, El Mencey 👑, El Palmero 🌴, El Costero 🎣, El Majo 🥣, El Guayota 🌋, El Cernícalo 🦅, La Romera 💃 y El Sabio 🧔*.
+  * **Insignias reactivas (`PlayerAvatarBadge`):** Borde coloreado según el equipo (Equipo A, B, C, D, Reserva o Espectador) con distintivos dinámicos de Líder 👑 y Repartidor 🃏.
+  * **Selector interactivo (`AvatarSelectionDialog`):** Selección ágil tanto en multijugador como en local para cada jugador (mesas de 2, 3, 4, 6 y 8).
+  * **Persistencia y sincronización:** Guardado local de perfil (`UserProfilePersistence`) y difusión en tiempo real vía WebSocket (`UPDATE_PLAYER_PROFILE`).
+* ⚡ **Panel "Modo Dios" para el Anfitrión Multijugador (`GodModeHostDialog`):**
+  * Consola de arbitraje en vivo para el anfitrión: ajuste de piedras y chicos de cada equipo, cambio de repartidor o mano, forzado de estados de partida, reasignación de equipos y botón de desatasque para recuentos interrumpidos.
+* ⏩ **Recuento Libre y Botón "Pasar sin Contar" en Última Mano:**
+  * El anfitrión y los líderes de equipo pueden gestionar el recuento independientemente de quién reparta la baraja (en local y multijugador).
+  * Nuevo botón seguro *"Pasar sin contar"* en el último reparto para avanzar de mano rápidamente sin forzar el conteo de cartas.
+* 👥 **Sala de Espera Reactiva en Tiempo Real:**
+  * Notificaciones visuales de estado: banners animados con *"Esperando jugadores"*, alertas en vivo de conexión (*"[Nombre] uniéndose..."*) y confirmación de *"Mesa completa"*.
+  * Huecos visuales (slots) con bordes punteados que representan las plazas libres de la mesa.
+* 🎵 **Pista BGM 07, Mezcla Aleatoria Inteligente y Estabilidad de Muestreo:**
+  * Nueva pista tradicional canaria `bgm_07.mp3` (*Círculo de Infantes*).
+  * Ciclo de reproducción aleatoria inteligente con memoria (`playedIndices`) para reproducir todo el repertorio sin repeticiones consecutivas.
+  * Estandarización estricta de frecuencia de muestreo a 44.100 Hz y 128 kbps CBR en el 100% de los audios, erradicando desfases de reloj en el hardware ("efecto ardilla").
+  * Corrección del orden de inicialización en el ciclo de vida del reproductor de audio en Kotlin.
 * 🎵 **Consolidación Integral y Estabilidad de Audio (Arquitectura MVP en RAM):**
   * **Reproducción 100% en Memoria RAM (`MediaDataSource`):** Se restaura la arquitectura original del MVP que alimenta al `MediaPlayer` desde un búfer en RAM con tamaño exacto de fin de fichero (`getSize()`), eliminando escrituras y lecturas de disco concurrentes en caché.
   * **Erradicación de aceleraciones y distorsión:** Se elimina el desbordamiento de límites de tramas MP3 en el contenedor APK (`openFd`) y la manipulación de `playbackParams` (evitando el filtro DSP *Sonic* de time-stretching), garantizando velocidad 1.0x nativa sin pulsos ni chasquidos.
@@ -39,7 +57,7 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 ## 📥 Descarga Directa
 
 Si deseas instalar y jugar a la Ronda Canaria con tu familia y amigos:
-* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.1-Beta / versionCode 6**).
+* Descarga el instalador oficial listo para usar desde la sección de **[Releases de GitHub](https://github.com/DevNaranjo/El-Piedrero/releases)** (**v1.1-Beta.2 / versionCode 7**).
 * Compatible con cualquier teléfono o tablet con **Android 7.0 (Nougat)** o superior (API 24+).
 * **Seguridad y Verificación:** Cada release incluye los archivos `.apk` y Android App Bundle (`.aab`) optimizados mediante ofuscación R8, acompañados de su correspondiente firma digital y archivo `checksums.txt` con los resúmenes criptográficos SHA-256 oficiales.
 * **Firma Oficial:** Certificado digital emitido a nombre de `DevNaranjo`.

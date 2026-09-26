@@ -47,6 +47,7 @@ import com.app.rondacanaria.ui.components.AutoResizedText
 import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
 import com.app.rondacanaria.ui.components.FloatingControlDock
 import com.app.rondacanaria.ui.components.MesaCardsDealDialog
+import com.app.rondacanaria.ui.components.GodModeHostDialog
 import com.app.rondacanaria.ui.components.MesaWaitingDialog
 import com.app.rondacanaria.ui.components.ModernPlayerScoreCard
 import com.app.rondacanaria.ui.components.ReactiveCantosGrid
@@ -122,10 +123,12 @@ fun ScoreBoardScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showCardCountDialog by remember { mutableStateOf(false) }
+    var showSkipCountConfirmDialog by remember { mutableStateOf(false) }
     var showCardCountWaitingDialog by remember { mutableStateOf(false) }
     var showMesaCardsDialog by remember { mutableStateOf(false) }
     var showMesaWaitingDialog by remember { mutableStateOf(false) }
     var showManageLeadersDialog by remember { mutableStateOf(false) }
+    var showGodModeDialog by remember { mutableStateOf(false) }
     var lastSeenMesaKey by rememberSaveable(gameState.gameId) { mutableStateOf("") }
     var showDealReminder by remember { mutableStateOf(false) }
     var activeBufoOption by remember { mutableStateOf<ActiveBufoOption?>(null) }
@@ -159,6 +162,7 @@ fun ScoreBoardScreen(
 
     val canShowMesaCards = uiState.isLocalGame || isMeDealing
     val canDoCardCount = uiState.isLocalGame || uiState.isHost || uiState.isLeader || isMeDealing
+    val canSkipWithoutCount = uiState.isLocalGame || uiState.isHost || uiState.isLeader
 
     // Detección automática al inicio de partida o nueva mano (solo en el primer reparto) para abrir diálogo de cartas a la mesa (al repartidor) o pantalla de espera (a los demás jugadores)
     val effectiveGameId = gameState.gameId.ifBlank { "game" }
@@ -216,6 +220,10 @@ fun ScoreBoardScreen(
             showTvCastDialog = false
         } else if (showAudioSettingsDialog) {
             showAudioSettingsDialog = false
+        } else if (showGodModeDialog) {
+            showGodModeDialog = false
+        } else if (showSkipCountConfirmDialog) {
+            showSkipCountConfirmDialog = false
         } else if (showCardCountDialog) {
             showCardCountDialog = false
             viewModel.setCountingCards(false)
@@ -504,6 +512,16 @@ fun ScoreBoardScreen(
                                     }
                                 )
                             }
+                            if (isAtMaxDeals && canSkipWithoutCount) {
+                                DropdownMenuItem(
+                                    text = { Text("Pasar sin Contar ⏩", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        showSkipCountConfirmDialog = true
+                                    }
+                                )
+                            }
                             if (uiState.isHost && !uiState.isLocalGame && gameState.maxPlayers in listOf(4, 6, 8)) {
                                 DropdownMenuItem(
                                     text = { Text("Gestionar Líderes 👑", fontWeight = FontWeight.SemiBold) },
@@ -511,6 +529,28 @@ fun ScoreBoardScreen(
                                     onClick = {
                                         showSettingsMenu = false
                                         showManageLeadersDialog = true
+                                    }
+                                )
+                            }
+                            if (uiState.isHost && !uiState.isLocalGame) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "⚡ Modo Dios (Anfitrión)",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Bolt,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        showGodModeDialog = true
                                     }
                                 )
                             }
@@ -828,26 +868,51 @@ fun ScoreBoardScreen(
                         }
                     }
 
-                    if (isAtMaxDeals && canDoCardCount) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Button(
-                            onClick = {
-                                showCardCountDialog = true
-                                viewModel.setCountingCards(true)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "🃏 Finalizar Mano: Recuento de Cartas",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.5.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    if (isAtMaxDeals) {
+                        if (canDoCardCount) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(
+                                onClick = {
+                                    showCardCountDialog = true
+                                    viewModel.setCountingCards(true)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "🃏 Finalizar Mano: Recuento de Cartas",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        if (canSkipWithoutCount) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedButton(
+                                onClick = { showSkipCountConfirmDialog = true },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "⏩ Pasar sin Contar",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -1541,6 +1606,7 @@ fun ScoreBoardScreen(
             currentDeal = gameState.currentDeal,
             maxDeals = maxDeals,
             nextDealerName = nextDealerName,
+            canSkipWithoutCards = canSkipWithoutCount,
             onApplyCount = { counts ->
                 viewModel.applyCardCount(counts)
                 viewModel.setCountingCards(false)
@@ -1555,6 +1621,87 @@ fun ScoreBoardScreen(
                 viewModel.setCountingCards(false)
                 showCardCountDialog = false
             }
+        )
+    }
+
+    // Diálogo de confirmación para pasar sin contar desde fuera
+    if (showSkipCountConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showSkipCountConfirmDialog = false },
+            icon = {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "¿Pasar sin Contar?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Se finalizará la mano actual y se comenzará la siguiente mano directamente, sin realizar el recuento de cartas ni asignar piedras adicionales.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSkipCountConfirmDialog = false
+                        showDealReminder = false
+                        viewModel.restartHand()
+                        viewModel.setCountingCards(false)
+                        showCardCountDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Pasar sin Contar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSkipCountConfirmDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Diálogo de Modo Dios para el Anfitrión (Control Total de Partida)
+    if (showGodModeDialog && uiState.isHost) {
+        GodModeHostDialog(
+            gameState = gameState,
+            onApplyUpdate = { sA, sB, sC, sD, wA, wB, wC, wD, hand, deal, dealer, status, winner, counting ->
+                viewModel.applyGodModeUpdate(
+                    scoreA = sA,
+                    scoreB = sB,
+                    scoreC = sC,
+                    scoreD = sD,
+                    winsA = wA,
+                    winsB = wB,
+                    winsC = wC,
+                    winsD = wD,
+                    currentHand = hand,
+                    currentDeal = deal,
+                    dealerPlayerId = dealer,
+                    status = status,
+                    winnerTeam = winner,
+                    isCountingCards = counting
+                )
+            },
+            onSwitchPlayerTeam = { playerId, newTeam ->
+                viewModel.switchPlayerTeam(playerId, newTeam)
+            },
+            onTogglePlayerLeader = { playerId ->
+                viewModel.togglePlayerLeader(playerId)
+            },
+            onDismiss = { showGodModeDialog = false }
         )
     }
 
@@ -3196,6 +3343,7 @@ fun CardCountDialog(
     currentDeal: Int,
     maxDeals: Int,
     nextDealerName: String,
+    canSkipWithoutCards: Boolean = true,
     onApplyCount: (Map<Team, Int>) -> Unit,
     onSkipWithoutCards: () -> Unit,
     onDismiss: () -> Unit
@@ -3514,8 +3662,10 @@ fun CardCountDialog(
         },
         dismissButton = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onSkipWithoutCards) {
-                    Text("Pasar sin Contar", textAlign = TextAlign.Center)
+                if (canSkipWithoutCards) {
+                    TextButton(onClick = onSkipWithoutCards) {
+                        Text("Pasar sin Contar", textAlign = TextAlign.Center)
+                    }
                 }
                 TextButton(onClick = onDismiss) {
                     Text("Cancelar", textAlign = TextAlign.Center)

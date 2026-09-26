@@ -21,7 +21,8 @@ enum class MessageType {
     APPLY_CARD_COUNT,
     RESET_GAME,
     RESTART_HAND,
-    SET_COUNTING_CARDS
+    SET_COUNTING_CARDS,
+    UPDATE_PLAYER_PROFILE
 }
 
 @Serializable
@@ -88,7 +89,8 @@ data class Player(
     val name: String,
     val team: Team,
     val isHost: Boolean,
-    val isLeader: Boolean = false
+    val isLeader: Boolean = false,
+    val avatarId: String = "avatar_piedrero"
 )
 
 @Serializable
@@ -159,7 +161,8 @@ data class GameState(
     val currentDeal: Int = 1,
     val currentHand: Int = 1,
     val dealerPlayerId: String? = null,
-    val isCountingCards: Boolean = false
+    val isCountingCards: Boolean = false,
+    val connectingPlayerName: String? = null
 ) {
     fun maxDeals(): Int = getMaxDeals(maxPlayers)
 }
@@ -174,7 +177,15 @@ fun getMaxDeals(maxPlayers: Int): Int = when (maxPlayers) {
 data class JoinRequestPayload(
     val playerName: String,
     val clientVersion: String = "1.0",
-    val roomToken: String = ""
+    val roomToken: String = "",
+    val avatarId: String = "avatar_piedrero"
+)
+
+@Serializable
+data class UpdatePlayerProfilePayload(
+    val playerId: String,
+    val avatarId: String? = null,
+    val name: String? = null
 )
 
 @Serializable
@@ -266,5 +277,6 @@ data class NetworkEnvelope(
     val applyCardCount: ApplyCardCountPayload? = null,
     val resetGame: ResetGamePayload? = null,
     val setCountingCards: SetCountingCardsPayload? = null,
+    val updatePlayerProfile: UpdatePlayerProfilePayload? = null,
     val gameStateBroadcast: GameState? = null
 )

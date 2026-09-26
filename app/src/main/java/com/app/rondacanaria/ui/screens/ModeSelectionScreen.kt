@@ -1,5 +1,6 @@
 package com.app.rondacanaria.ui.screens
 
+import com.app.rondacanaria.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -36,11 +37,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import com.app.rondacanaria.R
+import com.app.rondacanaria.data.model.AvatarCatalog
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.AvatarSelectionDialog
 import com.app.rondacanaria.ui.components.LicensesDialog
+import com.app.rondacanaria.ui.components.PlayerAvatarBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +68,21 @@ fun ModeSelectionScreen(
             listOf("Jugador 1", "Jugador 2", "Jugador 3", "Jugador 4", "Jugador 5", "Jugador 6", "Jugador 7", "Jugador 8")
         )
     }
+    var localPlayerAvatars by remember {
+        mutableStateOf(
+            listOf(
+                AvatarCatalog.AVATARS[0].id,
+                AvatarCatalog.AVATARS[1].id,
+                AvatarCatalog.AVATARS[2].id,
+                AvatarCatalog.AVATARS[3].id,
+                AvatarCatalog.AVATARS[4].id,
+                AvatarCatalog.AVATARS[5].id,
+                AvatarCatalog.AVATARS[6].id,
+                AvatarCatalog.AVATARS[7].id
+            )
+        )
+    }
+    var editingAvatarIndex by remember { mutableStateOf<Int?>(null) }
 
     // Al pulsar atrás en el menú principal: cerrar diálogos abiertos en vez de salir de la app
     BackHandler(enabled = showTvCastDialog || showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
@@ -506,6 +524,15 @@ fun ModeSelectionScreen(
                             },
                             label = { Text("Nombre Jugador 1") },
                             placeholder = { Text("Jugador 1") },
+                            leadingIcon = {
+                                PlayerAvatarBadge(
+                                    avatarId = localPlayerAvatars[0],
+                                    team = Team.TEAM_A,
+                                    size = 32.dp,
+                                    showBadges = false,
+                                    onClick = { editingAvatarIndex = 0 }
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -518,6 +545,15 @@ fun ModeSelectionScreen(
                             },
                             label = { Text("Nombre Jugador 2") },
                             placeholder = { Text("Jugador 2") },
+                            leadingIcon = {
+                                PlayerAvatarBadge(
+                                    avatarId = localPlayerAvatars[1],
+                                    team = Team.TEAM_B,
+                                    size = 32.dp,
+                                    showBadges = false,
+                                    onClick = { editingAvatarIndex = 1 }
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -531,6 +567,15 @@ fun ModeSelectionScreen(
                                 },
                                 label = { Text("Nombre Jugador 3") },
                                 placeholder = { Text("Jugador 3") },
+                                leadingIcon = {
+                                    PlayerAvatarBadge(
+                                        avatarId = localPlayerAvatars[2],
+                                        team = Team.TEAM_C,
+                                        size = 32.dp,
+                                        showBadges = false,
+                                        onClick = { editingAvatarIndex = 2 }
+                                    )
+                                },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -602,6 +647,14 @@ fun ModeSelectionScreen(
                                             },
                                             label = { Text("Jugador 1") },
                                             placeholder = { Text("Jugador ${idx1 + 1}") },
+                                            leadingIcon = {
+                                                PlayerAvatarBadge(
+                                                    avatarId = localPlayerAvatars[idx1],
+                                                    size = 28.dp,
+                                                    showBadges = false,
+                                                    onClick = { editingAvatarIndex = idx1 }
+                                                )
+                                            },
                                             singleLine = true,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -613,6 +666,14 @@ fun ModeSelectionScreen(
                                             },
                                             label = { Text("Jugador 2") },
                                             placeholder = { Text("Jugador ${idx2 + 1}") },
+                                            leadingIcon = {
+                                                PlayerAvatarBadge(
+                                                    avatarId = localPlayerAvatars[idx2],
+                                                    size = 28.dp,
+                                                    showBadges = false,
+                                                    onClick = { editingAvatarIndex = idx2 }
+                                                )
+                                            },
                                             singleLine = true,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -776,6 +837,17 @@ fun ModeSelectionScreen(
                         }
                     }
 
+                    val finalAvatars = if (localMaxPlayers in listOf(2, 3)) {
+                        listOf(localPlayerAvatars[0], localPlayerAvatars[1]) +
+                            if (localMaxPlayers == 3) listOf(localPlayerAvatars[2]) else emptyList()
+                    } else {
+                        when (localMaxPlayers) {
+                            4 -> listOf(localPlayerAvatars[0], localPlayerAvatars[2], localPlayerAvatars[1], localPlayerAvatars[3])
+                            6 -> listOf(localPlayerAvatars[0], localPlayerAvatars[2], localPlayerAvatars[1], localPlayerAvatars[3], localPlayerAvatars[4], localPlayerAvatars[5])
+                            else -> listOf(localPlayerAvatars[0], localPlayerAvatars[2], localPlayerAvatars[1], localPlayerAvatars[3], localPlayerAvatars[4], localPlayerAvatars[5], localPlayerAvatars[6], localPlayerAvatars[7])
+                        }
+                    }
+
                     viewModel.startLocalGame(
                         teamA = finalTeamA,
                         teamB = finalTeamB,
@@ -783,7 +855,8 @@ fun ModeSelectionScreen(
                         teamD = finalTeamD,
                         maxPlayers = localMaxPlayers,
                         reserveTeams = reserves,
-                        customPlayers = finalPlayers
+                        customPlayers = finalPlayers,
+                        playerAvatars = finalAvatars
                     )
                 },
                 shape = MaterialTheme.shapes.medium,
@@ -800,6 +873,17 @@ fun ModeSelectionScreen(
                     Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
+        )
+    }
+
+    editingAvatarIndex?.let { index ->
+        AvatarSelectionDialog(
+            currentAvatarId = localPlayerAvatars.getOrNull(index),
+            title = "Avatar para ${localPlayerNames.getOrNull(index) ?: "Jugador ${index + 1}"}",
+            onAvatarSelected = { newAvatar ->
+                localPlayerAvatars = localPlayerAvatars.toMutableList().also { it[index] = newAvatar }
+            },
+            onDismissRequest = { editingAvatarIndex = null }
         )
     }
 

@@ -33,6 +33,7 @@ class ClientGameUseCase(
     private var targetHost: String = ""
     private var targetPort: Int = NetworkUtils.DEFAULT_PORT
     private var localPlayerName: String = "Jugador"
+    private var localAvatarId: String = "avatar_piedrero"
     private var targetRoomToken: String = ""
     private var targetHostName: String = ""
     val localPlayerId: String = UUID.randomUUID().toString()
@@ -62,11 +63,13 @@ class ClientGameUseCase(
         playerName: String,
         roomToken: String = "",
         encryptionKey: String = "",
-        hostName: String = ""
+        hostName: String = "",
+        avatarId: String = "avatar_piedrero"
     ) {
         this.targetHost = host
         this.targetPort = port
         this.localPlayerName = playerName
+        this.localAvatarId = avatarId
         this.targetRoomToken = roomToken
         this.targetHostName = hostName
         this.socketClient.setEncryptionKey(encryptionKey)
@@ -141,10 +144,29 @@ class ClientGameUseCase(
             joinRequest = JoinRequestPayload(
                 playerName = localPlayerName,
                 clientVersion = "1.0",
-                roomToken = targetRoomToken
+                roomToken = targetRoomToken,
+                avatarId = localAvatarId
             )
         )
         socketClient.sendMessage(envelope)
+    }
+
+    fun requestUpdateProfile(newName: String? = null, newAvatarId: String? = null) {
+        if (newAvatarId != null) localAvatarId = newAvatarId
+        if (newName != null) localPlayerName = newName
+        val envelope = NetworkEnvelope(
+            type = MessageType.UPDATE_PLAYER_PROFILE,
+            sequenceNumber = outgoingSequence.incrementAndGet(),
+            senderId = localPlayerId,
+            updatePlayerProfile = UpdatePlayerProfilePayload(
+                playerId = localPlayerId,
+                avatarId = newAvatarId,
+                name = newName
+            )
+        )
+        useCaseScope?.launch {
+            socketClient.sendMessage(envelope)
+        }
     }
 
     internal fun handleIncomingEnvelope(envelope: NetworkEnvelope) {

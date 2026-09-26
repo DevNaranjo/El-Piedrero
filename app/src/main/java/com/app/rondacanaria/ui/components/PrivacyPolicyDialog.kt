@@ -104,7 +104,7 @@ fun PrivacyPolicyDialog(
 
                 PrivacySectionItem(
                     title = "🎵 Música Ambiental (Generada por IA)",
-                    description = "Las pistas de música instrumental que acompañan el juego (bgm_01 a bgm_06) han sido generadas mediante Inteligencia Artificial (IA) inspiradas en melodías y ritmos tradicionales del folclore canario, totalmente libres de derechos de autor y entidades de gestión colectiva (SGAE)."
+                    description = "Las pistas de música instrumental que acompañan el juego (bgm_01 a bgm_07) han sido generadas mediante Inteligencia Artificial (IA) inspiradas en melodías y ritmos tradicionales del folclore canario, totalmente libres de derechos de autor y entidades de gestión colectiva (SGAE)."
                 )
 
                 PrivacySectionItem(

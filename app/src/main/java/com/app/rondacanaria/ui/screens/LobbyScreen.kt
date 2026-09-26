@@ -3,10 +3,12 @@ package com.app.rondacanaria.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -24,7 +26,9 @@ import androidx.core.content.ContextCompat
 import com.app.rondacanaria.data.model.Team
 import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
+import com.app.rondacanaria.ui.components.AvatarSelectionDialog
 import com.app.rondacanaria.ui.components.CanarianNames
+import com.app.rondacanaria.ui.components.PlayerAvatarBadge
 import com.app.rondacanaria.ui.theme.elPiedreroTopAppBarColors
 import com.app.rondacanaria.ui.theme.goldActionButtonColors
 import com.app.rondacanaria.ui.theme.headlineContentColor
@@ -37,6 +41,7 @@ fun LobbyScreen(
 ) {
     val context = LocalContext.current
     var playerName by remember { mutableStateOf(uiState.playerName) }
+    var showAvatarDialog by remember { mutableStateOf(false) }
     var showNameError by remember { mutableStateOf(false) }
     var showCameraNoticeDialog by remember { mutableStateOf(false) }
     val randomExampleName = remember { CanarianNames.getRandomName() }
@@ -90,37 +95,68 @@ fun LobbyScreen(
                 textAlign = TextAlign.Center
             )
 
-            OutlinedTextField(
-                value = playerName,
-                onValueChange = {
-                    playerName = it
-                    viewModel.setPlayerName(it)
-                    if (it.trim().isNotBlank()) {
-                        showNameError = false
-                    }
-                },
-                label = { Text("Tu Nombre / Alias *") },
-                placeholder = {
-                    Text(
-                        text = "(ej: $randomExampleName)",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Selector interactivo de Avatar
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    PlayerAvatarBadge(
+                        avatarId = uiState.selectedAvatarId,
+                        size = 58.dp,
+                        showBadges = false,
+                        onClick = { showAvatarDialog = true }
                     )
-                },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                shape = MaterialTheme.shapes.medium,
-                isError = showNameError && !isNameValid,
-                supportingText = {
-                    if (showNameError && !isNameValid) {
-                        Text(
-                            text = "Es obligatorio poner un nombre antes de entrar a una partida",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .offset(x = 2.dp, y = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Cambiar avatar",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(3.dp)
                         )
                     }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+                }
+
+                OutlinedTextField(
+                    value = playerName,
+                    onValueChange = {
+                        playerName = it
+                        viewModel.setPlayerName(it)
+                        if (it.trim().isNotBlank()) {
+                            showNameError = false
+                        }
+                    },
+                    label = { Text("Tu Nombre / Alias *") },
+                    placeholder = {
+                        Text(
+                            text = "(ej: $randomExampleName)",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    shape = MaterialTheme.shapes.medium,
+                    isError = showNameError && !isNameValid,
+                    supportingText = {
+                        if (showNameError && !isNameValid) {
+                            Text(
+                                text = "Nombre obligatorio",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -498,6 +534,16 @@ fun LobbyScreen(
                     Text("Cancelar", textAlign = TextAlign.Center)
                 }
             }
+        )
+    }
+
+    if (showAvatarDialog) {
+        AvatarSelectionDialog(
+            currentAvatarId = uiState.selectedAvatarId,
+            onAvatarSelected = { newAvatarId ->
+                viewModel.selectAvatar(newAvatarId)
+            },
+            onDismissRequest = { showAvatarDialog = false }
         )
     }
 }

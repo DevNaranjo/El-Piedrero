@@ -3,7 +3,7 @@
 
 [🇪🇸 Español](README.md) • [🇬🇧 English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/Version-v1.1--Beta%20(Code%206)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
+[![Version](https://img.shields.io/badge/Version-v1.1--Beta.2%20(Code%207)-brightgreen.svg)](https://github.com/DevNaranjo/El-Piedrero/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%2B-brightgreen.svg?logo=android)](https://developer.android.com)
@@ -16,10 +16,28 @@ Play with a single phone in the center of the table or synchronize scores across
 
 ---
 
-## 🚀 What's New in Version 1.1-Beta
+## 🚀 What's New in Version 1.1-Beta.2
 
 > **Update focused on optimizing and polishing the scoreboard GUI:** fluid animations during the transition from bad stones to good stones, touch accessibility enhancements for seniors, advanced haptic micro-interactions, and custom themes with team avatars.
 
+* 🎭 **Canarian Themed Avatars System (13 Native Avatars):**
+  * **13 Identity Characters:** *El Piedrero 🪨, El Tahúr 🃏, El Mago 👒, El Lagarto 🦎, El Bardino 🐕, El Mencey 👑, El Palmero 🌴, El Costero 🎣, El Majo 🥣, El Guayota 🌋, El Cernícalo 🦅, La Romera 💃, and El Sabio 🧔*.
+  * **Reactive Badges (`PlayerAvatarBadge`):** Team-colored perimeter halos (Team A, B, C, D, Reserve, or Spectator) with dynamic Leader 👑 and Dealer 🃏 badges.
+  * **Interactive Selection (`AvatarSelectionDialog`):** Modal selector available for both multiplayer lobbies and local table setup (2, 3, 4, 6, and 8 players).
+  * **Persistence & Network Sync:** Local profile storage (`UserProfilePersistence`) and live WebSocket broadcasting (`UPDATE_PLAYER_PROFILE`).
+* ⚡ **Host "God Mode" Control Panel (`GodModeHostDialog`):**
+  * Live referee and arbitration console for the Host: direct stone and "chico" adjustment per team, dealer and hand reassignment, game state override, and frozen count unlock button.
+* ⏩ **Flexible Count & "Skip without Counting" Button:**
+  * Host and team leaders can manage the final card count regardless of who is dealing (in local and multiplayer modes).
+  * Safe *"Skip without Counting"* button on the last deal of the hand for fast progression.
+* 👥 **Real-Time Reactive Waiting Lobby:**
+  * Animated lobby banners: *"Waiting for players"*, live connection notifications (*"[Name] joining..."*), and *"Table full"* indicator.
+  * Dashed placeholder slots visually indicating open seats at the table.
+* 🎵 **BGM Track 07, Smart Shuffle Cycle & Sample Rate Harmonization:**
+  * New traditional Canarian instrumental track `bgm_07.mp3` (*Círculo de Infantes*).
+  * Smart shuffle cycle with history memory (`playedIndices`) ensuring full playlist rotation without immediate track repetition.
+  * Strict sample rate standardization to 44,100 Hz / 128 kbps CBR across 100% of all audio files, eliminating hardware clock drift and chipmunk pitch anomalies.
+  * Kotlin property initialization order fix in audio player lifecycle.
 * 🎵 **Comprehensive Audio Stability (RAM Architecture):** 100% in-memory audio playback via `MemoryAudioDataSource`, eliminating disk race conditions, stuttering, and chipmunk speed-up artifacts.
 * 👑 **Contextual "De bufos" Audio (`De-bufos.mp3`):** Authentic call sound synced over local P2P network for Host and Clients.
 * 🌓 **Smooth Theme Transitions:** Material 3 color animations with 380 ms `FastOutSlowInEasing`.
@@ -30,7 +48,7 @@ Play with a single phone in the center of the table or synchronize scores across
 ## 📥 Direct Download
 
 If you want to install and play Ronda Canaria with friends and family:
-* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases)** page (**v1.1-Beta / versionCode 6**).
+* Download the official ready-to-use installer from the **[GitHub Releases](https://github.com/DevNaranjo/El-Piedrero/releases)** page (**v1.1-Beta.2 / versionCode 7**).
 * Compatible with any Android smartphone or tablet running **Android 7.0 (Nougat)** or higher (API 24+).
 * **Security & Verification:** Each release includes optimized `.apk` and Android App Bundle (`.aab`) binaries built with R8 minification, official digital signatures, and a `checksums.txt` file containing SHA-256 digests.
 * **Official Signature:** Digital certificate issued to `DevNaranjo`.

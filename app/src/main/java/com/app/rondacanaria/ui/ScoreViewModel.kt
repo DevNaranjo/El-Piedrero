@@ -11,6 +11,7 @@ import com.app.rondacanaria.data.history.DEFAULT_CANTO_BUTTON_ORDER
 import com.app.rondacanaria.data.history.GameHistoryRepository
 import com.app.rondacanaria.data.history.LocalGamePersistence
 import com.app.rondacanaria.data.history.LocalSavedGame
+import com.app.rondacanaria.data.history.UserProfilePersistence
 import com.app.rondacanaria.data.model.*
 import com.app.rondacanaria.data.network.NetworkUtils
 import com.app.rondacanaria.domain.model.ConnectionInfo
@@ -34,6 +35,7 @@ enum class AppScreen {
 data class ScoreUiState(
     val currentScreen: AppScreen = AppScreen.MODE_SELECTION,
     val playerName: String = "",
+    val selectedAvatarId: String = AvatarCatalog.DEFAULT_AVATAR_ID,
     val teamAName: String = "Equipo A",
     val teamBName: String = "Equipo B",
     val teamCName: String = "Equipo C",
@@ -75,11 +77,14 @@ class ScoreViewModel(
     private val localPersistence = LocalGamePersistence(application.applicationContext)
     private val buttonLayoutPersistence = ButtonLayoutPersistence(application.applicationContext)
     private val accessibilityPersistence = AccessibilityPersistence(application.applicationContext)
+    private val userProfilePersistence = UserProfilePersistence(application.applicationContext)
     val gameHistory: StateFlow<List<GameHistoryRecord>> = historyRepository.history
     private var lastRecordedGameId: String? = null
 
     private val _uiState = MutableStateFlow(
         ScoreUiState(
+            playerName = userProfilePersistence.loadPlayerName(),
+            selectedAvatarId = userProfilePersistence.loadAvatarId(),
             isMusicEnabled = audioPlayer.isMusicEnabled,
             isSfxEnabled = audioPlayer.isSfxEnabled,
             isVibrationEnabled = audioPlayer.isVibrationEnabled,
@@ -285,7 +290,8 @@ class ScoreViewModel(
         teamD: String = "Equipo D",
         maxPlayers: Int,
         reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList(),
-        customPlayers: List<Pair<String, Team>>? = null
+        customPlayers: List<Pair<String, Team>>? = null,
+        playerAvatars: List<String>? = null
     ) {
         val effectiveReserves = when {
             maxPlayers == 8 -> if (reserveTeams.size == 2) reserveTeams else listOf(Team.TEAM_C, Team.TEAM_D)
@@ -295,51 +301,53 @@ class ScoreViewModel(
         val state = _uiState.value
         val localPlayers = if (!customPlayers.isNullOrEmpty()) {
             customPlayers.mapIndexed { index, (name, team) ->
+                val avatar = playerAvatars?.getOrNull(index) ?: AvatarCatalog.AVATARS[index % AvatarCatalog.AVATARS.size].id
                 Player(
                     id = "local_${index + 1}",
                     name = name.ifBlank { "Jugador ${index + 1}" },
                     team = team,
-                    isHost = index == 0
+                    isHost = index == 0,
+                    avatarId = avatar
                 )
             }
         } else {
             when (maxPlayers) {
                 2 -> listOf(
-                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false)
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id)
                 )
                 3 -> listOf(
-                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_3", name = teamC, team = Team.TEAM_C, isHost = false)
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id),
+                    Player(id = "local_3", name = teamC, team = Team.TEAM_C, isHost = false, avatarId = playerAvatars?.getOrNull(2) ?: AvatarCatalog.AVATARS[2].id)
                 )
                 4 -> listOf(
-                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
-                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false)
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false, avatarId = playerAvatars?.getOrNull(2) ?: AvatarCatalog.AVATARS[2].id),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(3) ?: AvatarCatalog.AVATARS[3].id)
                 )
                 6 -> listOf(
-                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
-                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false),
-                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false)
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false, avatarId = playerAvatars?.getOrNull(2) ?: AvatarCatalog.AVATARS[2].id),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(3) ?: AvatarCatalog.AVATARS[3].id),
+                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false, avatarId = playerAvatars?.getOrNull(4) ?: AvatarCatalog.AVATARS[4].id),
+                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false, avatarId = playerAvatars?.getOrNull(5) ?: AvatarCatalog.AVATARS[5].id)
                 )
                 8 -> listOf(
-                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false),
-                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false),
-                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false),
-                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false),
-                    Player(id = "local_7", name = "$teamD (J1)", team = Team.TEAM_D, isHost = false),
-                    Player(id = "local_8", name = "$teamD (J2)", team = Team.TEAM_D, isHost = false)
+                    Player(id = "local_1", name = "$teamA (J1)", team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = "$teamB (J1)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id),
+                    Player(id = "local_3", name = "$teamA (J2)", team = Team.TEAM_A, isHost = false, avatarId = playerAvatars?.getOrNull(2) ?: AvatarCatalog.AVATARS[2].id),
+                    Player(id = "local_4", name = "$teamB (J2)", team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(3) ?: AvatarCatalog.AVATARS[3].id),
+                    Player(id = "local_5", name = "$teamC (J1)", team = Team.TEAM_C, isHost = false, avatarId = playerAvatars?.getOrNull(4) ?: AvatarCatalog.AVATARS[4].id),
+                    Player(id = "local_6", name = "$teamC (J2)", team = Team.TEAM_C, isHost = false, avatarId = playerAvatars?.getOrNull(5) ?: AvatarCatalog.AVATARS[5].id),
+                    Player(id = "local_7", name = "$teamD (J1)", team = Team.TEAM_D, isHost = false, avatarId = playerAvatars?.getOrNull(6) ?: AvatarCatalog.AVATARS[6].id),
+                    Player(id = "local_8", name = "$teamD (J2)", team = Team.TEAM_D, isHost = false, avatarId = playerAvatars?.getOrNull(7) ?: AvatarCatalog.AVATARS[7].id)
                 )
                 else -> listOf(
-                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true),
-                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false)
+                    Player(id = "local_1", name = teamA, team = Team.TEAM_A, isHost = true, avatarId = playerAvatars?.getOrNull(0) ?: AvatarCatalog.AVATARS[0].id),
+                    Player(id = "local_2", name = teamB, team = Team.TEAM_B, isHost = false, avatarId = playerAvatars?.getOrNull(1) ?: AvatarCatalog.AVATARS[1].id)
                 )
             }
         }
@@ -410,8 +418,67 @@ class ScoreViewModel(
         }
     }
 
+    fun applyGodModeUpdate(
+        scoreA: Int? = null,
+        scoreB: Int? = null,
+        scoreC: Int? = null,
+        scoreD: Int? = null,
+        winsA: Int? = null,
+        winsB: Int? = null,
+        winsC: Int? = null,
+        winsD: Int? = null,
+        currentHand: Int? = null,
+        currentDeal: Int? = null,
+        dealerPlayerId: String? = null,
+        status: GameStatus? = null,
+        winnerTeam: Team? = null,
+        isCountingCards: Boolean? = null,
+        reason: String = "Ajuste manual del Anfitrión (Modo Dios)"
+    ) {
+        if (_uiState.value.isHost) {
+            viewModelScope.launch {
+                hostUseCase.godModeUpdate(
+                    scoreA = scoreA,
+                    scoreB = scoreB,
+                    scoreC = scoreC,
+                    scoreD = scoreD,
+                    winsA = winsA,
+                    winsB = winsB,
+                    winsC = winsC,
+                    winsD = winsD,
+                    currentHand = currentHand,
+                    currentDeal = currentDeal,
+                    dealerPlayerId = dealerPlayerId,
+                    status = status,
+                    winnerTeam = winnerTeam,
+                    isCountingCards = isCountingCards,
+                    reason = reason
+                )
+            }
+        }
+    }
+
     fun setPlayerName(name: String) {
         _uiState.update { it.copy(playerName = name) }
+        userProfilePersistence.savePlayerName(name)
+        if (_uiState.value.sessionStatus == SessionStatus.CONNECTED && !_uiState.value.isHost) {
+            clientUseCase.requestUpdateProfile(newName = name)
+        }
+    }
+
+    fun selectAvatar(avatarId: String) {
+        _uiState.update { it.copy(selectedAvatarId = avatarId) }
+        userProfilePersistence.saveAvatarId(avatarId)
+        if (_uiState.value.isHost) {
+            val hostPlayerId = _uiState.value.gameState.connectedPlayers.find { it.isHost }?.id
+            if (hostPlayerId != null) {
+                viewModelScope.launch {
+                    hostUseCase.updatePlayerAvatar(hostPlayerId, avatarId)
+                }
+            }
+        } else if (_uiState.value.sessionStatus == SessionStatus.CONNECTED) {
+            clientUseCase.requestUpdateProfile(newAvatarId = avatarId)
+        }
     }
 
     fun setRoomConfig(
@@ -459,7 +526,8 @@ class ScoreViewModel(
             teamCName = state.teamCName,
             teamDName = state.teamDName,
             maxPlayers = state.maxPlayers,
-            reserveTeams = initialReserves
+            reserveTeams = initialReserves,
+            hostAvatarId = state.selectedAvatarId
         )
 
         val currentHostState = hostUseCase.gameState.value
@@ -537,7 +605,8 @@ class ScoreViewModel(
             playerName = name,
             roomToken = info.roomToken,
             encryptionKey = info.secretKey,
-            hostName = info.hostName
+            hostName = info.hostName,
+            avatarId = _uiState.value.selectedAvatarId
         )
     }
 

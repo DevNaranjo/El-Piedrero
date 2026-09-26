@@ -48,6 +48,20 @@ class HostGameUseCase(
     private val clientLastSequence = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val clientDisconnectGraceJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val outgoingSequence = java.util.concurrent.atomic.AtomicLong(0)
+    private var connectingPlayerResetJob: Job? = null
+
+    private suspend fun setConnectingPlayer(statusText: String?) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            if (current.connectingPlayerName != statusText) {
+                _gameState.value = current.copy(
+                    connectingPlayerName = statusText,
+                    version = current.version + 1
+                )
+            }
+        }
+        broadcastCurrentState()
+    }
 
     val roomToken: String get() = currentRoomToken
     val encryptionKey: String get() = currentEncryptionKey
@@ -69,7 +83,8 @@ class HostGameUseCase(
         port: Int = NetworkUtils.DEFAULT_PORT,
         reserveTeams: List<Team> = if (maxPlayers == 6) listOf(Team.TEAM_C) else if (maxPlayers == 8) listOf(Team.TEAM_C, Team.TEAM_D) else emptyList(),
         initialPlayers: List<Player>? = null,
-        initialStatus: GameStatus = GameStatus.WAITING
+        initialStatus: GameStatus = GameStatus.WAITING,
+        hostAvatarId: String = "avatar_piedrero"
     ) {
         if (_isHostRunning.value) {
             stopHost()
@@ -92,7 +107,8 @@ class HostGameUseCase(
             id = UUID.randomUUID().toString(),
             name = hostPlayerName,
             team = Team.TEAM_A,
-            isHost = true
+            isHost = true,
+            avatarId = hostAvatarId
         )
         val players = if (!initialPlayers.isNullOrEmpty()) initialPlayers else listOf(hostPlayer)
         players.forEach { assignedPlayerSeats[it.id] = it.team }
@@ -159,7 +175,14 @@ class HostGameUseCase(
 
     private suspend fun handleServerEvent(event: ServerEvent) {
         when (event) {
-            is ServerEvent.ClientConnected -> {}
+            is ServerEvent.ClientConnected -> {
+                connectingPlayerResetJob?.cancel()
+                setConnectingPlayer("Alguien uniéndose...")
+                connectingPlayerResetJob = useCaseScope?.launch {
+                    delay(5000L)
+                    setConnectingPlayer(null)
+                }
+            }
             is ServerEvent.ClientDisconnected -> {
                 handleClientDisconnected(event.clientId)
             }
@@ -182,6 +205,9 @@ class HostGameUseCase(
         when (envelope.type) {
             MessageType.JOIN_REQUEST -> {
                 val joinReq = envelope.joinRequest ?: return
+                val joiningName = joinReq.playerName.ifBlank { "Jugador" }
+                connectingPlayerResetJob?.cancel()
+                setConnectingPlayer("$joiningName uniéndose...")
 
                 // Validación de seguridad: Token de autenticación de sala obligatorio
                 if (currentRoomToken.isNotBlank() && joinReq.roomToken != currentRoomToken) {
@@ -209,11 +235,15 @@ class HostGameUseCase(
                         Pair(false, null)
                     } else {
                         val assignedTeam = assignedPlayerSeats[envelope.senderId] ?: assignBalancedTeam()
-                        val player = existingPlayer?.copy(name = joinReq.playerName) ?: Player(
+                        val player = existingPlayer?.copy(
+                            name = joinReq.playerName,
+                            avatarId = joinReq.avatarId
+                        ) ?: Player(
                             id = envelope.senderId,
                             name = joinReq.playerName,
                             team = assignedTeam,
-                            isHost = false
+                            isHost = false,
+                            avatarId = joinReq.avatarId
                         )
                         assignedPlayerSeats[player.id] = player.team
 
@@ -284,6 +314,13 @@ class HostGameUseCase(
                 )
                 socketServer.sendToClient(clientId, response)
                 broadcastCurrentState()
+
+                connectingPlayerResetJob?.cancel()
+                connectingPlayerResetJob = useCaseScope?.launch {
+                    setConnectingPlayer("¡${newPlayer.name} se ha unido!")
+                    delay(2500L)
+                    setConnectingPlayer(null)
+                }
             }
 
             MessageType.ROOM_CONFIG_UPDATE -> {
@@ -465,6 +502,25 @@ class HostGameUseCase(
                 }
                 val isCounting = envelope.setCountingCards?.isCounting ?: false
                 setCountingCards(isCounting)
+            }
+
+            MessageType.UPDATE_PLAYER_PROFILE -> {
+                val profile = envelope.updatePlayerProfile ?: return
+                stateMutex.withLock {
+                    val updated = _gameState.value.connectedPlayers.map { p ->
+                        if (p.id == profile.playerId) {
+                            p.copy(
+                                name = profile.name ?: p.name,
+                                avatarId = profile.avatarId ?: p.avatarId
+                            )
+                        } else p
+                    }
+                    _gameState.value = _gameState.value.copy(
+                        version = _gameState.value.version + 1,
+                        connectedPlayers = updated
+                    )
+                }
+                broadcastCurrentState()
             }
 
             else -> {}
@@ -1124,6 +1180,92 @@ class HostGameUseCase(
 
             _gameState.value = current.copy(
                 connectedPlayers = updatedPlayers,
+                version = current.version + 1
+            )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun updatePlayerAvatar(playerId: String, avatarId: String) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            val updatedPlayers = current.connectedPlayers.map {
+                if (it.id == playerId) it.copy(avatarId = avatarId) else it
+            }
+            _gameState.value = current.copy(
+                connectedPlayers = updatedPlayers,
+                version = current.version + 1
+            )
+        }
+        broadcastCurrentState()
+    }
+
+    suspend fun godModeUpdate(
+        scoreA: Int? = null,
+        scoreB: Int? = null,
+        scoreC: Int? = null,
+        scoreD: Int? = null,
+        winsA: Int? = null,
+        winsB: Int? = null,
+        winsC: Int? = null,
+        winsD: Int? = null,
+        currentHand: Int? = null,
+        currentDeal: Int? = null,
+        dealerPlayerId: String? = null,
+        status: GameStatus? = null,
+        winnerTeam: Team? = null,
+        isCountingCards: Boolean? = null,
+        reason: String = "Ajuste manual del Anfitrión"
+    ) {
+        stateMutex.withLock {
+            val current = _gameState.value
+            val newScoreA = scoreA?.let { TeamScore.calculate(it) } ?: current.scoreTeamA
+            val newScoreB = scoreB?.let { TeamScore.calculate(it) } ?: current.scoreTeamB
+            val newScoreC = scoreC?.let { TeamScore.calculate(it) } ?: current.scoreTeamC
+            val newScoreD = scoreD?.let { TeamScore.calculate(it) } ?: current.scoreTeamD
+
+            val newWinsA = winsA?.coerceAtLeast(0) ?: current.winsTeamA
+            val newWinsB = winsB?.coerceAtLeast(0) ?: current.winsTeamB
+            val newWinsC = winsC?.coerceAtLeast(0) ?: current.winsTeamC
+            val newWinsD = winsD?.coerceAtLeast(0) ?: current.winsTeamD
+
+            val newHand = currentHand?.coerceAtLeast(1) ?: current.currentHand
+            val maxD = getMaxDeals(current.maxPlayers)
+            val newDeal = currentDeal?.coerceIn(1, maxD) ?: current.currentDeal
+            val newDealer = dealerPlayerId ?: current.dealerPlayerId
+            val newStatus = status ?: current.status
+            val newWinner = if (status == GameStatus.FINISHED) (winnerTeam ?: current.winnerTeam) else if (status != null && status != GameStatus.FINISHED) null else current.winnerTeam
+            val newIsCounting = isCountingCards ?: current.isCountingCards
+
+            val move = GameMove(
+                teamId = Team.TEAM_A,
+                deltaPiedras = 0,
+                reason = "⚡ Modo Dios: $reason",
+                previousTotalPiedras = current.scoreTeamA.totalPiedras,
+                newTotalPiedras = newScoreA.totalPiedras,
+                authorName = "Anfitrión 👑",
+                previousReserveTeams = current.reserveTeams,
+                dealNumber = newDeal,
+                handNumber = newHand,
+                previousDealerId = current.dealerPlayerId
+            )
+
+            _gameState.value = current.copy(
+                scoreTeamA = newScoreA,
+                scoreTeamB = newScoreB,
+                scoreTeamC = newScoreC,
+                scoreTeamD = newScoreD,
+                winsTeamA = newWinsA,
+                winsTeamB = newWinsB,
+                winsTeamC = newWinsC,
+                winsTeamD = newWinsD,
+                currentHand = newHand,
+                currentDeal = newDeal,
+                dealerPlayerId = newDealer,
+                status = newStatus,
+                winnerTeam = newWinner,
+                isCountingCards = newIsCounting,
+                moveHistory = current.moveHistory + move,
                 version = current.version + 1
             )
         }

@@ -64,6 +64,7 @@ class RondaAudioPlayer(private val context: Context) {
     private var activeMediaAfd: AssetFileDescriptor? = null
     private var sfxMediaAfd: AssetFileDescriptor? = null
     private var bgmPlaylist: List<String> = emptyList()
+    private val playedIndices = mutableListOf<Int>()
     private var currentBgmIndex = 0
     @Volatile
     private var lastBgmTrackStartTimeMs: Long = 0L
@@ -1126,11 +1127,13 @@ class RondaAudioPlayer(private val context: Context) {
                     "music/bgm_03.mp3",
                     "music/bgm_04.mp3",
                     "music/bgm_05.mp3",
-                    "music/bgm_06.mp3"
+                    "music/bgm_06.mp3",
+                    "music/bgm_07.mp3"
                 )
             }
 
             bgmPlaylist = allFiles.shuffled()
+            playedIndices.clear()
             Log.i(tag, "Playlist BGM cargada con ${bgmPlaylist.size} canciones: $bgmPlaylist")
             // Precarga en RAM sin tocar disco ni provocar colisiones concurrentes
             audioScope.launch {
@@ -1148,20 +1151,26 @@ class RondaAudioPlayer(private val context: Context) {
                 "music/bgm_03.mp3",
                 "music/bgm_04.mp3",
                 "music/bgm_05.mp3",
-                "music/bgm_06.mp3"
+                "music/bgm_06.mp3",
+                "music/bgm_07.mp3"
             ).shuffled()
+            playedIndices.clear()
         }
     }
 
     private fun pickNextRandomIndex(): Int {
         if (bgmPlaylist.isEmpty()) return 0
         if (bgmPlaylist.size == 1) return 0
-        var next = Random.nextInt(bgmPlaylist.size)
-        var attempts = 0
-        while (next == currentBgmIndex && attempts < 10) {
-            next = Random.nextInt(bgmPlaylist.size)
-            attempts++
+        if (playedIndices.size >= bgmPlaylist.size) {
+            playedIndices.clear()
         }
+        val available = (0 until bgmPlaylist.size).filter { it !in playedIndices && it != currentBgmIndex }
+        val next = if (available.isNotEmpty()) {
+            available.random()
+        } else {
+            (0 until bgmPlaylist.size).filter { it != currentBgmIndex }.randomOrNull() ?: 0
+        }
+        playedIndices.add(next)
         return next
     }
 
