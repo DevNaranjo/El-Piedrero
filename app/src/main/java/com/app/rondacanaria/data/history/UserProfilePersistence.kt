@@ -22,9 +22,18 @@ class UserProfilePersistence(context: Context) {
         return prefs.getString(KEY_AVATAR_ID, AvatarCatalog.DEFAULT_AVATAR_ID) ?: AvatarCatalog.DEFAULT_AVATAR_ID
     }
 
+    fun hasCompletedTutorial(): Boolean {
+        return prefs.getBoolean(KEY_TUTORIAL_COMPLETED, false)
+    }
+
+    fun setTutorialCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_TUTORIAL_COMPLETED, completed).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "ronda_user_profile_prefs"
         private const val KEY_PLAYER_NAME = "user_player_name"
         private const val KEY_AVATAR_ID = "user_avatar_id"
+        private const val KEY_TUTORIAL_COMPLETED = "has_completed_tutorial_tour"
     }
 }

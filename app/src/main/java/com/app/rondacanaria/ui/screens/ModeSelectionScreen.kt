@@ -9,9 +9,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
+import com.app.rondacanaria.BuildConfig
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -20,6 +24,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.app.rondacanaria.ui.components.AppTutorialDialog
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.PrivacyPolicyDialog
 import com.app.rondacanaria.ui.components.TvCastDialog
@@ -56,6 +61,8 @@ fun ModeSelectionScreen(
     var showTvCastDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
+    var showGlobalAvatarDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     var localMaxPlayers by remember { mutableStateOf(4) }
     var localTeamA by remember { mutableStateOf("Equipo A") }
     var localTeamB by remember { mutableStateOf("Equipo B") }
@@ -85,8 +92,10 @@ fun ModeSelectionScreen(
     var editingAvatarIndex by remember { mutableStateOf<Int?>(null) }
 
     // Al pulsar atrás en el menú principal: cerrar diálogos abiertos en vez de salir de la app
-    BackHandler(enabled = showTvCastDialog || showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog) {
-        if (showTvCastDialog) {
+    BackHandler(enabled = showTvCastDialog || showAudioSettingsDialog || showLocalSetupDialog || showPrivacyDialog || showLicensesDialog || showGlobalAvatarDialog) {
+        if (showGlobalAvatarDialog) {
+            showGlobalAvatarDialog = false
+        } else if (showTvCastDialog) {
             showTvCastDialog = false
         } else if (showLicensesDialog) {
             showLicensesDialog = false
@@ -104,17 +113,100 @@ fun ModeSelectionScreen(
             TopAppBar(
                 title = { Text("El Piedrero 🃏", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { showPrivacyDialog = true }) {
-                        Icon(Icons.Default.Shield, contentDescription = "Privacidad y Uso de Datos")
+                    // Avatar del Jugador (acceso directo táctil)
+                    IconButton(
+                        onClick = { showGlobalAvatarDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        PlayerAvatarBadge(
+                            avatarId = uiState.selectedAvatarId,
+                            size = 32.dp,
+                            showBadges = false
+                        )
                     }
-                    IconButton(onClick = { showTvCastDialog = true }) {
-                        Icon(Icons.Default.Tv, contentDescription = "Transmitir a Smart TV")
-                    }
-                    IconButton(onClick = { showAudioSettingsDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido")
-                    }
-                    IconButton(onClick = { viewModel.goToHistory() }) {
+
+                    // Historial de Partidas
+                    IconButton(
+                        onClick = { viewModel.goToHistory() },
+                        modifier = Modifier.size(38.dp)
+                    ) {
                         Icon(Icons.Default.History, contentDescription = "Ver Historial")
+                    }
+
+                    // Ajustes y Accesibilidad
+                    IconButton(
+                        onClick = { showAudioSettingsDialog = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Ajustes de Sonido y Accesibilidad")
+                    }
+
+                    // Menú de 3 Puntos (Opciones avanzadas y Recorrido)
+                    Box {
+                        IconButton(
+                            onClick = { showMoreMenu = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Más opciones")
+                        }
+
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Guía de Uso / Recorrido 📖", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.MenuBook,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    viewModel.openTutorial()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Cambiar mi Avatar 🎴", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = {
+                                    PlayerAvatarBadge(
+                                        avatarId = uiState.selectedAvatarId,
+                                        size = 24.dp,
+                                        showBadges = false
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showGlobalAvatarDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Transmitir a Smart TV 📺", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.Tv, contentDescription = null) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showTvCastDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Privacidad y Datos 🛡️", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showPrivacyDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Licencias de Código Abierto ⚖️", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showLicensesDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = elPiedreroTopAppBarColors()
@@ -176,9 +268,50 @@ fun ModeSelectionScreen(
                 text = "Selecciona la modalidad para iniciar la mesa",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
+                modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
                 textAlign = TextAlign.Center
             )
+
+            // Chip interactivo de Perfil y Avatar del Jugador
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                onClick = { showGlobalAvatarDialog = true },
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    PlayerAvatarBadge(
+                        avatarId = uiState.selectedAvatarId,
+                        size = 36.dp,
+                        showBadges = false
+                    )
+                    Column {
+                        Text(
+                            text = if (uiState.playerName.isNotBlank()) uiState.playerName else "Mi Avatar Canario",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Toca para cambiar avatar",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editar avatar",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
 
             // Opción 1: Marcador Local (1 Dispositivo)
             ElevatedCard(
@@ -410,6 +543,18 @@ fun ModeSelectionScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Versión de la Aplicación
+            Text(
+                text = "El Piedrero v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 
@@ -516,69 +661,108 @@ fun ModeSelectionScreen(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        OutlinedTextField(
-                            value = localPlayerNames[0],
-                            onValueChange = { newN ->
-                                localPlayerNames = localPlayerNames.toMutableList().also { it[0] = newN }
-                                localTeamA = newN
-                            },
-                            label = { Text("Nombre Jugador 1") },
-                            placeholder = { Text("Jugador 1") },
-                            leadingIcon = {
+                        // Jugador 1
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                onClick = { editingAvatarIndex = 0 },
+                                modifier = Modifier.size(46.dp),
+                                shadowElevation = 2.dp,
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                            ) {
                                 PlayerAvatarBadge(
                                     avatarId = localPlayerAvatars[0],
                                     team = Team.TEAM_A,
-                                    size = 32.dp,
-                                    showBadges = false,
-                                    onClick = { editingAvatarIndex = 0 }
+                                    size = 46.dp,
+                                    showBadges = false
                                 )
-                            },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            }
 
-                        OutlinedTextField(
-                            value = localPlayerNames[1],
-                            onValueChange = { newN ->
-                                localPlayerNames = localPlayerNames.toMutableList().also { it[1] = newN }
-                                localTeamB = newN
-                            },
-                            label = { Text("Nombre Jugador 2") },
-                            placeholder = { Text("Jugador 2") },
-                            leadingIcon = {
+                            OutlinedTextField(
+                                value = localPlayerNames[0],
+                                onValueChange = { newN ->
+                                    localPlayerNames = localPlayerNames.toMutableList().also { it[0] = newN }
+                                    localTeamA = newN
+                                },
+                                label = { Text("Nombre Jugador 1") },
+                                placeholder = { Text("Jugador 1") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Jugador 2
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                onClick = { editingAvatarIndex = 1 },
+                                modifier = Modifier.size(46.dp),
+                                shadowElevation = 2.dp,
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary)
+                            ) {
                                 PlayerAvatarBadge(
                                     avatarId = localPlayerAvatars[1],
                                     team = Team.TEAM_B,
-                                    size = 32.dp,
-                                    showBadges = false,
-                                    onClick = { editingAvatarIndex = 1 }
+                                    size = 46.dp,
+                                    showBadges = false
                                 )
-                            },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            }
 
-                        if (localMaxPlayers == 3) {
                             OutlinedTextField(
-                                value = localPlayerNames[2],
+                                value = localPlayerNames[1],
                                 onValueChange = { newN ->
-                                    localPlayerNames = localPlayerNames.toMutableList().also { it[2] = newN }
-                                    localTeamC = newN
+                                    localPlayerNames = localPlayerNames.toMutableList().also { it[1] = newN }
+                                    localTeamB = newN
                                 },
-                                label = { Text("Nombre Jugador 3") },
-                                placeholder = { Text("Jugador 3") },
-                                leadingIcon = {
+                                label = { Text("Nombre Jugador 2") },
+                                placeholder = { Text("Jugador 2") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Jugador 3 (si Trío)
+                        if (localMaxPlayers == 3) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    onClick = { editingAvatarIndex = 2 },
+                                    modifier = Modifier.size(46.dp),
+                                    shadowElevation = 2.dp,
+                                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary)
+                                ) {
                                     PlayerAvatarBadge(
                                         avatarId = localPlayerAvatars[2],
                                         team = Team.TEAM_C,
-                                        size = 32.dp,
-                                        showBadges = false,
-                                        onClick = { editingAvatarIndex = 2 }
+                                        size = 46.dp,
+                                        showBadges = false
                                     )
-                                },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                                }
+
+                                OutlinedTextField(
+                                    value = localPlayerNames[2],
+                                    onValueChange = { newN ->
+                                        localPlayerNames = localPlayerNames.toMutableList().also { it[2] = newN }
+                                        localTeamC = newN
+                                    },
+                                    label = { Text("Nombre Jugador 3") },
+                                    placeholder = { Text("Jugador 3") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     } else {
                         // 4, 6 u 8 Jugadores
@@ -638,45 +822,71 @@ fun ModeSelectionScreen(
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        OutlinedTextField(
-                                            value = localPlayerNames[idx1],
-                                            onValueChange = { newN ->
-                                                localPlayerNames = localPlayerNames.toMutableList().also { it[idx1] = newN }
-                                            },
-                                            label = { Text("Jugador 1") },
-                                            placeholder = { Text("Jugador ${idx1 + 1}") },
-                                            leadingIcon = {
+                                        // Jugador 1 del equipo
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                onClick = { editingAvatarIndex = idx1 },
+                                                modifier = Modifier.size(40.dp),
+                                                shadowElevation = 1.dp,
+                                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                                            ) {
                                                 PlayerAvatarBadge(
                                                     avatarId = localPlayerAvatars[idx1],
-                                                    size = 28.dp,
-                                                    showBadges = false,
-                                                    onClick = { editingAvatarIndex = idx1 }
+                                                    size = 40.dp,
+                                                    showBadges = false
                                                 )
-                                            },
-                                            singleLine = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                            }
 
-                                        OutlinedTextField(
-                                            value = localPlayerNames[idx2],
-                                            onValueChange = { newN ->
-                                                localPlayerNames = localPlayerNames.toMutableList().also { it[idx2] = newN }
-                                            },
-                                            label = { Text("Jugador 2") },
-                                            placeholder = { Text("Jugador ${idx2 + 1}") },
-                                            leadingIcon = {
+                                            OutlinedTextField(
+                                                value = localPlayerNames[idx1],
+                                                onValueChange = { newN ->
+                                                    localPlayerNames = localPlayerNames.toMutableList().also { it[idx1] = newN }
+                                                },
+                                                label = { Text("J1") },
+                                                placeholder = { Text("Jugador ${idx1 + 1}") },
+                                                singleLine = true,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+
+                                        // Jugador 2 del equipo
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                onClick = { editingAvatarIndex = idx2 },
+                                                modifier = Modifier.size(40.dp),
+                                                shadowElevation = 1.dp,
+                                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                                            ) {
                                                 PlayerAvatarBadge(
                                                     avatarId = localPlayerAvatars[idx2],
-                                                    size = 28.dp,
-                                                    showBadges = false,
-                                                    onClick = { editingAvatarIndex = idx2 }
+                                                    size = 40.dp,
+                                                    showBadges = false
                                                 )
-                                            },
-                                            singleLine = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                            }
+
+                                            OutlinedTextField(
+                                                value = localPlayerNames[idx2],
+                                                onValueChange = { newN ->
+                                                    localPlayerNames = localPlayerNames.toMutableList().also { it[idx2] = newN }
+                                                },
+                                                label = { Text("J2") },
+                                                placeholder = { Text("Jugador ${idx2 + 1}") },
+                                                singleLine = true,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -910,7 +1120,29 @@ fun ModeSelectionScreen(
             onDealReminderSecondsChange = { viewModel.setDealReminderSeconds(it) },
             onThemeModeChange = { viewModel.setThemeMode(it) },
             onSkipSong = { viewModel.skipSong() },
+            onOpenTutorial = {
+                showAudioSettingsDialog = false
+                viewModel.openTutorial()
+            },
             onDismiss = { showAudioSettingsDialog = false }
+        )
+    }
+
+    if (showGlobalAvatarDialog) {
+        AvatarSelectionDialog(
+            currentAvatarId = uiState.selectedAvatarId,
+            title = "Elige tu Avatar Canario 🎴",
+            onAvatarSelected = { newAvatarId ->
+                viewModel.selectAvatar(newAvatarId)
+            },
+            onDismissRequest = { showGlobalAvatarDialog = false }
+        )
+    }
+
+    if (uiState.showTutorialDialog) {
+        AppTutorialDialog(
+            onDismissRequest = { viewModel.dismissTutorial() },
+            onComplete = { viewModel.completeTutorial() }
         )
     }
 

@@ -44,6 +44,7 @@ fun ModernPlayerScoreCard(
     isSelected: Boolean,
     canModify: Boolean = true,
     isCompact: Boolean = false,
+    playerAvatars: List<String> = emptyList(),
     onSelect: () -> Unit = {},
     onManualAdjust: (Int) -> Unit,
     onCustomAdjustClick: (() -> Unit)? = null
@@ -96,12 +97,28 @@ fun ModernPlayerScoreCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Cabecera: Nombre de Equipo + Candado si es rival
+            // Cabecera: Avatares + Nombre de Equipo + Candado si es rival
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                if (playerAvatars.isNotEmpty()) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy((-6).dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        playerAvatars.forEach { avId ->
+                            PlayerAvatarBadge(
+                                avatarId = avId,
+                                size = if (isCompact) 20.dp else 24.dp,
+                                showBadges = false
+                            )
+                        }
+                    }
+                }
+
                 AutoResizedText(
                     text = teamName,
                     targetFontSize = if (isCompact) 14.sp else 16.sp,

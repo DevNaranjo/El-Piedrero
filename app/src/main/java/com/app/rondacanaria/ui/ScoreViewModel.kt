@@ -63,7 +63,8 @@ data class ScoreUiState(
     val fontScale: Float = AccessibilityPersistence.FONT_SCALE_NORMAL,
     val isDealReminderEnabled: Boolean = true,
     val dealReminderSeconds: Int = AccessibilityPersistence.DEFAULT_DEAL_REMINDER_SECONDS,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val showTutorialDialog: Boolean = false
 )
 
 class ScoreViewModel(
@@ -97,7 +98,8 @@ class ScoreViewModel(
             fontScale = accessibilityPersistence.loadFontScale(),
             isDealReminderEnabled = accessibilityPersistence.loadDealReminderEnabled(),
             dealReminderSeconds = accessibilityPersistence.loadDealReminderSeconds(),
-            themeMode = accessibilityPersistence.loadThemeMode()
+            themeMode = accessibilityPersistence.loadThemeMode(),
+            showTutorialDialog = !userProfilePersistence.hasCompletedTutorial()
         )
     )
     val uiState: StateFlow<ScoreUiState> = _uiState.asStateFlow()
@@ -480,6 +482,20 @@ class ScoreViewModel(
             clientUseCase.requestUpdateProfile(newAvatarId = avatarId)
         }
     }
+
+    fun openTutorial() {
+        _uiState.update { it.copy(showTutorialDialog = true) }
+    }
+
+    fun completeTutorial() {
+        userProfilePersistence.setTutorialCompleted(true)
+        _uiState.update { it.copy(showTutorialDialog = false) }
+    }
+
+    fun dismissTutorial() {
+        _uiState.update { it.copy(showTutorialDialog = false) }
+    }
+
 
     fun setRoomConfig(
         teamA: String,

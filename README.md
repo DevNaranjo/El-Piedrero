@@ -20,7 +20,14 @@ Permite jugar con un solo teléfono en el centro de la mesa o sincronizar las pi
 
 > **Actualización enfocada en optimizar y pulir la interfaz gráfica del marcador:** animaciones fluidas en la transición de piedras malas a buenas, mejoras de accesibilidad táctil para personas mayores, microinteracciones hápticas avanzadas y personalización de temas y avatares de equipo.
 
-* 🎭 **Sistema de Avatares Temáticos Canarios (13 Avatares Autóctonos):**
+* 📖 **Recorrido Guiado Interactivo (Onboarding) y Menú de 3 Puntos (⋮):**
+  * **Tutorial paso a paso:** Recorrido visual y accesible para aprender a usar la app, las reglas del tanteo (malas, buenas, chicos), cantos y turnos de reparto. Se ejecuta automáticamente en el primer inicio.
+  * **Acceso permanente:** Disponible en cualquier momento desde el menú de 3 puntos (⋮), en la barra superior y desde el diálogo de Ajustes y Accesibilidad.
+  * **Indicador de Versión:** Visualización clara de la versión y compilación de la app al pie del menú de inicio.
+* 🎭 **Sistema de Avatares Temáticos Canarios (13 Avatares Autóctonos) y Accesibilidad Táctil:**
+  * **Visualización en el Marcador:** Cada tarjeta de equipo (`ModernPlayerScoreCard`) muestra los avatares superpuestos de sus integrantes durante la partida.
+  * **Chip de Perfil en Pantalla Principal:** Acceso directo con un solo toque desde la pantalla de inicio para cambiar de avatar sin necesidad de entrar a una sala multijugador.
+  * **Ergonomía Táctil en Partida Local:** Botones circulares táctiles grandes (46 dp) independientes del campo de texto, eliminando cualquier conflicto con el teclado virtual de Android.
   * **Catálogo identitario de 13 figuras:** *El Piedrero 🪨, El Tahúr 🃏, El Mago 👒, El Lagarto 🦎, El Bardino 🐕, El Mencey 👑, El Palmero 🌴, El Costero 🎣, El Majo 🥣, El Guayota 🌋, El Cernícalo 🦅, La Romera 💃 y El Sabio 🧔*.
   * **Insignias reactivas (`PlayerAvatarBadge`):** Borde coloreado según el equipo (Equipo A, B, C, D, Reserva o Espectador) con distintivos dinámicos de Líder 👑 y Repartidor 🃏.
   * **Selector interactivo (`AvatarSelectionDialog`):** Selección ágil tanto en multijugador como en local para cada jugador (mesas de 2, 3, 4, 6 y 8).

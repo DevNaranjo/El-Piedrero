@@ -14,6 +14,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,6 +43,7 @@ import com.app.rondacanaria.ui.ScoreUiState
 import com.app.rondacanaria.ui.ScoreViewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.delay
+import com.app.rondacanaria.ui.components.AppTutorialDialog
 import com.app.rondacanaria.ui.components.AudioSettingsDialog
 import com.app.rondacanaria.ui.components.AutoResizedText
 import com.app.rondacanaria.ui.components.CustomizeButtonsDialog
@@ -296,6 +298,19 @@ fun ScoreBoardScreen(
     val showTeamC = hasTeamC && !isTeamCReserve
     val showTeamD = hasTeamD && !isTeamDReserve
 
+    val avatarsTeamA = remember(gameState.connectedPlayers) {
+        gameState.connectedPlayers.filter { it.team == Team.TEAM_A }.mapNotNull { it.avatarId }
+    }
+    val avatarsTeamB = remember(gameState.connectedPlayers) {
+        gameState.connectedPlayers.filter { it.team == Team.TEAM_B }.mapNotNull { it.avatarId }
+    }
+    val avatarsTeamC = remember(gameState.connectedPlayers) {
+        gameState.connectedPlayers.filter { it.team == Team.TEAM_C }.mapNotNull { it.avatarId }
+    }
+    val avatarsTeamD = remember(gameState.connectedPlayers) {
+        gameState.connectedPlayers.filter { it.team == Team.TEAM_D }.mapNotNull { it.avatarId }
+    }
+
     val isReserve = isMultiplayer && (effectiveMyTeam == Team.RESERVE || effectiveReserveTeams.contains(effectiveMyTeam))
     val isAtMaxDeals = gameState.currentDeal >= maxDeals
 
@@ -485,6 +500,20 @@ fun ScoreBoardScreen(
                             expanded = showSettingsMenu,
                             onDismissRequest = { showSettingsMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Guía de Juego y Marcador 📖", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.MenuBook,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    viewModel.openTutorial()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Ajustes y Accesibilidad", fontWeight = FontWeight.SemiBold) },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
@@ -942,6 +971,7 @@ fun ScoreBoardScreen(
                         isSelected = selectedTeamForCanto == Team.TEAM_A,
                         isCompact = isCompactCards,
                         canModify = canModifyA,
+                        playerAvatars = avatarsTeamA,
                         onSelect = { if (canModifyA) selectedTeamForCanto = Team.TEAM_A },
                         onManualAdjust = { delta -> viewModel.manualScoreChange(Team.TEAM_A, delta, if (delta > 0) "+1 piedra manual" else "-1 piedra manual") },
                         onCustomAdjustClick = { if (canModifyA) customAdjustTeam = Team.TEAM_A }
@@ -958,6 +988,7 @@ fun ScoreBoardScreen(
                         isSelected = selectedTeamForCanto == Team.TEAM_B,
                         isCompact = isCompactCards,
                         canModify = canModifyB,
+                        playerAvatars = avatarsTeamB,
                         onSelect = { if (canModifyB) selectedTeamForCanto = Team.TEAM_B },
                         onManualAdjust = { delta -> viewModel.manualScoreChange(Team.TEAM_B, delta, if (delta > 0) "+1 piedra manual" else "-1 piedra manual") },
                         onCustomAdjustClick = { if (canModifyB) customAdjustTeam = Team.TEAM_B }
@@ -974,6 +1005,7 @@ fun ScoreBoardScreen(
                         isSelected = selectedTeamForCanto == Team.TEAM_C,
                         isCompact = isCompactCards,
                         canModify = canModifyC,
+                        playerAvatars = avatarsTeamC,
                         onSelect = { if (canModifyC) selectedTeamForCanto = Team.TEAM_C },
                         onManualAdjust = { delta -> viewModel.manualScoreChange(Team.TEAM_C, delta, if (delta > 0) "+1 piedra manual" else "-1 piedra manual") },
                         onCustomAdjustClick = { if (canModifyC) customAdjustTeam = Team.TEAM_C }
@@ -990,6 +1022,7 @@ fun ScoreBoardScreen(
                         isSelected = selectedTeamForCanto == Team.TEAM_D,
                         isCompact = isCompactCards,
                         canModify = canModifyD,
+                        playerAvatars = avatarsTeamD,
                         onSelect = { if (canModifyD) selectedTeamForCanto = Team.TEAM_D },
                         onManualAdjust = { delta -> viewModel.manualScoreChange(Team.TEAM_D, delta, if (delta > 0) "+1 piedra manual" else "-1 piedra manual") },
                         onCustomAdjustClick = { if (canModifyD) customAdjustTeam = Team.TEAM_D }
@@ -1494,7 +1527,18 @@ fun ScoreBoardScreen(
                 showAudioSettingsDialog = false
                 showCustomizeButtonsDialog = true
             },
+            onOpenTutorial = {
+                showAudioSettingsDialog = false
+                viewModel.openTutorial()
+            },
             onDismiss = { showAudioSettingsDialog = false }
+        )
+    }
+
+    if (uiState.showTutorialDialog) {
+        AppTutorialDialog(
+            onDismissRequest = { viewModel.dismissTutorial() },
+            onComplete = { viewModel.completeTutorial() }
         )
     }
 
